@@ -75,6 +75,12 @@ def _load_metadata() -> list[dict]:
         ]
     return data
 
+BROWSE_TRIGGERS = [
+    "available videos", "all videos", "list videos", "what videos",
+    "show videos", "what do you have", "everything", "full list",
+    "what's indexed", "what is indexed", "show me everything",
+    "browse", "what can i ask", "indexed videos",
+]
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Tool 1: RAGRetrieverTool
@@ -207,8 +213,9 @@ class VideoMetadataTool(BaseTool):
         query_lower = query.lower().strip()
 
         # 'all' → return full catalog
-        if query_lower == "all":
+        if query_lower == "all" or any(trigger in query_lower for trigger in BROWSE_TRIGGERS):
             matches = videos
+                    
         else:
             matches = [
                 v for v in videos
@@ -243,7 +250,8 @@ class VideoMetadataTool(BaseTool):
             )
 
         # Format results
-        lines = [f"METADATA RESULT: Found {len(matches)} video(s) matching '{query}':\n"]
+        label = "in the catalog" if any(t in query_lower for t in BROWSE_TRIGGERS) else f"matching '{query}'"
+        lines = [f"METADATA RESULT: Found {len(matches)} video(s) {label}:\n"]
         for v in matches:
             video_id = v.get("video_id", "")
             title    = v.get("title",    "Unknown")

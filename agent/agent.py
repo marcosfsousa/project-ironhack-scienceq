@@ -1,42 +1,49 @@
 """
 agent.py
 --------
-LangGraph agent entry point for the YouTube QA Bot.
+LangGraph agent for YouTube QA.
+
+Graph: [START] → classify_intent → [rag | metadata | ingest] → respond → [END]
 
 Architecture:
-  - Hardcoded RAG-first routing: always calls RAGRetrieverTool first
-  - Falls back to VideoMetadataTool for catalog/listing queries
-  - ConversationBufferWindowMemory (5 turns) per session
-  - LangSmith tracing via environment variables (set in rag_chain.py)
+  - Three-way intent routing (classify_intent node, keyword-based, zero LLM cost):
+      URL detected       → ingest_node  (live_ingest pipeline)
+      Metadata keywords  → metadata_node (VideoMetadataTool)
+      Everything else    → rag_node (RAGRetrieverTool, multi_namespace=True)
+  - Custom ConversationMemory (5-turn sliding window) from memory.py
+  - LangSmith tracing configured via .env (LANGSMITH_TRACING, LANGSMITH_ENDPOINT)
 
-Graph structure:
-  [START] → classify_intent → [rag_node | metadata_node] → respond → [END]
+Key classes:
+  YouTubeQAAgent  — owns graph + memory + tools per session.
+                    Use one instance per browser session (store in st.session_state).
 
-Routing logic:
-  - METADATA queries: "what videos", "list", "do you have", "what topics",
-                      "which channels", "what's available"
-  - Everything else  → RAG (default)
+CLI:
+  python agent.py
+  Commands during interactive session:
+    reset   — clear conversation memory
+    sources — show source chunks from last RAG answer
+    quit    — exit
 
-Usage:
-  python agent.py          # interactive loop, corpus namespace
-  python agent.py --debug  # prints full retrieved context per turn
+Changes from Day 3:
+  - Added 'ingest' intent classification and ingest node
+  - multi_namespace=True by default (corpus + live queried together)
+  - ingest_url() imported from pipeline/live_ingest.py
+  - Last ingest result stored on agent for Streamlit access
 """
 
 from __future__ import annotations
 
-import argparse
 import logging
 import os
-from typing import Annotated, TypedDict
+import re
+import sys
+from pathlib import Path
+from typing import Any
+from dataclasses import dataclass, field
 
-from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage
-from langgraph.graph import END, START, StateGraph
-from langgraph.graph.message import add_messages
+from dotenv import load_dotenv                         # metadata resolution fallback
 
-from memory import create_memory
-from tools import get_tools, RAGRetrieverTool, VideoMetadataTool
-from retriever import PINECONE_NAMESPACE_CORPUS
+load_dotenv()
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -46,359 +53,429 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-load_dotenv()
+# ── Path setup ─────────────────────────────────────────────────────────────────
+_ROOT = Path(__file__).resolve().parent.parent
+_PIPELINE_DIR = _ROOT / "pipeline"
+_AGENT_DIR    = _ROOT / "agent"
 
-# ── Intent classification ──────────────────────────────────────────────────────
+for p in [str(_PIPELINE_DIR), str(_AGENT_DIR)]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
-# Keywords that signal a metadata/catalog query rather than a factual question
+# ── Local imports ──────────────────────────────────────────────────────────────
+from rag_chain import answer, stream_answer, RAGResponse  # noqa: E402
+from memory import ConversationMemory                      # noqa: E402
+from tools import get_tools                                # noqa: E402
+from live_ingest import ingest_url, IngestResult           # noqa: E402
+
+# ── LangGraph / LangChain ──────────────────────────────────────────────────────
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langgraph.graph import StateGraph, START, END
+from typing_extensions import TypedDict
+
+# ── Intent keywords ────────────────────────────────────────────────────────────
+
 METADATA_INTENT_KEYWORDS = [
-    "what videos",
-    "which videos",
-    "list videos",
-    "what topics",
-    "which topics",
-    "what channels",
-    "which channels",
-    "do you have",
-    "what do you have",
-    "what's available",
-    "what is available",
-    "show me videos",
-    "browse",
-    "catalog",
+    # original
+    "what videos", "which videos", "list videos", "show videos",
+    "what topics", "what channels", "catalog", "what do you know about",
+    "what's in", "what is in", "available videos", "indexed videos",
+    # additions
+    "what do you have", "full list", "everything you have",
+    "what's indexed", "what is indexed", "all videos",
+    "show me everything", "browse", "what can i ask",
 ]
 
-
-RESOLVE_SYSTEM = (
-    "You are a query resolver. Given a conversation history and a metadata query, "
-    "extract the specific topic, channel, or keyword the user is asking about. "
-    "Return ONLY the resolved search term (e.g. 'Physics', 'Veritasium', 'neural networks'). "
-    "No explanation, no preamble."
+# Matches any YouTube URL pattern
+_YT_URL_PATTERN = re.compile(
+    r"(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[A-Za-z0-9_-]{11}"
 )
-
-
-def resolve_metadata_query(question: str, history: list) -> str:
-    """
-    Resolve a vague metadata query like 'what videos do you have about that topic?'
-    into a concrete search term using conversation history.
-
-    Uses llama-3.1-8b-instant (separate Groq rate limit bucket).
-    Falls back to original question on any error.
-    """
-    if not history:
-        return question
-
-    history_text = ""
-    for msg in history:
-        role = "Human" if msg.__class__.__name__ == "HumanMessage" else "Assistant"
-        history_text += f"{role}: {msg.content}\n"
-
-    user_prompt = (
-        f"Conversation history:\n{history_text.strip()}\n\n"
-        f"Metadata query: {question}\n"
-        f"Resolved search term:"
-    )
-
-    try:
-        from langchain_groq import ChatGroq
-        from langchain_core.messages import HumanMessage as HMsg, SystemMessage as SMsg
-        llm = ChatGroq(
-            api_key=os.getenv("GROQ_API_KEY", ""),
-            model="llama-3.1-8b-instant",
-            temperature=0.0,
-            max_tokens=32,
-        )
-        response = llm.invoke([SMsg(content=RESOLVE_SYSTEM), HMsg(content=user_prompt)])
-        resolved = response.content.strip()
-        if resolved and resolved != question:
-            log.info(f"Metadata query resolved: {question!r} -> {resolved!r}")
-        return resolved or question
-    except Exception as e:
-        log.warning(f"Metadata resolve failed ({e}) — using original query.")
-        return question
-
-
-def classify_intent(question: str) -> str:
-    """
-    Classify whether a question needs RAG retrieval or metadata lookup.
-
-    Returns:
-      "metadata"  — question is about what's in the library
-      "rag"       — question is about content/concepts (default)
-    """
-    q = question.lower().strip()
-    if any(kw in q for kw in METADATA_INTENT_KEYWORDS):
-        return "metadata"
-    return "rag"
 
 
 # ── LangGraph state ────────────────────────────────────────────────────────────
 
 class AgentState(TypedDict):
-    question:    str
-    answer:      str
-    intent:      str
-    tool_output: str
-    messages:    Annotated[list[BaseMessage], add_messages]
+    messages:     list        # full conversation so far as LangChain message objects
+    question:     str         # current user question / raw input
+    intent:       str         # 'rag' | 'metadata' | 'ingest'
+    answer:       str         # final answer to return to user
+    rag_response: Any         # RAGResponse or None
 
 
-# ── Graph nodes ────────────────────────────────────────────────────────────────
+# ── Intent classification ──────────────────────────────────────────────────────
 
-def make_classify_node(debug: bool = False):
-    def classify_node(state: AgentState) -> AgentState:
-        intent = classify_intent(state["question"])
-        log.info(f"Intent classified: {intent!r} for question: {state['question']!r}")
-        return {**state, "intent": intent}
-    return classify_node
-
-
-def make_rag_node(rag_tool: RAGRetrieverTool, debug: bool = False):
-    def rag_node(state: AgentState) -> AgentState:
-        log.info("Routing to RAGRetrieverTool")
-        tool_output = rag_tool._run(state["question"])
-        if debug:
-            print(f"\n[DEBUG] RAG tool output:\n{tool_output}\n")
-        # Extract just the answer portion for the final response
-        answer = _extract_answer(tool_output)
-        return {**state, "tool_output": tool_output, "answer": answer}
-    return rag_node
-
-
-def make_metadata_node(metadata_tool: VideoMetadataTool, debug: bool = False):
-    def metadata_node(state: AgentState) -> AgentState:
-        log.info("Routing to VideoMetadataTool")
-        # Resolve vague references using conversation history
-        history = state.get("messages", [])
-        resolved_query = resolve_metadata_query(state["question"], history)
-        tool_output = metadata_tool._run(resolved_query)
-        if debug:
-            print(f"\n[DEBUG] Metadata tool output:\n{tool_output}\n")
-        # Strip internal prefix — not meant for end users
-        display = tool_output
-        for prefix in ("METADATA RESULT: ", "METADATA RESULT:\n"):
-            if display.startswith(prefix):
-                display = display[len(prefix):]
-                break
-        return {**state, "tool_output": tool_output, "answer": display}
-    return metadata_node
-
-
-def make_respond_node():
-    def respond_node(state: AgentState) -> AgentState:
-        """Final node — answer is already set by the tool node. Pass through."""
-        return state
-    return respond_node
-
-
-# ── Routing function ───────────────────────────────────────────────────────────
-
-def route_intent(state: AgentState) -> str:
-    """LangGraph conditional edge — routes based on classified intent."""
-    return state.get("intent", "rag")
-
-
-# ── Answer extraction ──────────────────────────────────────────────────────────
-
-def _extract_answer(tool_output: str) -> str:
+def classify_intent(state: AgentState) -> AgentState:
     """
-    Extract the clean answer text from RAGRetrieverTool's formatted output.
-    Strips the 'RETRIEVAL RESULT:' header and 'Sources:' footer for display.
+    Zero-cost keyword routing. Order matters:
+      1. URL detected → 'ingest'
+      2. Metadata keywords → 'metadata'
+      3. Everything else → 'rag'
     """
-    if "RETRIEVAL RESULT: No relevant content" in tool_output:
-        # Return the response line directly
-        for line in tool_output.splitlines():
-            if line.startswith("Response:"):
-                return line.replace("Response:", "").strip()
-        return tool_output
+    question = state["question"].lower().strip()
 
-    # Extract the Answer block
-    if "Answer:\n" in tool_output and "\n\nSources:" in tool_output:
-        answer_start = tool_output.index("Answer:\n") + len("Answer:\n")
-        answer_end   = tool_output.index("\n\nSources:")
-        return tool_output[answer_start:answer_end].strip()
+    if _YT_URL_PATTERN.search(state["question"]):
+        intent = "ingest"
+    elif any(kw in question for kw in METADATA_INTENT_KEYWORDS):
+        intent = "metadata"
+    else:
+        intent = "rag"
 
-    # Fallback — return full output
-    return tool_output
+    log.info(f"Intent classified: {intent}")
+    return {**state, "intent": intent}
 
 
-def _extract_sources(tool_output: str) -> str:
-    """Extract the Sources block from RAGRetrieverTool output for display."""
-    if "\n\nSources:\n" in tool_output:
-        return tool_output.split("\n\nSources:\n", 1)[1].strip()
-    return ""
+def _route_after_classify(state: AgentState) -> str:
+    return state["intent"]
 
 
-# ── Agent class ────────────────────────────────────────────────────────────────
+# ── RAG node ───────────────────────────────────────────────────────────────────
+
+def rag_node(state: AgentState) -> AgentState:
+    """
+    Call rag_chain.answer() with the current question + conversation history.
+    multi_namespace=True queries both corpus and live namespaces.
+    """
+    history  = state["messages"][:-1]  # exclude current HumanMessage
+    response: RAGResponse = answer(
+        question        = state["question"],
+        history         = history,
+        multi_namespace = True,
+    )
+    return {
+        **state,
+        "answer":       response.answer,
+        "rag_response": response,
+    }
+
+
+# ── Metadata node ──────────────────────────────────────────────────────────────
+
+def metadata_node(state: AgentState) -> AgentState:
+    """
+    Use VideoMetadataTool to answer catalog/listing queries.
+    Falls back gracefully if metadata.json is missing.
+    Resolves vague references ("that topic") using history + fast LLM.
+    """
+    tools      = get_tools()
+    meta_tool  = next(t for t in tools if t.name == "video_metadata")
+    question   = state["question"]
+
+    # History-aware resolution: if question contains vague references,
+    # ask the fast LLM to produce a concrete search term
+    history = state["messages"][:-1]
+    if history and any(
+        phrase in question.lower()
+        for phrase in ["that topic", "that video", "those videos", "it", "them", "that"]
+    ):
+        try:
+            from groq import Groq
+            client = Groq(api_key=os.environ["GROQ_API_KEY"])
+            history_text = "\n".join(
+                f"{'User' if isinstance(m, HumanMessage) else 'Bot'}: {m.content}"
+                for m in history[-6:]
+            )
+            prompt = (
+                f"Given this conversation:\n{history_text}\n\n"
+                f"The user now asks: \"{question}\"\n"
+                "What concrete topic or video title are they referring to? "
+                "Reply with only the search term, nothing else."
+            )
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=20,
+                temperature=0.0,
+            )
+            resolved = resp.choices[0].message.content.strip()
+            log.info(f"Metadata query resolved: '{question}' → '{resolved}'")
+            question = resolved
+        except Exception as e:
+            log.warning(f"Metadata resolution failed, using original query: {e}")
+
+    raw_result = meta_tool.run(question)
+    # Strip internal prefix if present
+    answer_text = re.sub(r"^METADATA RESULT:\s*", "", raw_result, flags=re.IGNORECASE)
+
+    return {**state, "answer": answer_text, "rag_response": None}
+
+
+# ── Ingest node ────────────────────────────────────────────────────────────────
+
+def ingest_node(state: AgentState) -> AgentState:
+    """
+    Extract the YouTube URL from the user's message, run live_ingest.ingest_url(),
+    and return a natural-language status message as the answer.
+    """
+    raw_message = state["question"]
+
+    # Pull the URL out of the message (user may write "analyse this: <url>")
+    url_match = _YT_URL_PATTERN.search(raw_message)
+    if not url_match:
+        return {
+            **state,
+            "answer": "I couldn't find a valid YouTube URL in your message. Please paste the full URL.",
+            "rag_response": None,
+        }
+
+    url = url_match.group(0)
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    log.info(f"Ingesting URL: {url}")
+    result: IngestResult = ingest_url(url)
+
+    if result.already_indexed:
+        answer_text = (
+            f"I already have **{result.title or result.video_id}** in my knowledge base. "
+            "You can ask questions about it now."
+        )
+    elif result.success:
+        answer_text = (
+            f"✅ Done! I've ingested **{result.title}** by {result.channel} "
+            f"({result.chunk_count} chunks indexed under topic: {result.topic}). "
+            "You can now ask me questions about this video."
+        )
+    else:
+        answer_text = f"❌ Ingestion failed: {result.error}"
+
+    return {
+        **state,
+        "answer":       answer_text,
+        "rag_response": None,
+        "_last_ingest": result,  # available on state for Streamlit to inspect
+    }
+
+
+# ── Respond node ───────────────────────────────────────────────────────────────
+
+def respond_node(state: AgentState) -> AgentState:
+    """
+    Passthrough — answer is already assembled by the routing node.
+    Exists as an explicit termination point so the graph topology is clear.
+    """
+    return state
+
+
+# ── Graph construction ─────────────────────────────────────────────────────────
+
+def _build_graph() -> Any:
+    builder = StateGraph(AgentState)
+
+    builder.add_node("classify_intent", classify_intent)
+    builder.add_node("rag",             rag_node)
+    builder.add_node("metadata",        metadata_node)
+    builder.add_node("ingest",          ingest_node)
+    builder.add_node("respond",         respond_node)
+
+    builder.add_edge(START, "classify_intent")
+    builder.add_conditional_edges(
+        "classify_intent",
+        _route_after_classify,
+        {"rag": "rag", "metadata": "metadata", "ingest": "ingest"},
+    )
+    builder.add_edge("rag",      "respond")
+    builder.add_edge("metadata", "respond")
+    builder.add_edge("ingest",   "respond")
+    builder.add_edge("respond",  END)
+
+    return builder.compile()
+
+
+# ── Public agent class ─────────────────────────────────────────────────────────
 
 class YouTubeQAAgent:
     """
-    LangGraph-based agent for YouTube video question answering.
+    One instance per user session. Store in st.session_state in Streamlit.
 
-    Each instance owns its own:
-      - LangGraph compiled graph
-      - Conversation memory (5-turn window)
-      - Tool instances (RAGRetrieverTool, VideoMetadataTool)
-
-    Create one instance per user session.
+    Usage:
+        agent = YouTubeQAAgent()
+        response = agent.chat("What causes black holes?")
+        print(response.answer)
+        print(response.sources)   # list of source dicts with timestamps
     """
 
-    def __init__(
-        self,
-        namespace: str = PINECONE_NAMESPACE_CORPUS,
-        debug: bool = False,
-    ):
-        self.namespace = namespace
-        self.debug     = debug
-        self.memory    = create_memory()
+    def __init__(self) -> None:
+        self.graph          = _build_graph()
+        self.memory         = ConversationMemory(k=5)
+        self._last_response: RAGResponse | None = None
+        self._last_ingest:   IngestResult | None = None
+        self._streamed_chunks: list = []
 
-        # Instantiate tools
-        tools = get_tools(namespace=namespace)
-        self.rag_tool      : RAGRetrieverTool  = tools[0]
-        self.metadata_tool : VideoMetadataTool = tools[1]
-
-        # Build and compile the graph
-        self.graph = self._build_graph()
-        log.info(f"YouTubeQAAgent ready | namespace: {namespace}")
-
-    def _build_graph(self):
-        builder = StateGraph(AgentState)
-
-        # Add nodes
-        builder.add_node("classify",  make_classify_node(self.debug))
-        builder.add_node("rag",       make_rag_node(self.rag_tool, self.debug))
-        builder.add_node("metadata",  make_metadata_node(self.metadata_tool, self.debug))
-        builder.add_node("respond",   make_respond_node())
-
-        # Edges
-        builder.add_edge(START, "classify")
-        builder.add_conditional_edges(
-            "classify",
-            route_intent,
-            {"rag": "rag", "metadata": "metadata"},
-        )
-        builder.add_edge("rag",      "respond")
-        builder.add_edge("metadata", "respond")
-        builder.add_edge("respond",  END)
-
-        return builder.compile()
-
-    def ask(self, question: str) -> dict:
+    def chat(self, question: str) -> "_ChatResponse":
         """
-        Ask a question and return the agent's response.
-
-        Args:
-            question: The user's question.
-
-        Returns:
-            dict with keys:
-              - answer:   str — the agent's response
-              - sources:  str — formatted source citations (empty for metadata queries)
-              - intent:   str — "rag" or "metadata"
-              - grounded: bool — False if no relevant chunks were found
+        Process a user message and return a _ChatResponse.
+        Always updates memory regardless of intent.
         """
-        # Inject current memory into the RAG tool before invoking
-        self.rag_tool.history = self.memory.to_history()
+        history = self.memory.to_history()
 
-        # Run the graph
         initial_state: AgentState = {
-            "question":    question,
-            "answer":      "",
-            "intent":      "",
-            "tool_output": "",
-            "messages":    self.memory.to_history(),
+            "messages":     history + [HumanMessage(content=question)],
+            "question":     question,
+            "intent":       "rag",   # overwritten by classify_intent
+            "answer":       "",
+            "rag_response": None,
         }
-        result = self.graph.invoke(initial_state)
 
-        answer      = result.get("answer", "")
-        tool_output = result.get("tool_output", "")
-        intent      = result.get("intent", "rag")
-        sources     = _extract_sources(tool_output) if intent == "rag" else ""
-        grounded    = "RETRIEVAL RESULT: No relevant content" not in tool_output
+        final_state = self.graph.invoke(initial_state)
 
-        # Save turn to memory
-        self.memory.save_turn(question, answer)
+        self._last_response = final_state.get("rag_response")
+        self._last_ingest   = final_state.get("_last_ingest")
+        answer_text         = final_state["answer"]
 
-        return {
-            "answer":   answer,
-            "sources":  sources,
-            "intent":   intent,
-            "grounded": grounded,
-        }
+        # Update memory
+        self.memory.save_turn(question, answer_text)
+
+        return _ChatResponse(
+            answer       = answer_text,
+            rag_response = self._last_response,
+            ingest_result= self._last_ingest,
+            intent       = final_state["intent"],
+        )
+
+    def stream_chat(self, question: str):
+        """
+        Generator yielding answer tokens for Streamlit st.write_stream.
+        Only streams for RAG intent; other intents yield the full answer at once.
+        Falls back to blocking chat() on any streaming error.
+
+        Yields: str tokens
+        """
+        self._streamed_chunks = []
+        history = self.memory.to_history()
+        intent  = _classify_intent_fast(question)
+
+        if intent != "rag":
+            # Non-RAG intents: run blocking and yield full answer
+            resp = self.chat(question)
+            yield resp.answer
+            return
+
+        # Stream RAG answer token by token
+        full_answer = ""
+        try:
+            token_stream, chunks = stream_answer(
+                question=        question,
+                history=         history,
+                multi_namespace= True,
+            )
+            for token in token_stream:
+                full_answer += token
+                yield token
+            self._streamed_chunks = chunks
+        except Exception as e:
+            log.error(f"Streaming failed, returning empty: {e}")
+            return
+
+        # Update memory with streamed answer
+        self.memory.save_turn(question, full_answer)
 
     def reset(self) -> None:
-        """Clear conversation memory. Call this for a 'New conversation' action."""
+        """Clear conversation memory. Does not affect Pinecone."""
         self.memory.clear()
-        log.info("Agent memory reset.")
+        self._last_response = None
+        self._last_ingest   = None
+        log.info("Conversation memory reset.")
+
+    @property
+    def last_sources(self) -> list[dict]:
+        """
+        Return source chunks from the last RAG answer.
+        Each dict has: title, video_id, start, end, chunk_text.
+
+        Checks streaming path (_streamed_chunks) first, then blocking
+        path (_last_response). Returns empty list if last intent was
+        not RAG or no sources were retrieved.
+        """
+
+        if self._streamed_chunks:
+            # format chunks the same way RAGResponse does
+            return [
+                {
+                    "title":      c.title,
+                    "video_id":   c.video_id,
+                    "channel":    c.channel,
+                    "start":      c.start,
+                    "end":        c.end,
+                    "chunk_text": c.text,
+                }
+                for c in self._streamed_chunks
+            ]
+        if self._last_response is None:
+            return []
+        return self._last_response.source_chunks_for_display
+
+
+# ── Helper: fast intent check without full graph invocation ───────────────────
+
+def _classify_intent_fast(question: str) -> str:
+    """Mirrors classify_intent node logic without touching the graph."""
+    q = question.lower().strip()
+    if _YT_URL_PATTERN.search(question):
+        return "ingest"
+    if any(kw in q for kw in METADATA_INTENT_KEYWORDS):
+        return "metadata"
+    return "rag"
+
+
+# ── Response dataclass ─────────────────────────────────────────────────────────
+
+from dataclasses import dataclass, field  # noqa: E402
+
+@dataclass
+class _ChatResponse:
+    answer:        str
+    intent:        str
+    rag_response:  Any | None = None
+    ingest_result: Any | None = None
+
+    @property
+    def sources(self) -> list[dict]:
+        if self.rag_response is None:
+            return []
+        return self.rag_response.source_chunks_for_display
 
 
 # ── CLI interactive loop ───────────────────────────────────────────────────────
 
-def run_interactive(debug: bool = False) -> None:
-    """
-    Interactive terminal loop for testing the agent.
-    Preserves conversation memory across turns.
-    Type 'exit' or 'quit' to stop.
-    Type 'reset' to clear memory and start a new conversation.
-    Type 'sources' to show sources from the last answer.
-    """
-    print("\n" + "═"*60)
-    print("  YouTube QA Bot — Interactive Mode")
-    print("  Commands: 'exit' | 'reset' | 'sources'")
-    print("═"*60 + "\n")
+def _cli() -> None:
+    print("\n🎬 YouTube QA Bot — interactive session")
+    print("Commands: 'reset' | 'sources' | 'quit'\n")
 
-    agent = YouTubeQAAgent(debug=debug)
-    last_sources = ""
+    agent = YouTubeQAAgent()
 
     while True:
         try:
-            question = input("You: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print("\nExiting.")
+            user_input = input("You: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nBye.")
             break
 
-        if not question:
+        if not user_input:
             continue
-
-        if question.lower() in ("exit", "quit"):
-            print("Goodbye!")
+        if user_input.lower() == "quit":
             break
-
-        if question.lower() == "reset":
+        if user_input.lower() == "reset":
             agent.reset()
-            last_sources = ""
-            print("── Memory cleared. Starting new conversation. ──\n")
+            print("Bot: Memory cleared.\n")
             continue
-
-        if question.lower() == "sources":
-            if last_sources:
-                print(f"\nSources:\n{last_sources}\n")
+        if user_input.lower() == "sources":
+            sources = agent.last_sources
+            if not sources:
+                print("Bot: No RAG sources from the last response.\n")
             else:
-                print("No sources from last answer.\n")
+                print("Bot: Sources from last answer:")
+                for s in sources:
+                    ts = f"{int(s.get('start', 0))}s–{int(s.get('end', 0))}s"
+                    print(f"  [{s.get('title', '?')}]  {ts}  — {s.get('chunk_text', '')[:80]}...")
+            print()
             continue
 
-        # Ask the agent
-        result = agent.ask(question)
+        response = agent.chat(user_input)
+        print(f"\nBot: {response.answer}\n")
+        if response.intent == "rag" and response.sources:
+            titles = list({s.get("title", "?") for s in response.sources})
+            print(f"  Sources: {', '.join(titles)}\n")
 
-        print(f"\nBot: {result['answer']}\n")
-
-        if result["sources"]:
-            last_sources = result["sources"]
-            print(f"── Sources ──────────────────────────────────────")
-            print(result["sources"])
-            print()
-
-        if not result["grounded"]:
-            print("── [No relevant content found in video library] ──\n")
-
-
-# ── Entry point ────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="YouTube QA Bot — interactive agent.")
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Print full tool output for each turn",
-    )
-    args = parser.parse_args()
-    run_interactive(debug=args.debug)
+    _cli()

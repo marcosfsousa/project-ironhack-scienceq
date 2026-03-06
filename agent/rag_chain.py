@@ -71,12 +71,12 @@ GROQ_MAX_TOKENS  = 1024
 # -- Rewrite Model config ----------------------------------------------------
 
 REWRITE_MODEL       = "llama-3.1-8b-instant"
-REWRITE_TEMPERATURE = 0.0
+REWRITE_TEMPERATURE = 0.0   # Temp set to 0 to prevent any creative deviations
 REWRITE_MAX_TOKENS  = 128
 
 # ── Retrieval config ───────────────────────────────────────────────────────────
 DEFAULT_TOP_K          = 5
-DEFAULT_SCORE_THRESHOLD = 0.35   # Below this → "I don't know" guard
+DEFAULT_SCORE_THRESHOLD = 0.28   # Below this → "I don't know" guard / Reduced from 0.35 on Day 4
 
 
 # ── Prompt templates ───────────────────────────────────────────────────────────
