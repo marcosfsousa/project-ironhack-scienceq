@@ -1,7 +1,7 @@
 {
   "created_at": "2026-03-05T11:23:17.886334Z",
-  "updated_at": "2026-03-05T16:32:01.714006Z",
-  "video_count": 28,
+  "updated_at": "2026-03-07T15:38:26.463088Z",
+  "video_count": 29,
   "videos": {
     "HeQX2HjkcNo": {
       "title": "Math's Fundamental Flaw",
@@ -226,6 +226,14 @@
       "url": "https://www.youtube.com/watch?v=t0qq9R__XiQ",
       "indexed": true,
       "video_id": "t0qq9R__XiQ"
+    },
+    "rXfFACs24zU": {
+      "title": "Brian Cox: The terrifying possibility of the Great Filter",
+      "channel": "Big Think",
+      "topic": "Cosmology",
+      "url": "https://www.youtube.com/watch?v=rXfFACs24zU",
+      "indexed": true,
+      "video_id": "rXfFACs24zU"
     }
   }
 }
