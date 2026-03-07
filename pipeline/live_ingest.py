@@ -116,19 +116,13 @@ def parse_video_id(url: str) -> str | None:
 
 # ── Duplicate check via Pinecone ───────────────────────────────────────────────
 
-def _is_already_indexed(video_id: str, index, live_namespace: str) -> bool:
-    """
-    Fetch a single known vector ID pattern for this video_id.
-    We check for '{video_id}_000' — the first chunk. If it exists,
-    the video is already indexed. Fast single-vector fetch, no query cost.
-    """
-    try:
-        result = index.fetch(ids=[f"{video_id}_000"], namespace=live_namespace)
-        return bool(result.vectors)
-    except Exception as e:
-        log.warning(f"Duplicate check failed (proceeding with ingest): {e}")
-        return False
-
+def _is_already_indexed(video_id: str, index, corpus_namespace: str, live_namespace: str) -> tuple[bool, str]:
+    """Returns (is_duplicate, namespace_where_found). Checks corpus first."""
+    for ns in [corpus_namespace, live_namespace]:
+        result = index.fetch(ids=[f"{video_id}_000"], namespace=ns)
+        if result.vectors:
+            return True, ns
+    return False, ""
 
 # ── Real metadata via yt-dlp ───────────────────────────────────────────────────
 
@@ -397,25 +391,33 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
 
     try:
         # ── 2. Pinecone client setup ───────────────────────────────────────────
-        pc              = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-        index_name      = os.environ["PINECONE_INDEX_NAME"]
-        live_namespace  = os.environ.get("PINECONE_NAMESPACE_LIVE", "live")
-        index           = pc.Index(index_name)
+        pc               = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+        index_name       = os.environ["PINECONE_INDEX_NAME"]
+        live_namespace   = os.environ.get("PINECONE_NAMESPACE_LIVE", "live")
+        corpus_namespace = os.environ.get("PINECONE_NAMESPACE_CORPUS", "corpus")
+        index            = pc.Index(index_name)
 
         # ── 3. Duplicate check ─────────────────────────────────────────────────
-        if not dry_run and _is_already_indexed(video_id, index, live_namespace):
-            try:
-                fetch_result = index.fetch(ids=[f"{video_id}_000"], namespace=live_namespace)
-                vector = fetch_result.vectors.get(f"{video_id}_000")
-                if vector and vector.metadata:
-                    result.title   = vector.metadata.get("title",   video_id)
-                    result.channel = vector.metadata.get("channel", "Unknown")
-                    result.topic   = vector.metadata.get("topic",   "Other")
-            except Exception:
-                result.title = video_id  # fallback to ID, better than "Unknown"
-            result.already_indexed = True
-            result.success         = True
-            return result
+        if not dry_run:
+            is_duplicate, found_in_ns = _is_already_indexed(video_id, index, corpus_namespace, live_namespace)
+            if is_duplicate:
+                try:
+                    fetch_result = index.fetch(ids=[f"{video_id}_000"], namespace=found_in_ns)
+                    vector = fetch_result.vectors.get(f"{video_id}_000")
+                    if vector and vector.metadata:
+                        result.title   = vector.metadata.get("title",   video_id)
+                        result.channel = vector.metadata.get("channel", "Unknown")
+                        result.topic   = vector.metadata.get("topic",   "Other")
+                except Exception:
+                    result.title = video_id
+                result.already_indexed = True
+                result.success         = True
+                result.message = (
+                    f'"{result.title}" is already in your knowledge base.'
+                    if found_in_ns == corpus_namespace
+                    else f'"{result.title}" was already ingested previously.'
+                )
+                return result
 
         # ── 4. Fetch real metadata via yt-dlp ──────────────────────────────────
         log.info("  Fetching metadata via yt-dlp...")

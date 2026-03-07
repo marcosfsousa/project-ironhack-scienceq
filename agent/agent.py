@@ -201,6 +201,8 @@ def metadata_node(state: AgentState) -> AgentState:
 
 # ── Ingest node ────────────────────────────────────────────────────────────────
 
+_TECHNICAL_ERRORS = ["Missing environment variable", "Unexpected error"] 
+
 def ingest_node(state: AgentState) -> AgentState:
     """
     Extract the YouTube URL from the user's message, run live_ingest.ingest_url(),
@@ -224,6 +226,7 @@ def ingest_node(state: AgentState) -> AgentState:
     log.info(f"Ingesting URL: {url}")
     result: IngestResult = ingest_url(url)
 
+
     if result.already_indexed:
         answer_text = (
             f"I already have **{result.title or result.video_id}** in my knowledge base. "
@@ -231,12 +234,13 @@ def ingest_node(state: AgentState) -> AgentState:
         )
     elif result.success:
         answer_text = (
-            f"✅ Done! I've ingested **{result.title}** by {result.channel} "
-            f"({result.chunk_count} chunks indexed under topic: {result.topic}). "
-            "You can now ask me questions about this video."
+            f"✅ Done! I've added **{result.title}** by {result.channel} to your knowledge base. You can now ask me questions about this video."
         )
+
+    elif result.error and any(result.error.startswith(t) for t in _TECHNICAL_ERRORS):
+        answer_text = "❌ Something went wrong while adding that video. Please try again or try a different URL."
     else:
-        answer_text = f"❌ Ingestion failed: {result.error}"
+        answer_text = f"❌ {result.error or 'Something went wrong. Please try again.'}"
 
     return {
         **state,
