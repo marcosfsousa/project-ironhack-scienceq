@@ -10,7 +10,6 @@ Layout:
 Session state keys:
   agent             — YouTubeQAAgent singleton (persists across reruns)
   messages          — list of {"role": "user"|"assistant", "content": str, "sources": list}
-  mode              — "corpus" | "live" (informational only; agent always queries both)
   last_embed_source — top-scoring RAG source chunk dict for video embed (None if not RAG)
 
 Run locally:
@@ -89,7 +88,6 @@ def _init_session() -> None:
     if "agent" not in st.session_state:
         st.session_state.agent             = YouTubeQAAgent()
         st.session_state.messages          = []   # list of dicts: role / content / sources
-        st.session_state.mode              = "corpus"
         st.session_state.last_embed_source = None  # top RAG chunk for video embed
 
 
@@ -202,25 +200,10 @@ def _render_sidebar() -> None:
         st.title("🎬 YouTube QA Bot")
         st.caption("Ask questions about science videos from Veritasium, Kurzgesagt, and Big Think.")
 
-        st.markdown('<div class="sidebar-section">Mode</div>', unsafe_allow_html=True)
-        mode = st.radio(
-            label     = "Query mode",
-            options   = ["Corpus (pre-indexed)", "Live URL (paste below)"],
-            index     = 0 if st.session_state.mode == "corpus" else 1,
-            label_visibility = "collapsed",
-        )
-        st.session_state.mode = "corpus" if "Corpus" in mode else "live"
-
-        if st.session_state.mode == "live":
-            st.info(
-                "Paste a YouTube URL in the chat to ingest a new video. "
-                "The bot will index it and then answer questions about it.",
-                icon="ℹ️",
-            )
-
         # ── Corpus browser ─────────────────────────────────────────────────────
-        st.markdown('<div class="sidebar-section">Corpus — 28 videos</div>', unsafe_allow_html=True)
         videos = _load_corpus_metadata()
+        video_count = len(videos) if videos else 0
+        st.markdown(f'<div class="sidebar-section">Corpus — {video_count} videos</div>', unsafe_allow_html=True)
         if videos:
             topic_filter = st.selectbox(
                 "Filter by topic",
@@ -272,6 +255,16 @@ def _render_history() -> None:
 def _render_starters() -> None:
     if st.session_state.messages:
         return  # only show on empty chat
+
+    count = len(_load_corpus_metadata())
+    st.markdown(
+        f"Ask questions about science and ideas from **{count} curated YouTube videos** — "
+        "Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, and more. "
+        "Answers are grounded in the actual transcripts, with source timestamps "
+        "so you can jump straight to the relevant moment.\n\n"
+        "You can also paste any YouTube URL into the chat to ask questions about "
+        "a video not in the library."
+    )
 
     st.markdown("#### What would you like to explore?")
     cols = st.columns(2)

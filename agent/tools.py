@@ -82,6 +82,28 @@ BROWSE_TRIGGERS = [
     "browse", "what can i ask", "indexed videos",
 ]
 
+# Topics that, if present in the query alongside a browse trigger, indicate
+# the user wants a filtered list — not the full catalog.
+_KNOWN_TOPICS = {
+    "physics", "biology", "cosmology", "psychology", "mathematics",
+    "technology", "cognitive science", "neuroscience", "philosophy",
+    "education", "history",
+}
+
+def _is_browse_all(query_lower: str) -> bool:
+    """
+    Return True only if the query is a genuine 'show everything' intent.
+    A query like 'what videos do you have on mathematics' contains a browse
+    trigger ('what videos') but also a topic word — it should be treated as
+    a topic filter, not a full-catalog dump.
+    """
+    has_trigger = query_lower == "all" or any(t in query_lower for t in BROWSE_TRIGGERS)
+    if not has_trigger:
+        return False
+    # If a known topic word is also present, it's a filtered request
+    has_topic = any(topic in query_lower for topic in _KNOWN_TOPICS)
+    return not has_topic
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Tool 1: RAGRetrieverTool
 # ══════════════════════════════════════════════════════════════════════════════
@@ -212,10 +234,9 @@ class VideoMetadataTool(BaseTool):
 
         query_lower = query.lower().strip()
 
-        # 'all' → return full catalog
-        if query_lower == "all" or any(trigger in query_lower for trigger in BROWSE_TRIGGERS):
+        # 'all' or bare browse intent → return full catalog
+        if _is_browse_all(query_lower):
             matches = videos
-                    
         else:
             matches = [
                 v for v in videos
@@ -250,7 +271,7 @@ class VideoMetadataTool(BaseTool):
             )
 
         # Format results
-        label = "in the catalog" if any(t in query_lower for t in BROWSE_TRIGGERS) else f"matching '{query}'"
+        label = "in the catalog" if _is_browse_all(query_lower) else f"matching '{query}'"
         lines = [f"METADATA RESULT: Found {len(matches)} video(s) {label}:\n"]
         for v in matches:
             video_id = v.get("video_id", "")

@@ -51,6 +51,7 @@ import logging
 import os
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -303,7 +304,11 @@ def _push_experiment_results(
         for result in results:
             if result.get("skipped"):
                 continue
-            run = ls_client.create_run(
+            # Generate run_id explicitly — create_run() returns None in
+            # langsmith SDK >= 0.0.69, so we can't rely on its return value.
+            run_id = str(uuid.uuid4())
+            ls_client.create_run(
+                id          = run_id,
                 name        = experiment_name,
                 run_type    = "chain",
                 inputs      = {"question": result["question"]},
@@ -314,22 +319,22 @@ def _push_experiment_results(
                     "scores":    result["scores"],
                 },
             )
-            ls_client.update_run(run.id, end_time=datetime.now(timezone.utc))
+            ls_client.update_run(run_id, end_time=datetime.now(timezone.utc))
 
             # Attach scores as feedback
             scores = result.get("scores", {})
             for dim, val in scores.items():
                 if dim == "mean":
                     ls_client.create_feedback(
-                        run_id = run.id,
+                        run_id = run_id,
                         key    = "mean_score",
-                        score  = val,
+                        score  = round(val / 5, 4),  # normalize 1-5 → 0.0-1.0
                     )
                 elif isinstance(val, dict) and "score" in val:
                     ls_client.create_feedback(
-                        run_id  = run.id,
+                        run_id  = run_id,
                         key     = dim,
-                        score   = val["score"],
+                        score   = round(val["score"] / 5, 4),  # normalize 1-5 → 0.0-1.0
                         comment = val.get("reason", ""),
                     )
         log.info(f"Pushed {len(results)} results to LangSmith experiment: {experiment_name}")

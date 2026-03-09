@@ -95,6 +95,12 @@ CONVERSATION:
 - If a follow-up question is ambiguous, answer the most likely interpretation \
 and briefly note your assumption.
 
+FORMATTING:
+- When presenting a list of videos from the video catalog, format each video \
+on its own line as a markdown list item. Do not run them together as prose.
+  Example:
+  - **Video Title** — Channel · Topic
+
 CONTEXT (transcript excerpts):
 {context}
 """
