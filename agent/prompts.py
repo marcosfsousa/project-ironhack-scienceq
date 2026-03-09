@@ -63,6 +63,7 @@ in the format [Title, MM:SS], only when the exact moment adds real value.
   Bad:  "According to Veritasium at 3:12, entropy always increases."
 - Source links are displayed below your answer — do not repeat them in your text.
 - If multiple chunks are relevant, synthesise them into one coherent answer.
+- Never use backticks or code formatting in your answers.
 - Keep answers concise: 2–3 paragraphs is ideal, 4 is the hard maximum. \
 A tighter answer that covers the key points is always better than a longer one.
 - Never restate the question. Never open with "Great question" or similar filler.

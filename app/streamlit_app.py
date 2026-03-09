@@ -46,7 +46,7 @@ from agent import YouTubeQAAgent, _classify_intent_fast  # noqa: E402
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="YouTube QA Bot",
+    page_title="ScienceQ",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -55,6 +55,12 @@ st.set_page_config(
 # ── Styling ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
+  /* Constrain main content width on large screens */
+  .block-container {
+    max-width: 860px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
   /* Tighten chat bubbles */
   .stChatMessage { padding: 0.5rem 0; }
   /* Source pill styling */
@@ -64,9 +70,14 @@ st.markdown("""
     color: #a8d8f0;
     border-radius: 12px;
     padding: 2px 10px;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     margin: 2px 3px;
     text-decoration: none;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
   }
   .source-pill:hover { background: #2a5080; }
   /* Sidebar section headers */
@@ -77,6 +88,13 @@ st.markdown("""
     letter-spacing: 0.08em;
     color: #888;
     margin: 1rem 0 0.3rem;
+  }
+  /* Starter question label */
+  .starter-label {
+    font-size: 0.85rem;
+    color: #888;
+    text-align: center;
+    margin-bottom: 0.5rem;
   }
 </style>
 """, unsafe_allow_html=True)
@@ -126,7 +144,7 @@ def _render_sources(sources: list[dict]) -> None:
     for s in sources:
         vid_id = s.get("video_id", "")
         start  = int(s.get("start", 0))
-        title  = html.escape(s.get("title", vid_id)[:40])
+        title  = html.escape(s.get("title", vid_id)[:28])
         key    = f"{vid_id}_{start}"
         if key in seen:
             continue
@@ -197,8 +215,15 @@ def _render_video_embed(sources: list[dict]) -> None:
 
 def _render_sidebar() -> None:
     with st.sidebar:
-        st.title("🎬 YouTube QA Bot")
+        st.title("🎬 ScienceQ")
         st.caption("Ask questions about science videos from Veritasium, Kurzgesagt, and Big Think.")
+
+        # ── Session controls (top) ─────────────────────────────────────────────
+        if st.button("🗑️ Clear conversation", use_container_width=True):
+            st.session_state.agent.reset()
+            st.session_state.messages          = []
+            st.session_state.last_embed_source = None
+            st.rerun()
 
         # ── Corpus browser ─────────────────────────────────────────────────────
         videos = _load_corpus_metadata()
@@ -228,14 +253,7 @@ def _render_sidebar() -> None:
         else:
             st.caption("metadata.json not found — run bootstrap_metadata.py first.")
 
-        # ── Session controls ───────────────────────────────────────────────────
-        st.markdown('<div class="sidebar-section">Session</div>', unsafe_allow_html=True)
-        if st.button("🗑️ Clear conversation", use_container_width=True):
-            st.session_state.agent.reset()
-            st.session_state.messages          = []
-            st.session_state.last_embed_source = None
-            st.rerun()
-
+        # ── Footer ────────────────────────────────────────────────────────────
         st.markdown("---")
         st.caption("Built with LangChain · Groq · Pinecone · Streamlit")
 
@@ -258,16 +276,19 @@ def _render_starters() -> None:
 
     count = len(_load_corpus_metadata())
     st.markdown(
-        f"Ask questions about science and ideas from **{count} curated YouTube videos** — "
-        "Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, and more. "
-        "Answers are grounded in the actual transcripts, with source timestamps "
-        "so you can jump straight to the relevant moment.\n\n"
-        "You can also paste any YouTube URL into the chat to ask questions about "
+        f'<div style="text-align: justify; font-size: 0.95rem; color: #ccc; margin-bottom: 1rem;">'
+        f"Ask questions about science and ideas from <strong>{count} curated YouTube videos</strong> — "
+        "Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, and more. \n\n"
+        "\n\nAnswers are grounded in the actual transcripts, with source timestamps "
+        "so you can jump straight to the relevant moment.\n"
+        "\nYou can also paste any YouTube URL into the chat to ask questions about "
         "a video not in the library."
+        f'</div>',
+        unsafe_allow_html=True,
     )
 
-    st.markdown("#### What would you like to explore?")
-    cols = st.columns(2)
+    st.markdown('<div class="starter-label">What would you like to explore?</div>', unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 3, 1])
     starters = [
         "Why has no one measured the speed of light?",
         "How does natural selection actually work?",
@@ -275,7 +296,7 @@ def _render_starters() -> None:
         "What videos do you have on mathematics?",
     ]
     for i, q in enumerate(starters):
-        if cols[i % 2].button(q, use_container_width=True, key=f"starter_{i}"):
+        if col.button(q, use_container_width=True, key=f"starter_{i}"):
             _handle_user_input(q)
             st.rerun()
 
@@ -360,7 +381,7 @@ def main() -> None:
     _init_session()
     _render_sidebar()
 
-    st.header("🎬 YouTube QA Bot", divider="blue")
+    st.header("🎬 ScienceQ", divider="blue")
 
     _render_history()
     _render_starters()
@@ -372,7 +393,7 @@ def main() -> None:
     # Chat input pinned to bottom
     user_input = st.chat_input(
         placeholder=(
-            "Ask a question about the corpus videos, or paste a YouTube URL to ingest a new one..."
+            "Ask a question about the existing videos, or simply paste a YouTube URL and ask a question about it..."
         )
     )
     if user_input and user_input.strip():
