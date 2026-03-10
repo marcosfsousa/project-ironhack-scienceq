@@ -8,9 +8,9 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) Data Ana
 
 ---
 
-<!-- GIF DEMO PLACEHOLDER -->
-<!-- Replace with an actual demo GIF before presentation -->
-![Demo](docs/demo.gif)
+## Demo
+
+![ScienceQ Demo](docs/demo.gif)
 
 ---
 
