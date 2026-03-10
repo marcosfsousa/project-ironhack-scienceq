@@ -43,6 +43,7 @@ for p in [str(_AGENT_DIR), str(_PIPELINE_DIR)]:
         sys.path.insert(0, p)
 
 from agent import YouTubeQAAgent, _classify_intent_fast  # noqa: E402
+from tools import _KNOWN_TOPICS  # noqa: E402
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -57,7 +58,14 @@ st.markdown("""
 <style>
   /* Constrain main content width on large screens */
   .block-container {
-    max-width: 860px;
+    max-width: 1368px;
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  /* Constrain chat input to match content width */
+  [data-testid="stBottomBlockContainer"] {
+    max-width: 1368px;
+    margin: 0 auto;
     padding-left: 2rem;
     padding-right: 2rem;
   }
@@ -89,6 +97,9 @@ st.markdown("""
     color: #888;
     margin: 1rem 0 0.3rem;
   }
+  /* Sidebar video links — classes used so media query can override */
+  .sidebar-video-title { color: #a8d8f0; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-video-channel { color: #888; }
   /* Starter question label */
   .starter-label {
     font-size: 0.85rem;
@@ -230,26 +241,28 @@ def _render_sidebar() -> None:
         video_count = len(videos) if videos else 0
         st.markdown(f'<div class="sidebar-section">Corpus — {video_count} videos</div>', unsafe_allow_html=True)
         if videos:
-            topic_filter = st.selectbox(
-                "Filter by topic",
-                options=["All"] + sorted({v.get("topic", "Other") for v in videos}),
-                label_visibility="collapsed",
-            )
-            filtered = (
-                videos if topic_filter == "All"
-                else [v for v in videos if v.get("topic") == topic_filter]
-            )
-            for v in sorted(filtered, key=lambda x: x.get("title", "")):
-                title   = html.escape(v.get("title", v.get("video_id", "Unknown"))[:50])
-                channel = html.escape(v.get("channel", ""))
-                vid_id  = v.get("video_id", "")
-                yt_url  = _safe_yt_url(vid_id) if vid_id else "#"
-                st.markdown(
-                    f'<a href="{yt_url}" target="_blank" style="font-size:0.8rem; '
-                    f'text-decoration:none; color:#a8d8f0;">▶ {title}</a>'
-                    f'<div style="font-size:0.7rem; color:#888; margin-bottom:6px">{channel}</div>',
-                    unsafe_allow_html=True,
-                )
+            # Group by topic, sorted alphabetically
+            topics_map: dict = {}
+            for v in videos:
+                topic = v.get("topic", "Other")
+                topics_map.setdefault(topic, []).append(v)
+
+            for topic in sorted(topics_map.keys()):
+                topic_videos = sorted(topics_map[topic], key=lambda x: x.get("title", ""))
+                with st.expander(f"{topic} ({len(topic_videos)})", expanded=False):
+                    for v in topic_videos:
+                        title    = html.escape(v.get("title", v.get("video_id", "Unknown"))[:60])
+                        channel  = html.escape(v.get("channel", ""))
+                        duration = v.get("duration", "")
+                        vid_id   = v.get("video_id", "")
+                        yt_url   = _safe_yt_url(vid_id) if vid_id else "#"
+                        # Duration badge: append to channel line if available
+                        meta = f"{channel} · {duration}" if duration else channel
+                        st.markdown(
+                            f'<a href="{yt_url}" target="_blank" class="sidebar-video-title" style="font-size:0.8rem;">▶ {title}</a>'
+                            f'<div class="sidebar-video-channel" style="font-size:0.7rem; margin-bottom:8px">{meta}</div>',
+                            unsafe_allow_html=True,
+                        )
         else:
             st.caption("metadata.json not found — run bootstrap_metadata.py first.")
 
@@ -263,7 +276,15 @@ def _render_sidebar() -> None:
 def _render_history() -> None:
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            content = msg["content"]
+            if msg["role"] == "assistant" and content.startswith("METADATA_LIST:"):
+                try:
+                    videos = json.loads(content[len("METADATA_LIST:"):])
+                    _render_metadata_list(videos, msg.get("query", ""))
+                except Exception:
+                    st.markdown(content)
+            else:
+                st.markdown(content)
             if msg["role"] == "assistant" and msg.get("sources"):
                 _render_sources(msg["sources"])
 
@@ -276,7 +297,7 @@ def _render_starters() -> None:
 
     count = len(_load_corpus_metadata())
     st.markdown(
-        f'<div style="text-align: justify; font-size: 0.95rem; color: #ccc; margin-bottom: 1rem;">'
+        f'<div class="intro-text" style="text-align: justify; font-size: 0.95rem; margin-bottom: 1rem;">'
         f"Ask questions about science and ideas from <strong>{count} curated YouTube videos</strong> — "
         "Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, and more. \n\n"
         "\n\nAnswers are grounded in the actual transcripts, with source timestamps "
@@ -299,6 +320,37 @@ def _render_starters() -> None:
         if col.button(q, use_container_width=True, key=f"starter_{i}"):
             _handle_user_input(q)
             st.rerun()
+
+
+# ── Metadata list renderer ─────────────────────────────────────────────────────
+
+def _render_metadata_list(videos: list[dict], query: str) -> None:
+    """
+    Render a clean video list from structured metadata, bypassing LLM formatting.
+    Called when agent returns a METADATA_LIST:<json> signal.
+    """
+    count = len(videos)
+    # Infer display label from query
+    q = query.lower()
+    topic_words = [w for w in _KNOWN_TOPICS if w in q]
+    label = topic_words[0].capitalize() if topic_words else "your query"
+
+    st.markdown(f"Here are the **{count} {label} video{'s' if count != 1 else ''}** in the library:")
+
+    for v in videos:
+        title    = v.get("title", "Unknown")
+        channel  = v.get("channel", "")
+        topic    = v.get("topic", "")
+        duration = v.get("duration", "")
+        url      = v.get("url", "")
+
+        meta_parts = [p for p in [channel, topic, duration] if p]
+        meta_str   = " · ".join(meta_parts)
+
+        if url:
+            st.markdown(f"- [**{title}**]({url})  \n  <span class='metadata-channel' style='font-size:0.8rem'>{meta_str}</span>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"- **{title}**  \n  <span class='metadata-channel' style='font-size:0.8rem'>{meta_str}</span>", unsafe_allow_html=True)
 
 
 # ── Input handler ──────────────────────────────────────────────────────────────
@@ -356,7 +408,19 @@ def _handle_user_input(user_input: str) -> None:
             ):
                 resp = agent.chat(user_input)
             full_answer = resp.answer
-            st.markdown(full_answer)
+
+            # Metadata tool returns "METADATA_LIST:<json>" — render directly
+            # without passing through the LLM to avoid inconsistent reformatting.
+            if full_answer.startswith("METADATA_LIST:"):
+                try:
+                    videos = json.loads(full_answer[len("METADATA_LIST:"):])
+                    _render_metadata_list(videos, user_input)
+                    # Keep the signal in full_answer — _render_history() will
+                    # detect it on rerun and re-render the list correctly.
+                except Exception:
+                    st.markdown(full_answer)
+            else:
+                st.markdown(full_answer)
             sources = resp.sources
 
         _render_sources(sources)
@@ -372,6 +436,7 @@ def _handle_user_input(user_input: str) -> None:
         "role":    "assistant",
         "content": full_answer,
         "sources": sources,
+        "query":   user_input,   # preserved for METADATA_LIST re-render in _render_history
     })
 
 
@@ -383,22 +448,35 @@ def main() -> None:
 
     st.header("🎬 ScienceQ", divider="blue")
 
-    _render_history()
-    _render_starters()
-
-    # Video embed for last RAG answer — rendered here so it survives st.rerun()
-    if st.session_state.get("last_embed_source"):
-        _render_video_embed([st.session_state["last_embed_source"]])
-
-    # Chat input pinned to bottom
+    # chat_input must be declared at top level — column nesting is unreliable
+    # across Streamlit versions. The value is captured here and processed inside
+    # chat_col below, which is safe since it's just a string.
     user_input = st.chat_input(
         placeholder=(
             "Ask a question about the existing videos, or simply paste a YouTube URL and ask a question about it..."
         )
     )
-    if user_input and user_input.strip():
-        _handle_user_input(user_input.strip())
-        st.rerun()
+
+    # 2-column layout: chat left (60%), embed right (40%).
+    # Right column only rendered when a RAG source exists — avoids blank column
+    # on first load and for metadata/ingest responses.
+    has_embed = bool(st.session_state.get("last_embed_source"))
+
+    if has_embed:
+        chat_col, embed_col = st.columns([3, 2])
+    else:
+        chat_col = st.container()
+
+    with chat_col:
+        _render_history()
+        _render_starters()
+        if user_input and user_input.strip():
+            _handle_user_input(user_input.strip())
+            st.rerun()
+
+    if has_embed:
+        with embed_col:
+            _render_video_embed([st.session_state["last_embed_source"]])
 
 
 if __name__ == "__main__":

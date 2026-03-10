@@ -8,9 +8,10 @@ Tools defined here:
   - VideoMetadataTool    → looks up video catalog info from metadata.json
 
 Design decision:
-  Tools return formatted strings (not dicts) so the LLM can reason over
-  the output naturally. Structured data is embedded in the string in a
-  readable format rather than raw JSON.
+  RAGRetrieverTool returns a formatted string so the LLM can reason over it.
+  VideoMetadataTool returns "METADATA_LIST:<json>" when matches are found —
+  detected by streamlit_app.py and rendered directly, bypassing LLM reformatting.
+  Plain-text fallback is used for no-match responses.
 
 Usage:
   from tools import get_tools
@@ -223,21 +224,33 @@ class VideoMetadataTool(BaseTool):
 
     def _run(self, query: str) -> str:
         """
-        Search metadata.json and return matching video entries as a
-        formatted string the agent can present directly to the user.
+        Search metadata.json and return a structured signal for direct rendering.
+
+        Return format for matches:
+            "METADATA_LIST:<json>"   ← detected by streamlit_app.py, rendered directly
+        Return format for no-match / catalog unavailable:
+            plain text fallback (displayed via st.markdown as-is)
+
+        Matching strategy:
+            1. 'all' or bare browse intent → full catalog
+            2. Exact substring match on title, topic, or channel
+            3. Loose fallback: any word (>3 chars) matched against topic field only
+               (restricting to topic prevents cross-contamination from title keywords)
         """
         log.info(f"VideoMetadataTool called | query: {query!r}")
 
         videos = _load_metadata()
         if not videos:
-            return "METADATA RESULT: Video catalog not available."
+            return "Video catalog not available."
 
         query_lower = query.lower().strip()
 
-        # 'all' or bare browse intent → return full catalog
+        # Pass 1: full catalog
         if _is_browse_all(query_lower):
             matches = videos
+
         else:
+            # Pass 2: exact substring match on title, topic, or channel
             matches = [
                 v for v in videos
                 if (
@@ -247,46 +260,36 @@ class VideoMetadataTool(BaseTool):
                 )
             ]
 
-        if not matches:
-            # Try a looser match — any word in the query
-            words = [w for w in query_lower.split() if len(w) > 3]
-            matches = [
-                v for v in videos
-                if any(
-                    w in v.get("title",   "").lower() or
-                    w in v.get("topic",   "").lower() or
-                    w in v.get("channel", "").lower()
-                    for w in words
-                )
-            ]
+            if not matches:
+                # Pass 3: loose word match — topic field only to avoid false positives
+                words = [w for w in query_lower.split() if len(w) > 3]
+                matches = [
+                    v for v in videos
+                    if any(w in v.get("topic", "").lower() for w in words)
+                ]
 
         if not matches:
-            # Summarise available topics and channels as a fallback
             topics   = sorted({v.get("topic",   "Unknown") for v in videos})
             channels = sorted({v.get("channel", "Unknown") for v in videos})
             return (
-                f"METADATA RESULT: No videos found matching '{query}'.\n\n"
-                f"Available topics:   {', '.join(topics)}\n"
+                f"No videos found matching '{query}'.\n\n"
+                f"Available topics: {', '.join(topics)}\n"
                 f"Available channels: {', '.join(channels)}"
             )
 
-        # Format results
-        label = "in the catalog" if _is_browse_all(query_lower) else f"matching '{query}'"
-        lines = [f"METADATA RESULT: Found {len(matches)} video(s) {label}:\n"]
+        # Build structured payload — app renders this directly, bypassing LLM
+        payload = []
         for v in matches:
             video_id = v.get("video_id", "")
-            title    = v.get("title",    "Unknown")
-            channel  = v.get("channel",  "Unknown")
-            topic    = v.get("topic",    "Unknown")
-            duration = v.get("duration", "Unknown")
-            url      = f"https://www.youtube.com/watch?v={video_id}" if video_id else "N/A"
-            lines.append(
-                f"  • {title}\n"
-                f"    Channel: {channel} | Topic: {topic} | Duration: {duration}\n"
-                f"    URL: {url}"
-            )
+            payload.append({
+                "title":    v.get("title",    "Unknown"),
+                "channel":  v.get("channel",  "Unknown"),
+                "topic":    v.get("topic",    "Unknown"),
+                "duration": v.get("duration", ""),
+                "url":      f"https://www.youtube.com/watch?v={video_id}" if video_id else "",
+            })
 
-        return "\n".join(lines)
+        return f"METADATA_LIST:{json.dumps(payload)}"
 
     async def _arun(self, query: str) -> str:
         raise NotImplementedError("Async not supported — use _run")

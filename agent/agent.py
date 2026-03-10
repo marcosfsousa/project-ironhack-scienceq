@@ -84,6 +84,11 @@ METADATA_INTENT_KEYWORDS = [
     "what do you have", "full list", "everything you have",
     "what's indexed", "what is indexed", "all videos",
     "show me everything", "browse", "what can i ask",
+    # specific "show me X videos" patterns — avoids capturing "show me how X works"
+    "show me videos", "show me biology", "show me physics", "show me mathematics",
+    "show me cosmology", "show me psychology", "show me philosophy",
+    "show me technology", "show me neuroscience", "show me education",
+    "show me cognitive",
 ]
 
 # Matches any YouTube URL pattern
@@ -154,49 +159,54 @@ def metadata_node(state: AgentState) -> AgentState:
     """
     Use VideoMetadataTool to answer catalog/listing queries.
     Falls back gracefully if metadata.json is missing.
-    Resolves vague references ("that topic") using history + fast LLM.
+
+    Always runs a fast LLM call (llama-3.1-8b-instant) to extract a clean
+    search keyword from the user's question before hitting the tool.
+    This normalises full sentences like "What videos do you have on mathematics?"
+    down to a single term like "mathematics", preventing match failures.
+    Falls back to the raw question if the LLM call fails.
     """
     tools      = get_tools()
     meta_tool  = next(t for t in tools if t.name == "video_metadata")
     question   = state["question"]
+    history    = state["messages"][:-1]
 
-    # History-aware resolution: if question contains vague references,
-    # ask the fast LLM to produce a concrete search term
-    history = state["messages"][:-1]
-    if history and any(
-        phrase in question.lower()
-        for phrase in ["that topic", "that video", "those videos", "it", "them", "that"]
-    ):
-        try:
-            from groq import Groq
-            client = Groq(api_key=os.environ["GROQ_API_KEY"])
-            history_text = "\n".join(
-                f"{'User' if isinstance(m, HumanMessage) else 'Bot'}: {m.content}"
-                for m in history[-6:]
-            )
-            prompt = (
-                f"Given this conversation:\n{history_text}\n\n"
-                f"The user now asks: \"{question}\"\n"
-                "What concrete topic or video title are they referring to? "
-                "Reply with only the search term, nothing else."
-            )
-            resp = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=20,
-                temperature=0.0,
-            )
-            resolved = resp.choices[0].message.content.strip()
-            log.info(f"Metadata query resolved: '{question}' → '{resolved}'")
-            question = resolved
-        except Exception as e:
-            log.warning(f"Metadata resolution failed, using original query: {e}")
+    # Always resolve to a clean search term via the fast model.
+    # Handles both direct queries ("what videos on physics?") and vague
+    # references ("that topic", "those videos") using conversation history.
+    try:
+        from groq import Groq
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        history_text = "\n".join(
+            f"{'User' if isinstance(m, HumanMessage) else 'Bot'}: {m.content}"
+            for m in history[-6:]
+        ) if history else ""
+
+        context_block = f"Given this conversation:\n{history_text}\n\n" if history_text else ""
+        prompt = (
+            f"{context_block}"
+            f"The user asks: \"{question}\"\n"
+            "Extract the single search term they want to look up in a video catalog "
+            "(e.g. a topic name, channel name, or keyword). "
+            "If they want everything, reply with: all\n"
+            "Reply with only the search term, nothing else. No punctuation."
+        )
+        resp = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=10,
+            temperature=0.0,
+        )
+        resolved = resp.choices[0].message.content.strip().lower()
+        log.info(f"Metadata query resolved: '{question}' → '{resolved}'")
+        question = resolved
+    except Exception as e:
+        log.warning(f"Metadata resolution failed, using original query: {e}")
 
     raw_result = meta_tool.run(question)
-    # Strip internal prefix if present
-    answer_text = re.sub(r"^METADATA RESULT:\s*", "", raw_result, flags=re.IGNORECASE)
-
-    return {**state, "answer": answer_text, "rag_response": None}
+    # Pass through as-is — streamlit_app.py detects "METADATA_LIST:<json>"
+    # and renders directly; plain-text fallbacks are displayed via st.markdown.
+    return {**state, "answer": raw_result, "rag_response": None}
 
 
 # ── Ingest node ────────────────────────────────────────────────────────────────
