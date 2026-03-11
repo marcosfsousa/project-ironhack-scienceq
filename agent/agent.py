@@ -1,7 +1,7 @@
 """
 agent.py
 --------
-LangGraph agent for YouTube QA.
+LangGraph agent for ScienceQ.
 
 Graph: [START] → classify_intent → [rag | metadata | ingest] → respond → [END]
 
@@ -454,7 +454,7 @@ class _ChatResponse:
 # ── CLI interactive loop ───────────────────────────────────────────────────────
 
 def _cli() -> None:
-    print("\n🎬 YouTube QA Bot — interactive session")
+    print("\n🎬 ScienceQ — interactive session")
     print("Commands: 'reset' | 'sources' | 'quit'\n")
 
     agent = YouTubeQAAgent()

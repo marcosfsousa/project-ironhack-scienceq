@@ -1,7 +1,7 @@
 """
 run_evals.py
 ------------
-LangSmith evaluation runner for the YouTube QA Bot.
+LangSmith evaluation runner for the ScienceQ.
 
 Loads eval_set.json, runs each case through the live agent, scores every
 answer with an LLM-as-judge on four rubric dimensions, and pushes results
@@ -267,7 +267,7 @@ def _get_or_create_langsmith_dataset(
     log.info(f"Creating LangSmith dataset: {dataset_name}")
     dataset = ls_client.create_dataset(
         dataset_name = dataset_name,
-        description  = "YouTube QA Bot eval set — 25 automated cases (20 factual + 5 multi-turn)",
+        description  = "ScienceQ eval set — 25 automated cases (20 factual + 5 multi-turn)",
     )
 
     # Upload examples (skip adversarial — no reference answer)
@@ -547,7 +547,7 @@ def run(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run YouTube QA Bot evaluations and push results to LangSmith."
+        description="Run ScienceQ evaluations and push results to LangSmith."
     )
     parser.add_argument(
         "--dry-run",

@@ -1,4 +1,4 @@
-# YouTube QA Bot
+# ScienceQ
 
 A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of 42 curated videos, or paste any YouTube URL to ingest and query it on the fly.
 

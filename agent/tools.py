@@ -1,7 +1,7 @@
 """
 tools.py
 --------
-LangChain tools for the YouTube QA Bot LangGraph agent.
+LangChain tools for the ScienceQ LangGraph agent.
 
 Tools defined here:
   - RAGRetrieverTool     → answers questions using Pinecone + Groq RAG chain

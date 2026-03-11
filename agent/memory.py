@@ -1,7 +1,7 @@
 """
 memory.py
 ---------
-Conversation memory for the YouTube QA Bot agent.
+Conversation memory for the ScienceQ Bot agent.
 
 Manages a sliding window of the last K conversation turns as a plain
 list of LangChain message objects. No external dependencies beyond

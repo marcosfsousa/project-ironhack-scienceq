@@ -60,7 +60,7 @@ def _get_or_create_dataset(ls_client) -> str:
     log.info(f"Dataset '{DATASET_NAME}' not found — creating empty dataset.")
     dataset = ls_client.create_dataset(
         dataset_name=DATASET_NAME,
-        description="YouTube QA Bot eval set — 25 automated cases (20 factual + 5 multi-turn)",
+        description="ScienceQ eval set — 25 automated cases (20 factual + 5 multi-turn)",
     )
     return str(dataset.id)
 

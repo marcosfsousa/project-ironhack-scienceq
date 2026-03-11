@@ -1,4 +1,4 @@
-# Dataset — YouTube QA Bot Corpus
+# Dataset — ScienceQ Corpus
 
 ## Overview
 

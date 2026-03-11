@@ -1,7 +1,7 @@
 """
 prompts.py
 ----------
-All prompt templates and static response strings for the YouTube QA Bot.
+All prompt templates and static response strings for the ScienceQ.
 
 Centralises:
   - SYSTEM_PROMPT         → main RAG answering prompt (injected via rag_chain._build_prompt)

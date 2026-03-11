@@ -1,7 +1,7 @@
 """
 streamlit_app.py
 ----------------
-Streamlit web UI for the YouTube QA Bot.
+Streamlit web UI for the ScienceQ.
 
 Layout:
   Sidebar  — mode info, corpus video browser, session controls

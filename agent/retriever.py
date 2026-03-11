@@ -1,7 +1,7 @@
 """
 retriever.py
 ------------
-Pinecone similarity search wrapper for the YouTube QA Bot.
+Pinecone similarity search wrapper for the ScienceQ.
 
 Wraps the Pinecone index with:
   - Namespace-aware querying (corpus | live)

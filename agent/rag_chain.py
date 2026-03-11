@@ -1,7 +1,7 @@
 """
 rag_chain.py
 ------------
-Core RAG chain for the YouTube QA Bot.
+Core RAG chain for the ScienceQ Bot.
 
 Wires together:
   - retriever.py       → Pinecone similarity search

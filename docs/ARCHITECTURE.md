@@ -1,8 +1,8 @@
-# Architecture — YouTube QA Bot
+# Architecture — ScienceQ
 
 ## Overview
 
-The YouTube QA Bot is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion, served through a streaming Streamlit chat interface.
+ScienceQ is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion, served through a streaming Streamlit chat interface.
 
 ---
 
