@@ -68,8 +68,8 @@ Evaluated on a 30-case QA set (20 factual, 5 multi-turn, 5 adversarial) with GPT
 **Prerequisites:** Python 3.11, a Pinecone account, a Groq API key, a LangSmith account.
 
 ```bash
-git clone https://github.com/<your-username>/project-ironhack-youtube-chatbot
-cd project-ironhack-youtube-chatbot
+git clone https://github.com/<your-username>/project-ironhack-scienceq
+cd project-ironhack-scienceq
 
 pip install -r requirements.txt
 
@@ -79,7 +79,7 @@ cp .env.example .env
 streamlit run app/streamlit_app.py
 ```
 
-The app connects to the existing Pinecone corpus index — no pipeline run required to use the pre-built corpus.
+The app connects to whichever Pinecone corpus index you configure in .env — no pipeline run required to query the pre-built corpus vectors once your index is populated.
 
 ### Required environment variables
 
