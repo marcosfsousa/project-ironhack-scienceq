@@ -79,8 +79,6 @@ cp .env.example .env
 streamlit run app/streamlit_app.py
 ```
 
-The app connects to whichever Pinecone corpus index you configure in .env — no pipeline run required to query the pre-built corpus vectors once your index is populated.
-
 ### Required environment variables
 
 ```
@@ -95,11 +93,12 @@ LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com
 LANGCHAIN_TRACING_V2=true
 ```
 
+
 ---
 
-## Rebuilding the corpus from scratch
+## Building the corpus from scratch
 
-If you want to index your own set of videos rather than using the pre-built Pinecone index, run the pipeline in order:
+If you want to index your own set of videos, run the pipeline in order:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -125,6 +124,8 @@ python pipeline/bootstrap_metadata.py
 ```
 
 Each script supports `--video-id` to run on a single video and `--force` to re-run over existing output. See the docstring at the top of each file for full CLI options.
+
+The chunks will be indexed in the namespace set under `PINECONE_NAMESPACE_CORPUS` in your `.env` file.
 
 ### Running tests
 
