@@ -78,6 +78,31 @@ Open [http://localhost:8501](http://localhost:8501). The embedding model is pre-
 
 ---
 
+## Running with Docker Compose
+
+Docker Compose separates the serving layer (Streamlit app) from the batch pipeline into two containers that share a `./data` volume.
+
+**Start the app:**
+```bash
+docker compose up app
+```
+
+**Run the full pipeline** (extract → clean → chunk → embed → bootstrap → enrich → index):
+```bash
+docker compose run pipeline --full
+```
+
+**Run individual pipeline steps:**
+```bash
+docker compose run pipeline --steps extract,clean,chunk
+docker compose run pipeline --steps enrich
+docker compose run pipeline --steps index
+```
+
+The pipeline container uses the `pipeline` profile and does **not** start automatically with `docker compose up`.
+
+---
+
 ## Quickstart (run locally)
 
 **Prerequisites:** Python 3.11, a Pinecone account, a Groq API key, a LangSmith account.

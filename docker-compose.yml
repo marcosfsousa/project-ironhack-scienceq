@@ -1,0 +1,33 @@
+services:
+
+  # ── Streamlit app ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    ports:
+      - "8501:8501"
+    volumes:
+      # mount data/ so the corpus browser reflects the latest metadata.json
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ── Batch pipeline ────────────────────────────────────────────────────────────
+  # Uses 'pipeline' profile so it does NOT start with 'docker compose up'.
+  # Run explicitly: docker compose run pipeline [--full | --steps <steps>]
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    env_file: .env
+    volumes:
+      # shared volume: pipeline writes to data/, app reads from data/
+      - ./data:/app/data
+    profiles:
+      - pipeline

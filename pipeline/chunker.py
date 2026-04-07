@@ -40,8 +40,12 @@ Usage:
 import argparse
 import json
 import logging
+import sys
 from datetime import datetime
 from pathlib import Path
+
+# Add pipeline dir so sponsorblock.py can be imported regardless of cwd
+sys.path.insert(0, str(Path(__file__).parent))
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 log = logging.getLogger(__name__)
@@ -146,10 +150,15 @@ def chunk_transcript(
     window: float,
     dry_run: bool = False,
     force: bool = False,
+    skip_sponsors: bool = True,
 ) -> dict | None:
     """
     Load transcript_clean.json, chunk it, write chunks.json.
     Returns a stats dict, or None if clean file not found.
+
+    Args:
+        skip_sponsors: if True, query SponsorBlock and filter out sponsor/
+                       intro/outro segments before chunking (default: True).
     """
     clean_path  = VIDEOS_DIR / video_id / "transcript_clean.json"
     chunks_path = VIDEOS_DIR / video_id / "chunks.json"
@@ -157,14 +166,26 @@ def chunk_transcript(
     if not clean_path.exists():
         log.warning(f"  Clean transcript not found, skipping: {clean_path}")
         return None
-    
+
     # Resume support — skip if already chunked (unless --force)
     if chunks_path.exists() and not force:
         log.info(f"  Already chunked, skipping: {video_id}  (use --force to re-chunk)")
         return {"video_id": video_id, "skipped": True, "reason": "already_chunked"}
 
-    clean = json.loads(clean_path.read_text(encoding="utf-8", errors="replace"))
+    clean    = json.loads(clean_path.read_text(encoding="utf-8", errors="replace"))
     segments = clean["transcript"]
+
+    # ── SponsorBlock filtering ─────────────────────────────────────────────────
+    if skip_sponsors:
+        from sponsorblock import get_sponsor_segments, is_sponsored
+        sponsor_segs = get_sponsor_segments(video_id)
+        if sponsor_segs:
+            before   = len(segments)
+            segments = [
+                seg for seg in segments
+                if not is_sponsored(seg["start"], seg["end"], sponsor_segs)
+            ]
+            log.info(f"  Filtered {before - len(segments)} sponsored segment(s)")
 
     chunks = chunk_segments(segments, window=window, video_id=video_id)
 
@@ -221,7 +242,13 @@ def save_chunk_log(log_data: dict) -> None:
 
 # ── Main ───────────────────────────────────────────────────────────────────────
 
-def run(video_id: str | None, window: float, dry_run: bool, force: bool) -> None:
+def run(
+    video_id: str | None,
+    window: float,
+    dry_run: bool,
+    force: bool,
+    skip_sponsors: bool = True,
+) -> None:
 
     if dry_run:
         log.info("DRY RUN — no files will be written.")
@@ -244,7 +271,7 @@ def run(video_id: str | None, window: float, dry_run: bool, force: bool) -> None
     for vid_id in sorted(targets):
         log.info(f"Chunking: {vid_id}")
 
-        stats = chunk_transcript(vid_id, window=window, dry_run=dry_run, force=force)
+        stats = chunk_transcript(vid_id, window=window, dry_run=dry_run, force=force, skip_sponsors=skip_sponsors)
 
         if stats is None:
             chunk_log["skipped"].append({
@@ -306,11 +333,22 @@ if __name__ == "__main__":
         help="Print stats only — do not write any files",
     )
     parser.add_argument(
-        "--force", 
-        action="store_true", 
-        help="Re-chunk already chunked videos"
+        "--force",
+        action="store_true",
+        help="Re-chunk already chunked videos",
+    )
+    parser.add_argument(
+        "--no-skip-sponsors",
+        action="store_true",
+        help="Disable SponsorBlock filtering (sponsors included in chunks)",
     )
 
     args = parser.parse_args()
 
-    run(video_id=args.video_id, window=args.window, dry_run=args.dry_run, force=args.force)
+    run(
+        video_id=args.video_id,
+        window=args.window,
+        dry_run=args.dry_run,
+        force=args.force,
+        skip_sponsors=not args.no_skip_sponsors,
+    )
