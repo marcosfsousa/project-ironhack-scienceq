@@ -77,17 +77,15 @@ Built with LangChain LCEL. Two execution paths:
 - **Blocking** (`answer()`) — used by the agent graph and eval runner
 - **Streaming** (`stream_answer()`) — yields tokens directly to the Streamlit UI
 
-Both paths share the same prompt template from `prompts.py`. The chain applies a `score_threshold=0.28` gate: queries scoring below this on all retrieved chunks receive a no-context fallback response rather than a hallucinated answer. Groq 429 rate limit errors are handled with exponential backoff (3 attempts, 2s → 4s → 8s).
+Both paths share the same prompt template from `prompts.py`. The chain applies a `score_threshold=0.40` gate: queries scoring below this on all retrieved chunks receive a no-context fallback response rather than a hallucinated answer. Groq 429 rate limit errors are handled with exponential backoff (3 attempts, 2s → 4s → 8s).
 
 ### Retriever (`agent/retriever.py`)
 
-Wraps Pinecone with namespace-aware querying. Embeddings are generated using `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions, cosine similarity). The retriever supports:
+Wraps Pinecone with namespace-aware querying. Embeddings are generated using Cohere `embed-multilingual-v3.0` (1024 dimensions, cosine similarity) with separate `input_type` values for indexing (`search_document`) and querying (`search_query`) — true asymmetric retrieval. The retriever supports:
 
 - Single namespace queries (`corpus` or `live`)
-- Multi-namespace merge (`retrieve_multi_namespace`) — merges both namespaces and returns top-k globally by score
+- Multi-namespace merge (`retrieve_multi_namespace`) — embeds the query once and fans out to both namespaces, then merges and returns top-k globally by score
 - Optional metadata filters by topic or channel
-
-Chunks are embedded at index time as `"{title} | {chunk_text}"` to bake topical context into the vector. At query time, plain query text is used — the asymmetry is intentional.
 
 ### Tools (`agent/tools.py`)
 
@@ -114,7 +112,7 @@ End-to-end pipeline triggered when the user pastes a YouTube URL:
 3. Extract transcript via `youtube-transcript-api`
 4. Clean and normalize text
 5. Chunk into ~60s windows
-6. Embed with `all-MiniLM-L6-v2`
+6. Embed with Cohere `embed-multilingual-v3.0` (`search_document` input_type)
 7. Upsert to Pinecone `live` namespace
 
 Note: `yt-dlp` is used only for metadata resolution in the live path. The corpus pipeline does not use `yt-dlp` — titles and channels are manually curated in `metadata.json`.
@@ -140,7 +138,7 @@ cleaner.py               →  transcript_clean.json
 chunker.py               →  chunks.json           (~60s windows)
     │
     ▼
-embedder.py              →  embeddings.json        (384-dim vectors)
+embedder.py              →  embeddings.json        (1024-dim vectors, Cohere)
     │
     ▼
 indexer.py               →  Pinecone upsert        [corpus namespace]
@@ -157,9 +155,9 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **Hardcoded RAG-first routing** over autonomous LLM routing — eliminates routing errors during live demos and removes one LLM call per turn.
 
-**Score threshold gate (0.28)** — lowered from an initial 0.35 on Day 5 after discovering that asymmetric embedding (title-prepended chunks indexed vs plain query text at retrieval time) depresses cosine scores. Single-word queries score 0.27–0.28, fuller questions score ~0.31 — both below the original gate. On-topic queries still clear 0.28 reliably; off-topic queries fall below it. Future upgrade path: swap `all-MiniLM-L6-v2` for a natively asymmetric model such as `msmarco-distilbert` or Cohere `embed-english-v3.0` (supports separate `input_type` for query vs document) — requires full re-indexing of all vectors.
+**Cohere asymmetric embeddings** — `embed-multilingual-v3.0` with separate `input_type` values (`search_document` at index time, `search_query` at retrieval time) is natively designed for asymmetric retrieval. This removes the need for title-prepended chunk text and improves precision, especially for short queries. Cosine scores with this model run higher (~0.49–0.78 for on-topic factual questions) than the old MiniLM model (~0.27–0.35). The 1024-dimensional vectors also support multilingual corpus expansion without re-indexing.
 
-**Title-prepended embeddings** — indexing chunks as `"{title} | {chunk_text}"` bakes topical context into vectors, improving retrieval precision for topic-adjacent queries.
+**Score threshold gate (0.40)** — calibrated via `eval/calibrate_threshold.py` against the 30-question eval set after Cohere re-indexing. `rag_factual` questions had a minimum top score of 0.49; adversarial out-of-corpus questions had a minimum of 0.39. The 0.40 gap preserves 100% hit rate on factual questions while providing a first-pass filter on the weakest off-topic matches. Adversarial intent filtering (prompt injection, out-of-scope requests) is handled by the LLM system prompt, not the score gate.
 
 **METADATA_LIST signal pattern** — `VideoMetadataTool` returns a structured `METADATA_LIST:<json>` prefix rather than a formatted string. The Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting which was producing inconsistent output. Plain-text fallbacks (no results found) are still passed through `st.markdown` as-is.
 
@@ -195,7 +193,7 @@ Evaluated using a 30-case eval set (`eval/eval_set.json`): 20 factual RAG cases,
 | prompt-v1 | 4.56 | 4.76 | 3.92 | 3.72 | 4.24 |
 | prompt-v2 | 4.28 | 4.88 | 4.04 | 4.36 | **4.39** |
 
-Results are tracked in LangSmith under the `youtube-qa-bot-prod` project for production traces and `youtube-qa-bot` for development.
+Results are tracked in LangSmith under the `scienceq` project.
 
 ---
 
@@ -204,7 +202,7 @@ Results are tracked in LangSmith under the `youtube-qa-bot-prod` project for pro
 | Layer | Technology |
 |---|---|
 | LLM | Groq — `llama-3.3-70b-versatile` (answers), `llama-3.1-8b-instant` (rewriting) |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` — 384 dimensions |
+| Embeddings | Cohere `embed-multilingual-v3.0` — 1024 dimensions, asymmetric |
 | Vector DB | Pinecone Serverless — cosine similarity, AWS us-east-1 |
 | Orchestration | LangChain LCEL + LangGraph |
 | Tracing | LangSmith |

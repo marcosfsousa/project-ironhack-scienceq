@@ -11,7 +11,7 @@ Pipeline (in order):
   5. Clean transcript using cleaner.clean_text()
   6. Chunk transcript using chunker.chunk_segments()
   7. Infer topic label via llama-3.1-8b-instant on first 500 words
-  8. Embed chunks via embedder.get_model()
+  8. Embed chunks via Cohere embed-multilingual-v3.0 (search_document)
   9. Upsert to Pinecone 'live' namespace
 
 Returns an IngestResult dataclass — never raises; errors are captured in .error.
