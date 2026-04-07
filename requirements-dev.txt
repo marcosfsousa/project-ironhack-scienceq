@@ -20,6 +20,7 @@ decorator==5.2.1
 defusedxml==0.7.1
 distro==1.9.0
 executing==2.2.1
+cohere
 filelock==3.25.0
 frozenlist==1.8.0
 fsspec==2026.2.0
@@ -27,10 +28,10 @@ gitdb==4.0.12
 GitPython==3.1.46
 groq==0.37.1
 h11==0.16.0
-hf-xet==1.3.2
+# hf-xet removed (sentence-transformers dependency, no longer needed)
 httpcore==1.0.9
 httpx==0.28.1
-huggingface_hub==1.5.0
+# huggingface_hub removed (sentence-transformers dependency, no longer needed)
 idna==3.11
 iniconfig==2.3.0
 ipykernel==7.2.0
@@ -60,11 +61,11 @@ markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 matplotlib-inline==0.2.1
 mdurl==0.1.2
-mpmath==1.3.0
+# mpmath removed (torch dependency, no longer needed)
 multidict==6.7.1
 narwhals==2.17.0
 nest-asyncio==1.6.0
-networkx==3.6.1
+# networkx removed (torch dependency, no longer needed)
 numpy==2.4.2
 openai==2.26.0
 orjson==3.11.7
@@ -100,28 +101,28 @@ requests==2.32.5
 requests-toolbelt==1.0.0
 rich==14.3.3
 rpds-py==0.30.0
-safetensors==0.7.0
+# safetensors removed (sentence-transformers dependency, no longer needed)
 scikit-learn==1.8.0
 scipy==1.17.1
-sentence-transformers==5.2.3
+# sentence-transformers removed — replaced by Cohere API (Phase 3)
 shellingham==1.5.4
-simsimd==6.5.15
+# simsimd removed (sentence-transformers dependency, no longer needed)
 six==1.17.0
 smmap==5.0.2
 sniffio==1.3.1
 stack-data==0.6.3
 streamlit==1.55.0
-sympy==1.14.0
+# sympy removed (torch dependency, no longer needed)
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tiktoken==0.12.0
-tokenizers==0.22.2
+# tokenizers removed (sentence-transformers dependency, no longer needed)
 toml==0.10.2
-torch==2.10.0
+# torch removed — replaced by Cohere API (Phase 3, saves ~2GB)
 tornado==6.5.4
 tqdm==4.67.1
 traitlets==5.14.3
-transformers==5.3.0
+# transformers removed (sentence-transformers dependency, no longer needed)
 typer==0.24.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0

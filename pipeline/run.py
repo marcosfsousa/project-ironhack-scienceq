@@ -78,7 +78,7 @@ def _run_chunk(skip_sponsors: bool = True) -> None:
 
 def _run_embed() -> None:
     log.info("━━ Step: embed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    embedder.run(video_id=None, batch_size=64, force=False, dry_run=False)
+    embedder.run(video_id=None, force=False, dry_run=False)
 
 
 def _run_bootstrap() -> None:

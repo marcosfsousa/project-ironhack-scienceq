@@ -5,7 +5,7 @@ langchain-pinecone
 langgraph
 langsmith
 pinecone
-sentence-transformers
+cohere
 youtube-transcript-api>=1.2.4
 python-dotenv
 streamlit

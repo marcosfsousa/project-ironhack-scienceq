@@ -66,9 +66,9 @@ _THIS_DIR = Path(__file__).resolve().parent
 if str(_THIS_DIR) not in sys.path:
     sys.path.insert(0, str(_THIS_DIR))
 
-from cleaner import clean_text, is_sponsor_segment   # noqa: E402
-from chunker import chunk_segments                    # noqa: E402
-from embedder import get_model                        # noqa: E402
+from cleaner import clean_text, is_sponsor_segment          # noqa: E402
+from chunker import chunk_segments                          # noqa: E402
+from embedder import COHERE_MODEL, _embed as _cohere_embed  # noqa: E402
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 CHUNK_WINDOW_SECONDS = 60
@@ -347,17 +347,11 @@ def _embed_and_upsert(
     dry_run: bool = False,
 ) -> int:
     """
-    Embed enriched text ("{title} | {chunk_text}") and upsert to Pinecone.
-    Mirrors the asymmetric embedding strategy from indexer.py.
+    Embed chunk texts via Cohere and upsert to Pinecone.
+    Uses input_type='search_document' for asymmetric retrieval.
     Returns number of vectors upserted.
     """
-    model = get_model()
-
-    # Build enriched texts for embedding
-    enriched_texts = [
-        f"{title} | {c['text']}" for c in chunks
-    ]
-    embeddings = model.encode(enriched_texts, normalize_embeddings=True).tolist()
+    embeddings = _cohere_embed([c["text"] for c in chunks])
 
     vectors = []
     for chunk, embedding in zip(chunks, embeddings):

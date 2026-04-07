@@ -49,17 +49,16 @@ import argparse
 import json
 import logging
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
+import cohere
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 
-# embedder.py lives in the same pipeline/ directory
-# get_model() returns the singleton SentenceTransformer
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
-from embedder import get_model
+from embedder import COHERE_MODEL, DIMENSION, _embed
 
 # ── Env + Logging ──────────────────────────────────────────────────────────────
 load_dotenv()
@@ -80,7 +79,6 @@ INDEX_LOG     = LOGS_DIR / "indexing_log.json"
 
 # ── Pinecone config ────────────────────────────────────────────────────────────
 INDEX_NAME   = os.getenv("PINECONE_INDEX_NAME", "youtube-qa-bot")
-DIMENSION    = 384
 METRIC       = "cosine"
 DEFAULT_NS   = os.getenv("PINECONE_NAMESPACE_CORPUS", "corpus")
 LIVE_NS      = os.getenv("PINECONE_NAMESPACE_LIVE", "live")
@@ -210,26 +208,29 @@ def index_video(
 
     log.info(f"  {len(chunks)} chunks | title: \"{title}\" | ns: {namespace}")
 
-    # Build enriched texts: "title | chunk_text"
-    enriched_texts = [f"{title} | {c['text']}" for c in chunks]
+    # Use cached embeddings.json if it exists and was produced by the same model.
+    # Avoids Cohere API calls (and token costs) on re-index runs.
+    vectors = None
+    embed_path = VIDEOS_DIR / video_id / "embeddings.json"
+    if embed_path.exists():
+        cached = json.loads(embed_path.read_text(encoding="utf-8"))
+        if cached.get("model") == COHERE_MODEL:
+            log.info("  Using cached embeddings.json (no API call).")
+            vec_by_id = {e["chunk_id"]: e["vector"] for e in cached["embeddings"]}
+            vectors   = [vec_by_id[c["chunk_id"]] for c in chunks]
+        else:
+            log.info("  embeddings.json model mismatch — re-embedding via Cohere.")
 
-    # Embed
-    log.info(f"  Embedding enriched texts...")
-    model   = get_model()
-    vectors = model.encode(
-        enriched_texts,
-        batch_size=32,
-        show_progress_bar=True,
-        convert_to_numpy=True,
-        normalize_embeddings=True,
-    )
+    if vectors is None:
+        log.info("  Embedding via Cohere API.")
+        vectors = _embed([c["text"] for c in chunks])
 
     # Build Pinecone records
     records = []
     for chunk, vector in zip(chunks, vectors):
         records.append({
             "id":     chunk["chunk_id"],
-            "values": vector.tolist(),
+            "values": vector,
             "metadata": {
                 "chunk_id":   chunk["chunk_id"],
                 "video_id":   video_id,

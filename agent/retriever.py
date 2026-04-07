@@ -25,9 +25,9 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
+import cohere
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from sentence_transformers import SentenceTransformer
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -45,8 +45,8 @@ PINECONE_INDEX_NAME       = os.getenv("PINECONE_INDEX_NAME", "youtube-qa-bot")
 PINECONE_NAMESPACE_CORPUS = os.getenv("PINECONE_NAMESPACE_CORPUS", "corpus")
 PINECONE_NAMESPACE_LIVE   = os.getenv("PINECONE_NAMESPACE_LIVE", "live")
 
-EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-DEFAULT_TOP_K    = 5
+COHERE_MODEL  = "embed-multilingual-v3.0"
+DEFAULT_TOP_K = 5
 
 
 # ── Data types ─────────────────────────────────────────────────────────────────
@@ -94,18 +94,21 @@ class RetrievedChunk:
 
 
 # ── Singletons ─────────────────────────────────────────────────────────────────
-# Both model and Pinecone index are loaded once per process.
+# Both Cohere client and Pinecone index are loaded once per process.
 
-_embed_model: Optional[SentenceTransformer] = None
+_cohere_client: Optional[cohere.Client] = None
 _pinecone_index = None
 
 
-def _get_embed_model() -> SentenceTransformer:
-    global _embed_model
-    if _embed_model is None:
-        log.info(f"Loading embedding model: {EMBED_MODEL_NAME}")
-        _embed_model = SentenceTransformer(EMBED_MODEL_NAME)
-    return _embed_model
+def _get_cohere_client() -> cohere.Client:
+    global _cohere_client
+    if _cohere_client is None:
+        api_key = os.getenv("COHERE_API_KEY")
+        if not api_key:
+            raise EnvironmentError("COHERE_API_KEY not set. Check your .env file.")
+        _cohere_client = cohere.Client(api_key=api_key)
+        log.info(f"Cohere client initialised. Model: {COHERE_MODEL}")
+    return _cohere_client
 
 
 def _get_index():
@@ -156,11 +159,18 @@ def retrieve(
         log.warning("retrieve() called with empty query — returning []")
         return []
 
-    model = _get_embed_model()
-    index = _get_index()
+    client = _get_cohere_client()
+    index  = _get_index()
 
-    # Embed the query
-    query_vector = model.encode(query, normalize_embeddings=True).tolist()
+    # Embed the query with search_query input_type (asymmetric retrieval)
+    resp = client.embed(
+        texts=[query],
+        model=COHERE_MODEL,
+        input_type="search_query",
+        embedding_types=["float"],
+    )
+    raw = resp.embeddings
+    query_vector = (raw.float_ if hasattr(raw, "float_") else raw)[0]
 
     # Build optional metadata filter
     pinecone_filter: dict = {}

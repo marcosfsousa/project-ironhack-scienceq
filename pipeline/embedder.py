@@ -1,34 +1,31 @@
 """
 embedder.py
 -----------
-Embeds transcript chunks produced by chunker.py.
+Embeds transcript chunks produced by chunker.py using Cohere's API.
 Reads  → data/videos/{video_id}/chunks.json
 Writes → data/videos/{video_id}/embeddings.json
 
 Why write embeddings to disk?
-  Embedding is slow (~1–2 min per video on CPU).
-  Persisting vectors lets you re-index into Pinecone
-  without re-embedding — useful during corpus curation
-  when you're tweaking namespaces or metadata.
+  Cohere charges per token. Persisting vectors lets you re-index into Pinecone
+  (e.g. after tweaking namespaces or metadata) without paying to re-embed.
 
 Embedding model:
-  sentence-transformers/all-MiniLM-L6-v2
-  - 384-dimensional vectors
-  - Fast on CPU (~2000 sentences/sec)
-  - Good semantic quality for English science content
-  - Free, no API key needed
+  cohere embed-multilingual-v3.0
+  - 1024-dimensional vectors
+  - Supports 100+ languages (ready for Phase 6 multilingual corpus)
+  - input_type="search_document" for asymmetric retrieval
 
 Output format (embeddings.json):
   {
     "video_id":      "...",
-    "model":         "all-MiniLM-L6-v2",
-    "dimension":     384,
+    "model":         "embed-multilingual-v3.0",
+    "dimension":     1024,
     "embedded_at":   "...",
     "chunk_count":   N,
     "embeddings": [
       {
         "chunk_id": "aircAruvnKk_000",
-        "vector":   [0.123, ...]   // 384 floats
+        "vector":   [0.123, ...]   // 1024 floats
       },
       ...
     ]
@@ -36,14 +33,12 @@ Output format (embeddings.json):
 
 Guarantees:
   - chunks.json is NEVER modified
-  - Running twice produces identical output (deterministic model)
   - Resume support: skips videos where embeddings.json already exists
   - Progress log written to data/logs/embedding_log.json
 
 Usage:
   python embedder.py                        # embed all videos
   python embedder.py --video-id aircAruvnKk # embed one video
-  python embedder.py --batch-size 64        # tune batch size
   python embedder.py --dry-run              # print stats, write nothing
   python embedder.py --force                # re-embed even if already done
 """
@@ -51,10 +46,14 @@ Usage:
 import argparse
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
-from sentence_transformers import SentenceTransformer
+import cohere
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -65,49 +64,63 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-DATA_DIR      = Path("data")
-VIDEOS_DIR    = DATA_DIR / "videos"
-LOGS_DIR      = DATA_DIR / "logs"
-EMBED_LOG     = LOGS_DIR / "embedding_log.json"
+DATA_DIR   = Path("data")
+VIDEOS_DIR = DATA_DIR / "videos"
+LOGS_DIR   = DATA_DIR / "logs"
+EMBED_LOG  = LOGS_DIR / "embedding_log.json"
 
 # ── Model config ───────────────────────────────────────────────────────────────
-MODEL_NAME  = "sentence-transformers/all-MiniLM-L6-v2"
-DIMENSION   = 384          # fixed for this model
-DEFAULT_BATCH_SIZE = 32    # safe default for CPU; raise to 128 on GPU
+COHERE_MODEL     = "embed-multilingual-v3.0"
+DIMENSION        = 1024
+COHERE_BATCH_SIZE = 96   # Cohere API limit per request
 
 
-# ── Model loader (singleton — load once per process) ──────────────────────────
+# ── Cohere client (singleton) ──────────────────────────────────────────────────
 
-_model: SentenceTransformer | None = None
+_co: cohere.Client | None = None
 
-def get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        log.info(f"Loading embedding model: {MODEL_NAME}")
-        _model = SentenceTransformer(MODEL_NAME)
-        log.info(f"Model loaded. Embedding dimension: {DIMENSION}")
-    return _model
+def _get_client() -> cohere.Client:
+    global _co
+    if _co is None:
+        api_key = os.getenv("COHERE_API_KEY")
+        if not api_key:
+            raise EnvironmentError("COHERE_API_KEY not set. Add it to your .env file.")
+        _co = cohere.Client(api_key=api_key)
+        log.info(f"Cohere client initialised. Model: {COHERE_MODEL} ({DIMENSION}d)")
+    return _co
+
+
+def _embed(texts: list[str]) -> list[list[float]]:
+    """
+    Embed texts with input_type='search_document'. Batches in groups of 96.
+    Returns a list of 1024-float vectors in the same order as the input.
+    """
+    client = _get_client()
+    all_vectors: list[list[float]] = []
+    for i in range(0, len(texts), COHERE_BATCH_SIZE):
+        resp = client.embed(
+            texts=texts[i : i + COHERE_BATCH_SIZE],
+            model=COHERE_MODEL,
+            input_type="search_document",
+            embedding_types=["float"],
+        )
+        raw = resp.embeddings
+        # SDK v5: resp.embeddings.float_ | SDK v4: resp.embeddings (already a list)
+        batch = raw.float_ if hasattr(raw, "float_") else raw
+        all_vectors.extend(batch)
+    return all_vectors
 
 
 # ── Per-video embedding ────────────────────────────────────────────────────────
 
 def embed_video(
     video_id: str,
-    batch_size: int,
-    force: bool,
-    dry_run: bool,
+    force:    bool,
+    dry_run:  bool,
 ) -> dict | None:
     """
-    Load chunks.json, embed all chunk texts, write embeddings.json.
-
-    Args:
-        video_id:   YouTube video ID (folder name under data/videos/)
-        batch_size: number of texts to encode at once
-        force:      re-embed even if embeddings.json already exists
-        dry_run:    compute embeddings but write nothing to disk
-
-    Returns:
-        stats dict on success, None if chunks.json not found
+    Load chunks.json, embed all chunk texts via Cohere, write embeddings.json.
+    Returns a stats dict on success, None if chunks.json not found.
     """
     chunks_path = VIDEOS_DIR / video_id / "chunks.json"
     embed_path  = VIDEOS_DIR / video_id / "embeddings.json"
@@ -116,12 +129,14 @@ def embed_video(
         log.warning(f"  chunks.json not found, skipping: {chunks_path}")
         return None
 
-    # Resume support — skip if already done (unless --force)
+    # Resume support — skip if already done with same model (unless --force)
     if embed_path.exists() and not force:
-        log.info(f"  Already embedded, skipping: {video_id}  (use --force to re-embed)")
-        return {"video_id": video_id, "skipped": True, "reason": "already_embedded"}
+        existing = json.loads(embed_path.read_text(encoding="utf-8"))
+        if existing.get("model") == COHERE_MODEL:
+            log.info(f"  Already embedded ({COHERE_MODEL}), skipping: {video_id}")
+            return {"video_id": video_id, "skipped": True, "reason": "already_embedded"}
+        log.info(f"  Model mismatch in embeddings.json — re-embedding: {video_id}")
 
-    # Load chunks
     data   = json.loads(chunks_path.read_text(encoding="utf-8"))
     chunks = data["chunks"]
 
@@ -129,54 +144,34 @@ def embed_video(
         log.warning(f"  No chunks found in {chunks_path}, skipping.")
         return None
 
-    # Extract texts preserving order
     chunk_ids = [c["chunk_id"] for c in chunks]
     texts     = [c["text"]     for c in chunks]
 
-    log.info(f"  Embedding {len(texts)} chunks in batches of {batch_size}...")
-
-    # Embed — show_progress_bar gives a tqdm bar per-video
-    model   = get_model()
-    vectors = model.encode(
-        texts,
-        batch_size=batch_size,
-        show_progress_bar=True,
-        convert_to_numpy=True,
-        normalize_embeddings=True,   # cosine sim ≡ dot product → faster Pinecone queries
-    )
-
-    # Sanity check
-    assert vectors.shape == (len(texts), DIMENSION), (
-        f"Unexpected embedding shape: {vectors.shape}"
-    )
+    log.info(f"  Embedding {len(texts)} chunks via Cohere...")
+    vectors = _embed(texts)
 
     embedded_at = datetime.utcnow().isoformat() + "Z"
-
     stats = {
         "video_id":    video_id,
         "chunk_count": len(chunks),
         "dimension":   DIMENSION,
-        "model":       MODEL_NAME,
+        "model":       COHERE_MODEL,
         "embedded_at": embedded_at,
     }
 
     if dry_run:
-        log.info(f"  DRY RUN — embeddings computed but not written.")
+        log.info("  DRY RUN — embeddings computed but not written.")
         return stats
 
-    # Build output payload
     output = {
         "video_id":    video_id,
-        "model":       MODEL_NAME,
+        "model":       COHERE_MODEL,
         "dimension":   DIMENSION,
         "embedded_at": embedded_at,
         "chunk_count": len(chunks),
         "embeddings": [
-            {
-                "chunk_id": chunk_id,
-                "vector":   vector.tolist(),   # numpy → plain list for JSON
-            }
-            for chunk_id, vector in zip(chunk_ids, vectors)
+            {"chunk_id": cid, "vector": vec}
+            for cid, vec in zip(chunk_ids, vectors)
         ],
     }
 
@@ -184,7 +179,6 @@ def embed_video(
         json.dumps(output, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-
     return stats
 
 
@@ -204,26 +198,23 @@ def save_embed_log(log_data: dict) -> None:
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def run(
-    video_id:   str | None,
-    batch_size: int,
-    force:      bool,
-    dry_run:    bool,
+    video_id: str | None,
+    force:    bool,
+    dry_run:  bool,
 ) -> None:
 
     if dry_run:
         log.info("DRY RUN — no files will be written.")
 
-    # Resolve targets
-    if video_id:
-        targets = [video_id]
-        log.info(f"Processing single video: {video_id}")
-    else:
-        targets = sorted(p.name for p in VIDEOS_DIR.iterdir() if p.is_dir())
-        if not targets:
-            log.warning(f"No video folders found in {VIDEOS_DIR}")
-            return
-        log.info(f"Found {len(targets)} video(s) to embed.")
+    targets = (
+        [video_id] if video_id
+        else sorted(p.name for p in VIDEOS_DIR.iterdir() if p.is_dir())
+    )
+    if not targets:
+        log.warning(f"No video folders found in {VIDEOS_DIR}")
+        return
 
+    log.info(f"Found {len(targets)} video(s) to embed.")
     embed_log  = load_embed_log()
     total_ok   = 0
     total_skip = 0
@@ -232,12 +223,7 @@ def run(
     for vid_id in targets:
         log.info(f"Embedding: {vid_id}")
         try:
-            stats = embed_video(
-                vid_id,
-                batch_size=batch_size,
-                force=force,
-                dry_run=dry_run,
-            )
+            stats = embed_video(vid_id, force=force, dry_run=dry_run)
 
             if stats is None:
                 embed_log["skipped"].append({
@@ -254,7 +240,7 @@ def run(
 
             log.info(
                 f"  ✓ {stats['chunk_count']} chunks embedded | "
-                f"dim: {stats['dimension']} | model: {MODEL_NAME}"
+                f"dim: {stats['dimension']} | model: {COHERE_MODEL}"
             )
             embed_log["embedded"].append(stats)
             total_ok += 1
@@ -285,36 +271,14 @@ def run(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Embed YouTube transcript chunks using sentence-transformers."
+        description="Embed YouTube transcript chunks using Cohere API."
     )
-    parser.add_argument(
-        "--video-id",
-        type=str,
-        default=None,
-        help="Embed a single video ID (default: embed all)",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=DEFAULT_BATCH_SIZE,
-        help=f"Encoding batch size (default: {DEFAULT_BATCH_SIZE}). "
-             "Raise to 128 if running on GPU.",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Re-embed videos that already have embeddings.json",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Compute embeddings but write nothing to disk",
-    )
+    parser.add_argument("--video-id", type=str, default=None,
+                        help="Embed a single video ID (default: embed all)")
+    parser.add_argument("--force", action="store_true",
+                        help="Re-embed videos that already have embeddings.json")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Compute embeddings but write nothing to disk")
     args = parser.parse_args()
 
-    run(
-        video_id=args.video_id,
-        batch_size=args.batch_size,
-        force=args.force,
-        dry_run=args.dry_run,
-    )
+    run(video_id=args.video_id, force=args.force, dry_run=args.dry_run)
