@@ -126,6 +126,79 @@ def _get_index():
 
 # ── Core retrieval ─────────────────────────────────────────────────────────────
 
+def _embed_query(query: str) -> list[float]:
+    """Embed a single query string with search_query input_type."""
+    client = _get_cohere_client()
+    resp = client.embed(
+        texts=[query],
+        model=COHERE_MODEL,
+        input_type="search_query",
+        embedding_types=["float"],
+    )
+    raw = resp.embeddings
+    # Cohere SDK v4 returns a list directly; v5 wraps in EmbeddingList with .float_
+    return (raw.float_ if hasattr(raw, "float_") else raw)[0]
+
+
+def _query_pinecone(
+    query_vector: list[float],
+    *,
+    namespace: str,
+    top_k: int,
+    filter_topic: Optional[str],
+    filter_channel: Optional[str],
+    score_threshold: float,
+) -> list[RetrievedChunk]:
+    """Run a pre-computed vector query against one Pinecone namespace."""
+    index = _get_index()
+
+    pinecone_filter: dict = {}
+    if filter_topic:
+        pinecone_filter["topic"] = {"$eq": filter_topic}
+    if filter_channel:
+        pinecone_filter["channel"] = {"$eq": filter_channel}
+
+    query_kwargs: dict = {
+        "vector":           query_vector,
+        "top_k":            top_k,
+        "namespace":        namespace,
+        "include_metadata": True,
+    }
+    if pinecone_filter:
+        query_kwargs["filter"] = pinecone_filter
+
+    try:
+        response = index.query(**query_kwargs)
+    except Exception as e:
+        log.error(f"Pinecone query failed: {e}")
+        return []
+
+    chunks: list[RetrievedChunk] = []
+    for match in response.get("matches", []):
+        score = match.get("score", 0.0)
+        if score < score_threshold:
+            continue
+        meta = match.get("metadata", {})
+        chunks.append(RetrievedChunk(
+            chunk_id  = meta.get("chunk_id",   match["id"]),
+            video_id  = meta.get("video_id",   ""),
+            title     = meta.get("title",      "Unknown"),
+            channel   = meta.get("channel",    "Unknown"),
+            topic     = meta.get("topic",      "Unknown"),
+            start     = float(meta.get("start", 0.0)),
+            end       = float(meta.get("end",   0.0)),
+            text      = meta.get("chunk_text", ""),
+            score     = round(score, 4),
+            namespace = namespace,
+        ))
+
+    log.info(
+        f"Retrieved {len(chunks)} chunk(s) "
+        f"(namespace={namespace!r}, top_k={top_k}, threshold={score_threshold})"
+    )
+    return chunks
+
+
 def retrieve(
     query: str,
     *,
@@ -141,8 +214,6 @@ def retrieve(
     Args:
         query:            Natural language question or search text.
         namespace:        Pinecone namespace — "corpus" (pre-built) or "live" (on-the-fly).
-                          Accepts the namespace string directly or the convenience
-                          constants PINECONE_NAMESPACE_CORPUS / PINECONE_NAMESPACE_LIVE.
         top_k:            Number of results to return (default: 5).
         filter_topic:     Optional metadata filter — only return chunks from this topic
                           (e.g. "Physics", "Biology"). Case-sensitive, matches metadata.json.
@@ -159,69 +230,14 @@ def retrieve(
         log.warning("retrieve() called with empty query — returning []")
         return []
 
-    client = _get_cohere_client()
-    index  = _get_index()
-
-    # Embed the query with search_query input_type (asymmetric retrieval)
-    resp = client.embed(
-        texts=[query],
-        model=COHERE_MODEL,
-        input_type="search_query",
-        embedding_types=["float"],
+    return _query_pinecone(
+        _embed_query(query),
+        namespace=namespace,
+        top_k=top_k,
+        filter_topic=filter_topic,
+        filter_channel=filter_channel,
+        score_threshold=score_threshold,
     )
-    raw = resp.embeddings
-    query_vector = (raw.float_ if hasattr(raw, "float_") else raw)[0]
-
-    # Build optional metadata filter
-    pinecone_filter: dict = {}
-    if filter_topic:
-        pinecone_filter["topic"] = {"$eq": filter_topic}
-    if filter_channel:
-        pinecone_filter["channel"] = {"$eq": filter_channel}
-
-    # Query Pinecone
-    query_kwargs: dict = {
-        "vector":          query_vector,
-        "top_k":           top_k,
-        "namespace":       namespace,
-        "include_metadata": True,
-    }
-    if pinecone_filter:
-        query_kwargs["filter"] = pinecone_filter
-
-    try:
-        response = index.query(**query_kwargs)
-    except Exception as e:
-        log.error(f"Pinecone query failed: {e}")
-        return []
-
-    # Parse results
-    chunks: list[RetrievedChunk] = []
-    for match in response.get("matches", []):
-        score = match.get("score", 0.0)
-        if score < score_threshold:
-            continue
-
-        meta = match.get("metadata", {})
-        chunk = RetrievedChunk(
-            chunk_id  = meta.get("chunk_id",   match["id"]),
-            video_id  = meta.get("video_id",   ""),
-            title     = meta.get("title",      "Unknown"),
-            channel   = meta.get("channel",    "Unknown"),
-            topic     = meta.get("topic",      "Unknown"),
-            start     = float(meta.get("start", 0.0)),
-            end       = float(meta.get("end",   0.0)),
-            text      = meta.get("chunk_text", ""),
-            score     = round(score, 4),
-            namespace = namespace,
-        )
-        chunks.append(chunk)
-
-    log.info(
-        f"Retrieved {len(chunks)} chunk(s) for query "
-        f"(namespace={namespace!r}, top_k={top_k}, threshold={score_threshold})"
-    )
-    return chunks
 
 
 def retrieve_multi_namespace(
@@ -232,20 +248,29 @@ def retrieve_multi_namespace(
 ) -> list[RetrievedChunk]:
     """
     Query both 'corpus' and 'live' namespaces and merge results.
-    Useful when the user has ingested a live URL alongside the pre-built corpus.
+    Embeds the query once and reuses the vector for both namespace queries.
 
     Returns top_k results globally (not top_k per namespace), sorted by score.
     """
-    corpus_results = retrieve(
-        query,
+    if not query.strip():
+        log.warning("retrieve_multi_namespace() called with empty query — returning []")
+        return []
+
+    query_vector = _embed_query(query)
+    corpus_results = _query_pinecone(
+        query_vector,
         namespace=PINECONE_NAMESPACE_CORPUS,
         top_k=top_k,
+        filter_topic=None,
+        filter_channel=None,
         score_threshold=score_threshold,
     )
-    live_results = retrieve(
-        query,
+    live_results = _query_pinecone(
+        query_vector,
         namespace=PINECONE_NAMESPACE_LIVE,
         top_k=top_k,
+        filter_topic=None,
+        filter_channel=None,
         score_threshold=score_threshold,
     )
     combined = corpus_results + live_results

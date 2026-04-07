@@ -82,8 +82,9 @@ REWRITE_MAX_TOKENS  = 128
 
 # ── Retrieval config ───────────────────────────────────────────────────────────
 DEFAULT_TOP_K           = 5
-DEFAULT_SCORE_THRESHOLD = 0.28   # Below this → "I don't know" guard
-                                    # Reduced from 0.35 on Day 4 (asymmetric embedding fix)
+DEFAULT_SCORE_THRESHOLD = 0.40   # Below this → "I don't know" guard
+                                    # Calibrated via eval_set.json (30 questions) after Cohere re-index:
+                                    # rag_factual min=0.49, adversarial min=0.39 → gap sits at 0.40
 
 # ── Groq retry config ──────────────────────────────────────────────────────────
 GROQ_MAX_RETRIES   = 3      # Maximum attempts before giving up

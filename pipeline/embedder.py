@@ -47,6 +47,7 @@ import argparse
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -70,9 +71,10 @@ LOGS_DIR   = DATA_DIR / "logs"
 EMBED_LOG  = LOGS_DIR / "embedding_log.json"
 
 # ── Model config ───────────────────────────────────────────────────────────────
-COHERE_MODEL     = "embed-multilingual-v3.0"
-DIMENSION        = 1024
-COHERE_BATCH_SIZE = 96   # Cohere API limit per request
+COHERE_MODEL      = "embed-multilingual-v3.0"
+DIMENSION         = 1024
+COHERE_BATCH_SIZE = 96    # Cohere API limit per request
+RATE_LIMIT_WAIT   = 62    # seconds to wait on 429 before retrying
 
 
 # ── Cohere client (singleton) ──────────────────────────────────────────────────
@@ -93,17 +95,28 @@ def _get_client() -> cohere.Client:
 def _embed(texts: list[str]) -> list[list[float]]:
     """
     Embed texts with input_type='search_document'. Batches in groups of 96.
+    Retries once on 429 after waiting RATE_LIMIT_WAIT seconds (free tier: 100k tokens/min).
     Returns a list of 1024-float vectors in the same order as the input.
     """
     client = _get_client()
     all_vectors: list[list[float]] = []
     for i in range(0, len(texts), COHERE_BATCH_SIZE):
-        resp = client.embed(
-            texts=texts[i : i + COHERE_BATCH_SIZE],
-            model=COHERE_MODEL,
-            input_type="search_document",
-            embedding_types=["float"],
-        )
+        batch_texts = texts[i : i + COHERE_BATCH_SIZE]
+        for attempt in range(2):
+            try:
+                resp = client.embed(
+                    texts=batch_texts,
+                    model=COHERE_MODEL,
+                    input_type="search_document",
+                    embedding_types=["float"],
+                )
+                break
+            except Exception as e:
+                if attempt == 0 and "429" in str(e):
+                    log.warning(f"  Rate limit hit — waiting {RATE_LIMIT_WAIT}s before retry...")
+                    time.sleep(RATE_LIMIT_WAIT)
+                else:
+                    raise
         raw = resp.embeddings
         # SDK v5: resp.embeddings.float_ | SDK v4: resp.embeddings (already a list)
         batch = raw.float_ if hasattr(raw, "float_") else raw

@@ -16,7 +16,7 @@ Usage:
   python -m pipeline.run --full
   python -m pipeline.run --steps extract,clean,chunk
   python -m pipeline.run --steps enrich
-  python -m pipeline.run --full --dry-run
+  python -m pipeline.run --steps embed,index --force
 
 Run from the project root. Reads .env automatically.
 """
@@ -76,9 +76,9 @@ def _run_chunk(skip_sponsors: bool = True) -> None:
     )
 
 
-def _run_embed() -> None:
+def _run_embed(force: bool = False) -> None:
     log.info("━━ Step: embed ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    embedder.run(video_id=None, force=False, dry_run=False)
+    embedder.run(video_id=None, force=force, dry_run=False)
 
 
 def _run_bootstrap() -> None:
@@ -91,9 +91,9 @@ def _run_enrich() -> None:
     enrich_metadata.run(dry_run=False)
 
 
-def _run_index() -> None:
+def _run_index(force: bool = False) -> None:
     log.info("━━ Step: index ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    indexer.run(video_id=None, namespace="corpus", force=False, dry_run=False)
+    indexer.run(video_id=None, namespace="corpus", force=force, dry_run=False)
 
 
 STEP_RUNNERS = {
@@ -138,6 +138,11 @@ def main() -> None:
         action="store_true",
         help="Disable SponsorBlock filtering during the chunk step",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-process videos already marked as done (applies to embed and index steps)",
+    )
 
     args = parser.parse_args()
 
@@ -150,11 +155,14 @@ def main() -> None:
             parser.error(f"Unknown step(s): {', '.join(unknown)}. Available: {', '.join(ALL_STEPS)}")
 
     skip_sponsors = not args.no_skip_sponsors
+    force = args.force
 
-    # Bake skip_sponsors into the chunk runner so all runners share the same () interface
+    # Bake per-step flags into runners so all share the same () interface
     runners = {
         **STEP_RUNNERS,
         "chunk": functools.partial(_run_chunk, skip_sponsors=skip_sponsors),
+        "embed": functools.partial(_run_embed, force=force),
+        "index": functools.partial(_run_index, force=force),
     }
 
     log.info(f"ScienceQ pipeline — running steps: {' → '.join(steps)}")
