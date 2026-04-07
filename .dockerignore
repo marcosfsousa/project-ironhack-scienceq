@@ -1,0 +1,41 @@
+# Large data directories (not needed at runtime)
+data/logs/
+data/videos/
+
+# Eval artifacts
+eval/
+
+# Secrets — never bake into image
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.ruff_cache/
+
+# Git
+.git/
+.gitignore
+
+# IDE and tooling
+.vscode/
+.devcontainer/
+.claude/
+
+# Docs and planning (not needed at runtime)
+docs/
+notebooks/
+
+# Dev-only files
+requirements-dev.txt
+tests/
+
+# Mempalace
+entities.json
+mempalace.yaml

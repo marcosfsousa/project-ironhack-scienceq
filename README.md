@@ -63,6 +63,21 @@ Evaluated on a 30-case QA set (20 factual, 5 multi-turn, 5 adversarial) with GPT
 
 ---
 
+## Running with Docker
+
+**Prerequisites:** Docker installed, a `.env` file with your API keys (copy from `.env.example`).
+
+```bash
+docker build -t scienceq .
+docker run --env-file .env -p 8501:8501 scienceq
+```
+
+Open [http://localhost:8501](http://localhost:8501). The embedding model is pre-baked into the image — no download on first request.
+
+> **Note:** The image is ~2.5GB due to PyTorch (pulled in by `sentence-transformers`). This will shrink significantly in a future release when embeddings move to Cohere's API.
+
+---
+
 ## Quickstart (run locally)
 
 **Prerequisites:** Python 3.11, a Pinecone account, a Groq API key, a LangSmith account.
