@@ -45,7 +45,7 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 | Layer | Technology |
 |---|---|
 | LLM | Groq — `llama-3.3-70b-versatile` |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` (384d) |
+| Embeddings | Cohere `embed-multilingual-v3.0` (1024d, asymmetric) |
 | Vector DB | Pinecone Serverless (cosine, AWS us-east-1) |
 | Orchestration | LangChain LCEL + LangGraph |
 | Tracing | LangSmith |
@@ -72,9 +72,7 @@ docker build -t scienceq .
 docker run --env-file .env -p 8501:8501 scienceq
 ```
 
-Open [http://localhost:8501](http://localhost:8501). The embedding model is pre-baked into the image — no download on first request.
-
-> **Note:** The image is ~2.5GB due to PyTorch (pulled in by `sentence-transformers`). This will shrink significantly in a future release when embeddings move to Cohere's API.
+Open [http://localhost:8501](http://localhost:8501).
 
 ---
 
@@ -96,7 +94,7 @@ docker compose run pipeline --full
 ```bash
 docker compose run pipeline --steps extract,clean,chunk
 docker compose run pipeline --steps enrich
-docker compose run pipeline --steps index
+docker compose run pipeline --steps embed,index --force
 ```
 
 The pipeline container uses the `pipeline` profile and does **not** start automatically with `docker compose up`.
@@ -105,10 +103,10 @@ The pipeline container uses the `pipeline` profile and does **not** start automa
 
 ## Quickstart (run locally)
 
-**Prerequisites:** Python 3.11, a Pinecone account, a Groq API key, a LangSmith account.
+**Prerequisites:** Python 3.11, a Pinecone account, a Groq API key, a Cohere API key, a LangSmith account.
 
 ```bash
-git clone https://github.com/<your-username>/project-ironhack-scienceq
+git clone https://github.com/marcosfsousa/project-ironhack-scienceq
 cd project-ironhack-scienceq
 
 pip install -r requirements.txt
@@ -122,48 +120,39 @@ streamlit run app/streamlit_app.py
 ### Required environment variables
 
 ```
+GROQ_API_KEY=
+COHERE_API_KEY=
 PINECONE_API_KEY=
 PINECONE_INDEX_NAME=youtube-qa-bot
 PINECONE_NAMESPACE_CORPUS=corpus
 PINECONE_NAMESPACE_LIVE=live
-GROQ_API_KEY=
 LANGSMITH_API_KEY=
-LANGSMITH_PROJECT=youtube-qa-bot
-LANGSMITH_ENDPOINT=https://eu.api.smith.langchain.com
+LANGSMITH_PROJECT=scienceq
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGCHAIN_TRACING_V2=true
 ```
-
 
 ---
 
 ## Building the corpus from scratch
 
-If you want to index your own set of videos, run the pipeline in order:
+If you want to index your own set of videos, run the pipeline steps in order:
 
 ```bash
 pip install -r requirements-dev.txt
 
-# 1. Extract transcripts (edit data/video_urls.txt with your URLs first)
-python pipeline/transcript_extractor.py
+# Run the full pipeline (edit data/video_urls.txt with your URLs first)
+python -m pipeline.run --full
 
-# 2. Clean transcripts
-python pipeline/cleaner.py
-
-# 3. Chunk into ~60s windows
-python pipeline/chunker.py
-
-# 4. Embed chunks
-python pipeline/embedder.py
-
-# 5. Upsert to Pinecone
-python pipeline/indexer.py
-
-# 6. Build metadata catalog
-python pipeline/bootstrap_metadata.py
-# Then manually fill in topic/difficulty fields in data/metadata.json
+# Or run individual steps
+python -m pipeline.run --steps extract,clean,chunk
+python -m pipeline.run --steps embed,index
+python -m pipeline.run --steps embed,index --force   # re-process already-done videos
 ```
 
-Each script supports `--video-id` to run on a single video and `--force` to re-run over existing output. See the docstring at the top of each file for full CLI options.
+**Manual step between `chunk` and `embed`:** after `bootstrap` runs, open `data/metadata.json` and verify/fill in `title`, `channel`, and `topic` for each video. The `enrich` step auto-fills these via the YouTube Data API + Groq, but review the output before indexing.
+
+Each individual script also supports `--video-id` to run on a single video. See the docstring at the top of each file for full CLI options.
 
 The chunks will be indexed in the namespace set under `PINECONE_NAMESPACE_CORPUS` in your `.env` file.
 
@@ -182,11 +171,14 @@ python tests/run_all_tests.py
 ```
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
 ├── app/                # Streamlit UI
-├── data/               # metadata.json, eval_set.json, per-video transcript/chunk files
-├── docs/               # ARCHITECTURE.md, DATASET.md
-├── eval/               # LangSmith eval runner and results
-├── pipeline/           # Offline corpus pipeline (extract → clean → chunk → embed → index)
+├── data/               # metadata.json, per-video transcript/chunk/embedding files
+├── docs/               # ARCHITECTURE.md, DATASET.md, implementation plan
+├── eval/               # Eval set, LangSmith runner, threshold calibration, results
+├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
+├── Dockerfile              # App image (Streamlit)
+├── Dockerfile.pipeline     # Pipeline image (batch jobs)
+├── docker-compose.yml
 ├── .env.example
 ├── requirements.txt        # Runtime (Streamlit Cloud)
 └── requirements-dev.txt    # Full dev + pipeline + eval dependencies
@@ -202,6 +194,7 @@ python tests/run_all_tests.py
 
 ## Next steps
 
-- Swap `all-MiniLM-L6-v2` for a natively asymmetric model (e.g. Cohere `embed-english-v3.0`) to improve retrieval scores without threshold tuning
-- Add a reranker pass (cross-encoder) after initial retrieval for better precision
+- Reranker pass using Cohere Rerank v3 after initial retrieval for better precision
+- Retrieval parameter sweeps (top-k, threshold) using the eval set as benchmark
 - Whisper integration for videos without captions
+- Multilingual corpus expansion (embed-multilingual-v3.0 already in place)
