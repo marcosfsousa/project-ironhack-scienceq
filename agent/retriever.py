@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import cohere
+import dataclasses
 from dotenv import load_dotenv
 from pinecone import Pinecone
 
@@ -156,11 +157,10 @@ def _rerank(
         documents = [c.text for c in chunks],
         top_n     = min(top_n, len(chunks)),
     )
-    reranked: list[RetrievedChunk] = []
-    for r in resp.results:
-        chunk = chunks[r.index]
-        chunk.rerank_score = round(r.relevance_score, 4)
-        reranked.append(chunk)
+    reranked: list[RetrievedChunk] = [
+        dataclasses.replace(chunks[r.index], rerank_score=round(r.relevance_score, 4))
+        for r in resp.results
+    ]
 
     log.info(
         f"Reranked {len(chunks)} → {len(reranked)} chunks "

@@ -98,7 +98,6 @@ def _run_cases(
 
     # Import after env is set — retriever reads RERANKER_ENABLED at module level,
     # so we force a reimport to pick up the new value.
-    import importlib
     import retriever as _retriever_mod
     _retriever_mod.RERANKER_ENABLED = reranker_on
     # Also reset the Cohere/Pinecone singletons so they re-read config cleanly.
