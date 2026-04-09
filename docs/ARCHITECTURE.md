@@ -86,6 +86,21 @@ Wraps Pinecone with namespace-aware querying. Embeddings are generated using Coh
 - Single namespace queries (`corpus` or `live`)
 - Multi-namespace merge (`retrieve_multi_namespace`) — embeds the query once and fans out to both namespaces, then merges and returns top-k globally by score
 - Optional metadata filters by topic or channel
+- Optional Cohere Rerank layer (see below)
+
+**Retrieval flow with reranker enabled:**
+
+```
+query
+  → Cohere embed (search_query, 1024d)
+  → Pinecone top_k=10 (over-retrieve)
+  → Cohere Rerank v3.5 (cross-encoder re-scoring)
+  → top_n=5 passed to LLM
+```
+
+Toggled via `RERANKER_ENABLED=true/false` in `.env`. When on, `retrieve()` always fetches `RERANKER_FETCH_K=10` candidates from Pinecone regardless of the caller's `top_k`, then lets Cohere Rerank filter down to the requested count. For multi-namespace queries, 10 candidates are fetched from each namespace (20 total) before reranking.
+
+Each `RetrievedChunk` carries both `score` (Pinecone cosine similarity) and `rerank_score` (Cohere relevance score, `None` when reranker is off), making pre/post ordering visible in LangSmith traces and UI source citations.
 
 ### Tools (`agent/tools.py`)
 
@@ -159,6 +174,8 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **Score threshold gate (0.40)** — calibrated via `eval/calibrate_threshold.py` against the 30-question eval set after Cohere re-indexing. `rag_factual` questions had a minimum top score of 0.49; adversarial out-of-corpus questions had a minimum of 0.39. The 0.40 gap preserves 100% hit rate on factual questions while providing a first-pass filter on the weakest off-topic matches. Adversarial intent filtering (prompt injection, out-of-scope requests) is handled by the LLM system prompt, not the score gate.
 
+**Cohere Rerank v3.5 (optional)** — a cross-encoder reranker sits between Pinecone retrieval and the LLM. Bi-encoder cosine similarity (used at Pinecone query time) is fast but imprecise — it encodes query and document independently. A cross-encoder like Cohere Rerank jointly attends to both, producing more accurate relevance scores at the cost of one additional API call per query. The design over-retrieves 10 candidates from Pinecone, reranks them, and passes the top 5 to the LLM. Toggled via `RERANKER_ENABLED` env var to enable A/B comparison without code changes. Impact is quantified by `eval/sweep_reranker.py`, which runs the full eval set with and without the reranker and outputs a per-dimension side-by-side table.
+
 **METADATA_LIST signal pattern** — `VideoMetadataTool` returns a structured `METADATA_LIST:<json>` prefix rather than a formatted string. The Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting which was producing inconsistent output. Plain-text fallbacks (no results found) are still passed through `st.markdown` as-is.
 
 **Custom `ConversationMemory`** — avoids `langchain-community` dependency, which had unstable versioning during development.
@@ -192,6 +209,10 @@ Evaluated using a 30-case eval set (`eval/eval_set.json`): 20 factual RAG cases,
 |---|---|---|---|---|---|
 | prompt-v1 | 4.56 | 4.76 | 3.92 | 3.72 | 4.24 |
 | prompt-v2 | 4.28 | 4.88 | 4.04 | 4.36 | **4.39** |
+| Phase 3 — Cohere embeddings (reranker off) | 4.12 | 4.76 | 3.60 | 3.60 | 4.02 |
+| Phase 4 — Cohere Rerank v3.5 (reranker on) | 4.40 | 4.84 | 3.64 | 4.12 | **4.25** |
+
+Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 4 is the new baseline for Phase 5 parameter sweeps. Biggest reranker gain: conciseness (+0.52), driven by tighter chunk selection reducing LLM context noise. Grounding (3.64) remains the weakest dimension — a generation-side issue, not retrieval.
 
 Results are tracked in LangSmith under the `scienceq` project.
 

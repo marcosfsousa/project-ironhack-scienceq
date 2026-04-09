@@ -48,6 +48,14 @@ PINECONE_NAMESPACE_LIVE   = os.getenv("PINECONE_NAMESPACE_LIVE", "live")
 COHERE_MODEL  = "embed-multilingual-v3.0"
 DEFAULT_TOP_K = 5
 
+# ── Reranker config ────────────────────────────────────────────────────────────
+# When enabled, Pinecone fetches RERANKER_FETCH_K candidates; Cohere Rerank
+# then re-scores them and returns the caller's top_k. Toggled via env var so
+# A/B comparison is possible without code changes.
+RERANKER_ENABLED  = os.getenv("RERANKER_ENABLED", "false").lower() == "true"
+RERANKER_MODEL    = "rerank-v3.5"
+RERANKER_FETCH_K  = 10   # Pinecone over-retrieval count when reranking
+
 
 # ── Data types ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +75,7 @@ class RetrievedChunk:
     text:       str
     score:      float                        # cosine similarity (0–1)
     namespace:  str                          # which namespace this came from
+    rerank_score: Optional[float] = None     # Cohere Rerank relevance score (None when reranker off)
 
     @property
     def youtube_link(self) -> str:
@@ -125,6 +134,40 @@ def _get_index():
 
 
 # ── Core retrieval ─────────────────────────────────────────────────────────────
+
+def _rerank(
+    query: str,
+    chunks: list["RetrievedChunk"],
+    top_n: int,
+) -> list["RetrievedChunk"]:
+    """
+    Re-score retrieved chunks with Cohere Rerank and return the top_n.
+
+    Each returned chunk has rerank_score set (the Cohere relevance score, 0–1).
+    The original cosine score is preserved on the object for observability.
+    Chunks are returned sorted by rerank_score descending.
+    """
+    if not chunks:
+        return chunks
+    client = _get_cohere_client()
+    resp = client.rerank(
+        model     = RERANKER_MODEL,
+        query     = query,
+        documents = [c.text for c in chunks],
+        top_n     = min(top_n, len(chunks)),
+    )
+    reranked: list[RetrievedChunk] = []
+    for r in resp.results:
+        chunk = chunks[r.index]
+        chunk.rerank_score = round(r.relevance_score, 4)
+        reranked.append(chunk)
+
+    log.info(
+        f"Reranked {len(chunks)} → {len(reranked)} chunks "
+        f"(model={RERANKER_MODEL}, top_n={top_n})"
+    )
+    return reranked
+
 
 def _embed_query(query: str) -> list[float]:
     """Embed a single query string with search_query input_type."""
@@ -230,14 +273,21 @@ def retrieve(
         log.warning("retrieve() called with empty query — returning []")
         return []
 
-    return _query_pinecone(
+    # When reranking, over-retrieve from Pinecone then let Cohere Rerank filter down.
+    fetch_k = RERANKER_FETCH_K if RERANKER_ENABLED else top_k
+    chunks  = _query_pinecone(
         _embed_query(query),
         namespace=namespace,
-        top_k=top_k,
+        top_k=fetch_k,
         filter_topic=filter_topic,
         filter_channel=filter_channel,
         score_threshold=score_threshold,
     )
+
+    if RERANKER_ENABLED and chunks:
+        chunks = _rerank(query, chunks, top_n=top_k)
+
+    return chunks
 
 
 def retrieve_multi_namespace(
@@ -257,10 +307,13 @@ def retrieve_multi_namespace(
         return []
 
     query_vector = _embed_query(query)
+    # When reranking, over-retrieve from each namespace so the reranker has
+    # enough candidates across both corpus and live to choose from.
+    fetch_k = RERANKER_FETCH_K if RERANKER_ENABLED else top_k
     corpus_results = _query_pinecone(
         query_vector,
         namespace=PINECONE_NAMESPACE_CORPUS,
-        top_k=top_k,
+        top_k=fetch_k,
         filter_topic=None,
         filter_channel=None,
         score_threshold=score_threshold,
@@ -268,12 +321,16 @@ def retrieve_multi_namespace(
     live_results = _query_pinecone(
         query_vector,
         namespace=PINECONE_NAMESPACE_LIVE,
-        top_k=top_k,
+        top_k=fetch_k,
         filter_topic=None,
         filter_channel=None,
         score_threshold=score_threshold,
     )
     combined = corpus_results + live_results
+
+    if RERANKER_ENABLED and combined:
+        return _rerank(query, combined, top_n=top_k)
+
     combined.sort(key=lambda c: c.score, reverse=True)
     return combined[:top_k]
 

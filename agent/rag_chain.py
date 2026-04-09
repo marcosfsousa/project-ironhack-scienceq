@@ -156,11 +156,12 @@ class RAGResponse:
         """Per-chunk source info for detailed citation display in the UI."""
         return [
             {
-                "title":     chunk.title,
-                "timestamp": chunk.timestamp_label,
-                "link":      chunk.youtube_link,
-                "score":     chunk.score,
-                "text":      chunk.text[:200] + ("..." if len(chunk.text) > 200 else ""),
+                "title":        chunk.title,
+                "timestamp":    chunk.timestamp_label,
+                "link":         chunk.youtube_link,
+                "score":        chunk.score,
+                "rerank_score": chunk.rerank_score,   # None when reranker is off
+                "text":         chunk.text[:200] + ("..." if len(chunk.text) > 200 else ""),
             }
             for chunk in self.chunks
         ]
