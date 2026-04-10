@@ -47,15 +47,15 @@ PINECONE_NAMESPACE_CORPUS = os.getenv("PINECONE_NAMESPACE_CORPUS", "corpus")
 PINECONE_NAMESPACE_LIVE   = os.getenv("PINECONE_NAMESPACE_LIVE", "live")
 
 COHERE_MODEL  = "embed-multilingual-v3.0"
-DEFAULT_TOP_K = 5
 
-# ── Reranker config ────────────────────────────────────────────────────────────
-# When enabled, Pinecone fetches RERANKER_FETCH_K candidates; Cohere Rerank
-# then re-scores them and returns the caller's top_k. Toggled via env var so
-# A/B comparison is possible without code changes.
-RERANKER_ENABLED  = os.getenv("RERANKER_ENABLED", "false").lower() == "true"
+# ── Retrieval tuning config ────────────────────────────────────────────────────
+# Env-driven so the parameter sweep script can patch them at runtime without
+# code changes (same pattern as RERANKER_ENABLED).
+RERANKER_ENABLED  = os.getenv("RERANKER_ENABLED",  "false").lower() == "true"
 RERANKER_MODEL    = "rerank-v3.5"
-RERANKER_FETCH_K  = 10   # Pinecone over-retrieval count when reranking
+RETRIEVER_FETCH_K = int(os.getenv("RETRIEVER_FETCH_K", "10"))
+RETRIEVER_TOP_N   = int(os.getenv("RETRIEVER_TOP_N",   "5"))
+SCORE_THRESHOLD   = float(os.getenv("SCORE_THRESHOLD", "0.40"))
 
 
 # ── Data types ─────────────────────────────────────────────────────────────────
@@ -246,10 +246,10 @@ def retrieve(
     query: str,
     *,
     namespace: str = "corpus",
-    top_k: int = DEFAULT_TOP_K,
+    top_k: Optional[int] = None,
     filter_topic: Optional[str] = None,
     filter_channel: Optional[str] = None,
-    score_threshold: float = 0.0,
+    score_threshold: Optional[float] = None,
 ) -> list[RetrievedChunk]:
     """
     Embed a query and return the top-k most similar chunks from Pinecone.
@@ -257,13 +257,14 @@ def retrieve(
     Args:
         query:            Natural language question or search text.
         namespace:        Pinecone namespace — "corpus" (pre-built) or "live" (on-the-fly).
-        top_k:            Number of results to return (default: 5).
+        top_k:            Chunks to return after reranking (or directly from Pinecone when
+                          reranker is off). Defaults to RETRIEVER_TOP_N env var (default 5).
         filter_topic:     Optional metadata filter — only return chunks from this topic
                           (e.g. "Physics", "Biology"). Case-sensitive, matches metadata.json.
         filter_channel:   Optional metadata filter — only return chunks from this channel
                           (e.g. "Veritasium"). Case-sensitive.
-        score_threshold:  Minimum cosine similarity score to include a result (default: 0.0).
-                          Raise to 0.3–0.4 to filter low-confidence matches.
+        score_threshold:  Minimum cosine similarity score to include a result.
+                          Defaults to SCORE_THRESHOLD env var (default 0.40).
 
     Returns:
         List of RetrievedChunk objects, sorted by score descending.
@@ -273,19 +274,22 @@ def retrieve(
         log.warning("retrieve() called with empty query — returning []")
         return []
 
+    effective_top_k     = top_k if top_k is not None else RETRIEVER_TOP_N
+    effective_threshold = score_threshold if score_threshold is not None else SCORE_THRESHOLD
+
     # When reranking, over-retrieve from Pinecone then let Cohere Rerank filter down.
-    fetch_k = RERANKER_FETCH_K if RERANKER_ENABLED else top_k
+    fetch_k = RETRIEVER_FETCH_K if RERANKER_ENABLED else effective_top_k
     chunks  = _query_pinecone(
         _embed_query(query),
         namespace=namespace,
         top_k=fetch_k,
         filter_topic=filter_topic,
         filter_channel=filter_channel,
-        score_threshold=score_threshold,
+        score_threshold=effective_threshold,
     )
 
     if RERANKER_ENABLED and chunks:
-        chunks = _rerank(query, chunks, top_n=top_k)
+        chunks = _rerank(query, chunks, top_n=effective_top_k)
 
     return chunks
 
@@ -293,30 +297,34 @@ def retrieve(
 def retrieve_multi_namespace(
     query: str,
     *,
-    top_k: int = DEFAULT_TOP_K,
-    score_threshold: float = 0.0,
+    top_k: Optional[int] = None,
+    score_threshold: Optional[float] = None,
 ) -> list[RetrievedChunk]:
     """
     Query both 'corpus' and 'live' namespaces and merge results.
     Embeds the query once and reuses the vector for both namespace queries.
 
     Returns top_k results globally (not top_k per namespace), sorted by score.
+    Defaults for top_k and score_threshold fall through to module-level env vars.
     """
     if not query.strip():
         log.warning("retrieve_multi_namespace() called with empty query — returning []")
         return []
 
+    effective_top_k     = top_k if top_k is not None else RETRIEVER_TOP_N
+    effective_threshold = score_threshold if score_threshold is not None else SCORE_THRESHOLD
+
     query_vector = _embed_query(query)
     # When reranking, over-retrieve from each namespace so the reranker has
     # enough candidates across both corpus and live to choose from.
-    fetch_k = RERANKER_FETCH_K if RERANKER_ENABLED else top_k
+    fetch_k = RETRIEVER_FETCH_K if RERANKER_ENABLED else effective_top_k
     corpus_results = _query_pinecone(
         query_vector,
         namespace=PINECONE_NAMESPACE_CORPUS,
         top_k=fetch_k,
         filter_topic=None,
         filter_channel=None,
-        score_threshold=score_threshold,
+        score_threshold=effective_threshold,
     )
     live_results = _query_pinecone(
         query_vector,
@@ -324,15 +332,15 @@ def retrieve_multi_namespace(
         top_k=fetch_k,
         filter_topic=None,
         filter_channel=None,
-        score_threshold=score_threshold,
+        score_threshold=effective_threshold,
     )
     combined = corpus_results + live_results
 
     if RERANKER_ENABLED and combined:
-        return _rerank(query, combined, top_n=top_k)
+        return _rerank(query, combined, top_n=effective_top_k)
 
     combined.sort(key=lambda c: c.score, reverse=True)
-    return combined[:top_k]
+    return combined[:effective_top_k]
 
 
 def format_context_for_llm(chunks: list[RetrievedChunk]) -> str:
@@ -357,8 +365,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--query",     type=str, required=True,
                         help="Search query")
-    parser.add_argument("--k",         type=int, default=DEFAULT_TOP_K,
-                        help=f"Number of results (default: {DEFAULT_TOP_K})")
+    parser.add_argument("--k",         type=int, default=RETRIEVER_TOP_N,
+                        help=f"Number of results (default: {RETRIEVER_TOP_N})")
     parser.add_argument("--namespace", type=str, default="corpus",
                         choices=["corpus", "live"],
                         help="Pinecone namespace (default: corpus)")

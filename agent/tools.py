@@ -30,8 +30,10 @@ from dotenv import load_dotenv
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from rag_chain import answer, RAGResponse, DEFAULT_SCORE_THRESHOLD
+from rag_chain import answer, RAGResponse
 from retriever import PINECONE_NAMESPACE_CORPUS, PINECONE_NAMESPACE_LIVE
+
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "0.40"))
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 log = logging.getLogger(__name__)
@@ -140,7 +142,7 @@ class RAGRetrieverTool(BaseTool):
     # These are set at instantiation time via get_tools()
     namespace:        str   = PINECONE_NAMESPACE_CORPUS
     top_k:            int   = 5
-    score_threshold:  float = DEFAULT_SCORE_THRESHOLD
+    score_threshold:  float = SCORE_THRESHOLD
     multi_namespace:  bool  = False
 
     # Conversation history injected by the agent before each tool call
@@ -302,7 +304,7 @@ class VideoMetadataTool(BaseTool):
 def get_tools(
     namespace: str = PINECONE_NAMESPACE_CORPUS,
     top_k: int = 5,
-    score_threshold: float = DEFAULT_SCORE_THRESHOLD,
+    score_threshold: float = SCORE_THRESHOLD,
     multi_namespace: bool = False,
     history: Optional[list] = None,
 ) -> list[BaseTool]:

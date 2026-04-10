@@ -80,12 +80,6 @@ REWRITE_MODEL       = "llama-3.1-8b-instant"
 REWRITE_TEMPERATURE = 0.0   # Temp set to 0 to prevent any creative deviations
 REWRITE_MAX_TOKENS  = 128
 
-# ── Retrieval config ───────────────────────────────────────────────────────────
-DEFAULT_TOP_K           = 5
-DEFAULT_SCORE_THRESHOLD = 0.40   # Below this → "I don't know" guard
-                                    # Calibrated via eval_set.json (30 questions) after Cohere re-index:
-                                    # rag_factual min=0.49, adversarial min=0.39 → gap sits at 0.40
-
 # ── Groq retry config ──────────────────────────────────────────────────────────
 GROQ_MAX_RETRIES   = 3      # Maximum attempts before giving up
 GROQ_RETRY_BASE    = 2.0    # Base delay in seconds (doubles each retry)
@@ -238,8 +232,8 @@ def answer(
     question: str,
     *,
     namespace: str = PINECONE_NAMESPACE_CORPUS,
-    top_k: int = DEFAULT_TOP_K,
-    score_threshold: float = DEFAULT_SCORE_THRESHOLD,
+    top_k: Optional[int] = None,
+    score_threshold: Optional[float] = None,
     history: Optional[list] = None,
     multi_namespace: bool = False,
 ) -> RAGResponse:
@@ -359,8 +353,8 @@ def stream_answer(
     question: str,
     *,
     namespace: str = PINECONE_NAMESPACE_CORPUS,
-    top_k: int = DEFAULT_TOP_K,
-    score_threshold: float = DEFAULT_SCORE_THRESHOLD,
+    top_k: Optional[int] = None,
+    score_threshold: Optional[float] = None,
     history: Optional[list] = None,
     multi_namespace: bool = False,
 ) -> tuple[Iterator[str], list[RetrievedChunk]]:
@@ -448,8 +442,10 @@ if __name__ == "__main__":
     parser.add_argument("--question",  type=str, required=True)
     parser.add_argument("--namespace", type=str, default="corpus",
                         choices=["corpus", "live"])
-    parser.add_argument("--k",         type=int, default=DEFAULT_TOP_K)
-    parser.add_argument("--threshold", type=float, default=DEFAULT_SCORE_THRESHOLD)
+    parser.add_argument("--k",         type=int,   default=None,
+                        help="Chunks to retrieve (default: RETRIEVER_TOP_N env var)")
+    parser.add_argument("--threshold", type=float, default=None,
+                        help="Min cosine score (default: SCORE_THRESHOLD env var)")
     parser.add_argument("--multi",     action="store_true",
                         help="Query both corpus and live namespaces")
     args = parser.parse_args()

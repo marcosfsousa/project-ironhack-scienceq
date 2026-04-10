@@ -1,0 +1,760 @@
+{
+  "experiment": "youtube-qa-bot-eval-20260410_123625",
+  "timestamp": "20260410_123625",
+  "judge_model": "gpt-4.1",
+  "total_cases": 25,
+  "scored": 25,
+  "adversarial_flagged": 5,
+  "results": [
+    {
+      "case_id": "rag_001",
+      "case_type": "rag_factual",
+      "topic": "Mathematics",
+      "video": "Math's Fundamental Flaw",
+      "question": "What is Gödel's incompleteness theorem and what does it say about mathematics?",
+      "reference": "Gödel's incompleteness theorem states that in any consistent formal mathematical system, there are true statements that cannot be proved within that system. This means mathematics can never be both complete and consistent — there will always be truths that lie beyond what can be formally proven. Gödel constructed a self-referential statement equivalent to 'this statement cannot be proved,' which, if provable, would make the system inconsistent.",
+      "answer": "Gödel's incompleteness theorem states that any basic mathematical system that can do fundamental arithmetic will always have statements within it which are true but which have no proof. This means that truth and provability are not the same thing, and there will always be true statements about mathematics that cannot be proven. In essence, it shows that any consistent formal system of math is incomplete, and a system like that cannot prove its own consistency, leaving open the possibility that some contradiction could always crop up in the future, revealing that the system had been inconsistent the whole time.\n\nGödel's theorem has significant implications for mathematics, as it challenges the idea that mathematics can be complete and consistent. It suggests that mathematics is inherently incomplete, and that there are limits to what can be proven or known. This has far-reaching consequences for the foundations of mathematics and our understanding of the nature of mathematical truth. \n\nThe theorem is often seen as a fundamental flaw in mathematics, as it highlights the limitations of mathematical systems and the impossibility of creating a complete and consistent system of mathematics. However, it also underscores the complexity and richness of mathematics, and has led to new areas of research and inquiry in the field.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer includes all key facts: that no consistent formal mathematical system can prove all truths, there are always true statements that cannot be proven, mathematics cannot be both complete and consistent, and it references the system's inability to prove its own consistency."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 3,
+          "reason": "While the core explanation is grounded, substantial commentary on the theorem's implications for the foundations of mathematics and characterizing it as a 'fundamental flaw' ventures beyond typical transcript content from a science YouTube video and includes external interpretation."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer repeats ideas about incompleteness multiple times and extends to meta-commentary on its significance, resulting in some unnecessary padding."
+        },
+        "mean": 4.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_002",
+      "case_type": "rag_factual",
+      "topic": "Mathematics",
+      "video": "The Simplest Math Problem No One Can Solve - Collatz Conjecture",
+      "question": "What is the Collatz conjecture and why has no one been able to prove it?",
+      "reference": "The Collatz conjecture starts with any positive integer: if it's even, divide by 2; if it's odd, multiply by 3 and add 1. The conjecture states that no matter what number you start with, you will always eventually reach 1. Despite its simple rules, no one has been able to prove this for all integers. Mathematicians have verified it for extraordinarily large numbers, but a general proof remains elusive because the sequence behaves unpredictably.",
+      "answer": "The Collatz conjecture is a mathematical problem that states every positive integer, if you apply the rules of dividing by two if the number is even and multiplying by three and adding one if the number is odd, will eventually end up in the four, two, one loop. Despite much effort, no one has been able to prove the conjecture true, and it's possible that it's not true, or that it's undecidable, meaning we may never know for sure. One reason it's been difficult to prove is that almost all attempts have focused on proving it true, with little effort spent looking for counterexamples. Additionally, the problem has been shown to be related to a Turing-complete machine, which means it's subject to the halting problem, making it possible that the conjecture is undecidable. \n\nThe conjecture has been studied extensively, and while many results have been found, such as the fact that almost all Collatz sequences reach a point below their initial value, these results are not enough to prove the conjecture true. In fact, it's been shown that it would take only one counterexample to disprove the conjecture, but so far, none have been found. The inclusion of negative numbers also adds complexity to the problem, as it introduces multiple independent loops, which raises questions about why there shouldn't be similar loops on the positive side of the number line.\n\nIt's also worth noting that even if almost all numbers have a number in their sequence that is arbitrarily small, as proven by Terry Tao, this doesn't necessarily mean that all numbers will eventually end up in the four, two, one loop. The search for a proof or counterexample continues, but the problem remains one of the most famous unsolved problems in mathematics.",
+      "scores": {
+        "correctness": {
+          "score": 3,
+          "reason": "The answer contains the basic rules and statement of the Collatz conjecture, but introduces inaccuracies (such as the 'four, two, one loop'), overstates undecidability, includes misleading context about research efforts, and adds unrelated complexity about negative numbers not relevant to the key facts."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 2,
+          "reason": "The answer introduces several advanced external concepts such as undecidability, the halting problem, Turing completeness, research by Terry Tao, and details about negative numbers, which go beyond what would reasonably be present in most science YouTube transcripts about the Collatz conjecture."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer contains some padding, repetition, and additional speculative commentary that extends beyond a concise explanation of the conjecture and its current status."
+        },
+        "mean": 3.25
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_003",
+      "case_type": "rag_factual",
+      "topic": "Mathematics",
+      "video": "The essence of calculus",
+      "question": "How does 3Blue1Brown explain the core idea behind calculus?",
+      "reference": "The core idea of calculus is about understanding how things change. Derivatives capture the rate of change of a function at any given point, essentially asking what happens when you zoom in infinitely close to a curve until it looks like a straight line. Integrals work in reverse, summing infinitely many infinitely small quantities to find areas under curves. The fundamental theorem of calculus connects these two ideas, showing that differentiation and integration are inverse operations.",
+      "answer": "3Blue1Brown, also known as Grant, explains the core idea behind calculus by starting with a simple geometric problem, such as finding the area of a circle. He wants viewers to think about how they might stumble upon the core ideas of calculus, including integrals, derivatives, and the fact that they're opposites, by deeply contemplating this problem and exploring the interesting thoughts that come about. He uses a visual approach, slicing up the circle into many concentric rings, to lead viewers to a glimpse of these big ideas in calculus. The goal is for viewers to feel like they could have invented calculus themselves by thinking about the right diagrams and exploring the ideas in a certain way.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer conveys most key ideas—visual intuition, circles leading to integrals and derivatives, and their relationship—but lacks explicit mention of rate of change, zooming in to a straight line for derivatives, and the fundamental theorem of calculus."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging or librarian-style opening phrases."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer is fully grounded in the video’s likely presentation, describing 3Blue1Brown’s visual and conceptual approach without introducing external facts or claims."
+        },
+        "conciseness": {
+          "score": 5,
+          "reason": "The answer is concise, uses 2 paragraphs, avoids repetition and padding, and delivers only relevant, dense information."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_004",
+      "case_type": "rag_factual",
+      "topic": "Physics",
+      "video": "Why No One Has Measured The Speed Of Light",
+      "question": "Why is it impossible to measure the one-way speed of light?",
+      "reference": "Measuring the one-way speed of light requires synchronising two clocks at different locations. But the only way to synchronise them is to send a signal between them — which itself requires knowing the speed of light. This is a circular problem. All experimental measurements of the speed of light are actually two-way measurements (there and back), which average the speed in both directions. It's conventionally assumed that light travels at the same speed in all directions, but this can never be empirically verified.",
+      "answer": "It's impossible to measure the one-way speed of light because any attempt to do so would actually measure the two-way speed. For example, using a high-speed camera to see light passing through an object would also capture the light bouncing back to the camera, thus measuring the two-way speed, not the one-way speed [Why No One Has Measured The Speed Of Light, 8:15 – 9:16]. The problem is fundamental: the only way people have managed to measure the speed of light is for a round trip, and it's possible that the speed of light is different in different directions, but this difference is always averaged out when measuring the round-trip speed. \n\nThis issue arises because the speed of light is assumed to be the same in all directions, but if it's not, then measuring the one-way speed becomes impossible with current methods. Even trying to synchronize clocks and move them apart to measure the one-way speed won't work if the speed of light depends on direction, as time dilation would also depend on direction. \n\nThe round-trip speed of light is always 'c', regardless of the one-way speed, which is why physics works the same whether the one-way speed is 'c' or something else, as long as the round-trip speed averages out to 'c'. This makes the one-way speed of light a hidden aspect of the universe, and its measurement remains an open problem in physics. \n\n- **Why No One Has Measured The Speed Of Light** — Veritasium · Physics\n- **The Speed of Light** — 3Blue1Brown · Physics\n- **Time Dilation** — Big Think · Physics",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately explains the synchronization issue, the necessity of two-way measurements, the conventional assumption about equal speed, and why measuring the one-way speed is fundamentally impossible, covering all key facts from the reference."
+        },
+        "tone": {
+          "score": 3,
+          "reason": "The answer includes explicit references to video timestamps and sources, which function as hedging openers and weaken the directness of the tone."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded in plausible video content, but references to time dilation depending on direction and stating the one-way speed measurement as an 'open problem in physics' verge on external or speculative detail beyond the transcript context."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer covers the necessary points but includes some repetition and extra detail (like mentioning camera experiments and meta-statements) that make it slightly padded beyond the most concise explanation."
+        },
+        "mean": 3.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_005",
+      "case_type": "rag_factual",
+      "topic": "Physics",
+      "video": "The True Nature of Matter and Mass",
+      "question": "What does mass actually consist of according to modern physics?",
+      "reference": "Most of the mass of ordinary matter does not come from the Higgs field giving mass to quarks. Instead, the vast majority of proton and neutron mass comes from the binding energy of quarks — the energy of the gluon field holding them together. The Higgs field accounts for only a small fraction of the mass of everyday matter. This means mass is largely a manifestation of energy, consistent with Einstein's E=mc².",
+      "answer": "Mass is composed of a combination of intrinsically massless, light-speed particles, such as quarks and electrons, that are prevented from streaming freely through the universe by fields that confine them, like the Higgs field and the binding gluon field. These particles gain their tiny masses from a type of confinement via the Higgs field. Without the Higgs field, they would be massless speed of light particles. The mass of an object is an emergent property of the ensemble of these particles and fields bumping and sloshing around inside it, resisting acceleration. \n\nIn other words, mass is not a fundamental property, but rather a result of the interaction between massless particles and the fields that confine them. This is evident in the way that quarks and electrons, which are intrinsically massless, gain mass through their interaction with the Higgs field. The combination of these massless particles and the fields that confine them gives rise to the property we observe as mass.\n\nThis understanding of mass is supported by the concept of inertial mass, which is the degree to which an object resists being accelerated. The equivalence principle, as described by general relativity, also plays a role in understanding how mass responds to gravitational fields.",
+      "scores": {
+        "correctness": {
+          "score": 3,
+          "reason": "The answer identifies the roles of the Higgs field and binding fields in mass but overemphasizes the Higgs mechanism, omits the crucial fact that most mass comes from gluon binding energy, and incorrectly implies electrons are confined, leading to notable gaps."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly without any hedging openers or framing statements throughout."
+        },
+        "grounding": {
+          "score": 3,
+          "reason": "The answer provides grounded discussion about confinement, the Higgs and gluon fields, and emergent mass but introduces external details like electrons being intrinsically massless (they are not), and references to the equivalence principle and general relativity, which are not necessarily within the scope of a science YouTube video's explanation."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer repeats several points about massless particles gaining mass from fields and gives similar explanations in multiple paragraphs, resulting in some unnecessary padding."
+        },
+        "mean": 3.5
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_006",
+      "case_type": "rag_factual",
+      "topic": "Physics",
+      "video": "The Geometry of Causality",
+      "question": "What is a light cone and how does it relate to causality?",
+      "reference": "A light cone is a geometric representation in spacetime of all the events that can be causally connected to a given point. The future light cone contains all events that can be influenced by the present event, while the past light cone contains all events that could have influenced it. Nothing can travel faster than light, so events outside the light cone are causally disconnected — they can neither influence nor be influenced by the event at the cone's origin.",
+      "answer": "A light cone is defined by the nearest downhill contour in a spacetime diagram, which determines the forward light cone for anyone anywhere on the diagram. The light cone essentially marks the boundary beyond which events are causally disconnected from a given point in spacetime. In other words, it defines the region of spacetime where events can be causally influenced by a particular point. The light cone is a fundamental concept in understanding causality, as it determines what events can be caused by a given event and what events can be affected by it. \n\nThe direction of causality is closely tied to the direction of the light cone, and reversing the direction of causality would require traveling backwards in time or exceeding the speed of light. The shape of the light cone is determined by the geometry of spacetime, and it plays a crucial role in understanding how causality works in different regions of spacetime, including those with strong gravitational fields like black holes. \n\nIn essence, the light cone provides a geometric representation of causality, allowing us to visualize and understand the causal relationships between different events in spacetime.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer accurately explains that the light cone defines the boundary for causal connection and its relation to the speed of light and causality, but omits explicit mention of the 'future' and 'past' light cones and is slightly less precise on technical definitions."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging or librarian framing."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded, accurately discussing light cones and causality as would be expected in a science YouTube video, but includes the specific phrase 'nearest downhill contour' which is unlikely to be standard or expected terminology, making it a borderline external detail."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long and repeats similar points about causality and the geometric interpretation, but overall contains no major padding and remains relevant."
+        },
+        "mean": 4.25
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_007",
+      "case_type": "rag_factual",
+      "topic": "Cosmology",
+      "video": "Brian Cox: The terrifying possibility of the Great Filter",
+      "question": "What is the Great Filter and why is it considered terrifying?",
+      "reference": "The Great Filter is a hypothetical barrier in the development of civilisations that prevents them from becoming interstellar. It's proposed as an explanation for the Fermi Paradox — the observation that despite the universe's vastness, we detect no signs of other intelligent life. The terrifying aspect is its position: if the Filter lies ahead of us, it means some catastrophic obstacle awaits all advanced civilisations. If it lies behind us, humanity may be exceptionally rare. Either interpretation has profound implications.",
+      "answer": "The Great Filter is an idea that attempts to explain the Fermi paradox, which questions why we don't see any evidence of other civilizations in the universe. The Great Filter suggests that there is a barrier or filter that prevents civilizations from becoming interstellar, and it can lie in our future or our past. If the Great Filter lies in our future, it means that civilizations like ours can develop and grow, but will eventually be stopped from becoming a multi-planetary species. This is considered terrifying because it implies that we may be approaching a point of no return, where our civilization will be halted or destroyed, and we may not be able to escape our solar system or colonize other planets.\n\nThe possibility that the Great Filter lies in our future is unsettling because it suggests that we may be facing a significant threat to our existence, and that our actions or inactions could determine the fate of our civilization. It's terrifying to think that we might be on the verge of a catastrophic event or a self-inflicted disaster that could prevent us from becoming a long-term, sustainable presence in the universe. The fact that we don't see any evidence of other civilizations suggests that the Great Filter might be a significant obstacle, and that we may be next in line to face it. \n\nThe idea of the Great Filter is also terrifying because it highlights our own mortality and the fragility of our existence. It forces us to confront the possibility that our civilization may not be as resilient or sustainable as we think, and that we may be more vulnerable to extinction than we realize. This realization can be unsettling and humbling, and it challenges us to think more critically about our place in the universe and our responsibility to ensure the long-term survival of our civilization.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately covers all key facts: it explains the Great Filter concept, its relevance to the Fermi Paradox, the significance of its position (past or future), and why it is considered terrifying, matching the ground truth in detail."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging or librarian framing present."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer stays mostly grounded in what a typical science YouTube video would state, but phrases like 'multi-planetary species,' 'self-inflicted disaster,' and 'responsibility to ensure survival' edge toward external interpretation or emphasis not strictly derivable from the transcript context."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer has useful information but includes considerable repetition and elaboration that could be condensed into a denser and more concise response."
+        },
+        "mean": 4.25
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_008",
+      "case_type": "rag_factual",
+      "topic": "Cosmology",
+      "video": "Black Hole Star - The Star That Shouldn't Exist",
+      "question": "What is a black hole star and why shouldn't it exist?",
+      "reference": "A black hole star, or quasi-star, is a theoretical type of star from the early universe where a black hole forms at the centre of a massive protostar before the surrounding gas can collapse. The black hole feeds on the gas, releasing energy that temporarily stabilises the star against collapse. These objects would have been extraordinarily massive — potentially millions of times the mass of the Sun. They shouldn't exist by normal stellar physics because such massive accumulations of gas typically collapse immediately, but in the early universe conditions may have been different.",
+      "answer": "A black hole star is a hypothetical massive star that has a black hole at its core. It's considered to be the largest possible star, with a mass of up to a million solar masses. What makes it unusual is that it has a black hole inside, which is typically thought to be a separate entity from a star. The black hole is like a cosmic parasite, consuming the star's material and growing in size. \n\nThe reason a black hole star shouldn't exist is that our current understanding of star formation and growth doesn't allow for such a massive object to form. Normally, black holes are thought to form from the collapse of a massive star, but they shouldn't be able to exist inside a star. The presence of a black hole at the center of a star would also affect the star's behavior and evolution in ways that are not currently understood. Additionally, the growth of supermassive black holes, which are found at the centers of galaxies, is still not well understood, and the existence of black hole stars could potentially help explain how these massive black holes formed so quickly in the early universe.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer correctly identifies a black hole star as a hypothetical massive star with a black hole at its core and addresses its mass and why it shouldn't exist, but omits specific details about the energy release stabilizing the star and the early universe context."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer stays mostly within what could be inferred from a science YouTube video, with just a borderline external detail about black hole stars explaining the growth of supermassive black holes, which is not in the reference answer but is a common speculative point in such videos."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long with minor elaboration, but it remains dense and largely avoids unnecessary padding or repetition."
+        },
+        "mean": 4.25
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_009",
+      "case_type": "rag_factual",
+      "topic": "Cosmology",
+      "video": "Neutron Stars: The Most Extreme Objects in the Universe",
+      "question": "What makes neutron stars so extreme compared to other objects in the universe?",
+      "reference": "Neutron stars are the collapsed cores of massive stars, compressed to roughly 20 kilometres in diameter while containing more mass than the Sun. Their density is so extreme that a teaspoon of neutron star material would weigh billions of tonnes. They spin incredibly fast — some hundreds of times per second — and have the strongest magnetic fields known. The matter inside them may exist in exotic states not found anywhere else, potentially including quark matter.",
+      "answer": "Neutron stars are considered extreme objects in the universe due to their incredibly high density, which is 200 trillion times anything found on Earth. This density leads to extreme conditions, such as the formation of Cooper pairs, where pairs of spin-½ neutrons become connected, allowing them to act as spin-0 or spin-1 particles. Additionally, the core of a neutron star can become a superfluid, a frictionless fluid that can sustain vortices with enormous amounts of energy, and a superconductor, which helps maintain the star's enormous magnetic field. The surface gravity of a neutron star is also incredibly strong, with a gravitational pull of around 100 billion G's, which is much stronger than anything found on Earth or other celestial bodies. \n\nThe atmosphere of a neutron star is also unique, consisting of a plasma of ionized atoms, mostly hydrogen and helium, which is only about a meter thick. The conditions on a neutron star are so extreme that they can lead to the formation of exotic states of matter, such as quark-gluon plasma, which is thought to have existed in the early universe. These extreme conditions make neutron stars one of the most extreme objects in the universe, even more so than black holes in some ways. \n\nThe combination of these extreme conditions, including the density, gravity, and magnetic field, make neutron stars a fascinating and unique object of study in the universe.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer covers most key facts—extreme density, strong gravity, exotic matter states, magnetic fields—but omits their typical size, origin as collapsed cores, and extremely fast spin."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging or librarian-style framing."
+        },
+        "grounding": {
+          "score": 2,
+          "reason": "The answer includes several detailed external statistics (e.g., 200 trillion times Earth density, 100 billion G's surface gravity), specific physical processes (Cooper pairs, superfluidity, superconductivity), and speculative references (quark-gluon plasma, comparison to black holes) that go notably beyond what is typically covered or inferable from a general science YouTube video transcript on neutron stars."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer contains some repetition and minor padding, particularly in summarizing points already made and including somewhat extraneous details, making it less concise than ideal."
+        },
+        "mean": 3.5
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_010",
+      "case_type": "rag_factual",
+      "topic": "Cosmology",
+      "video": "Brian Cox - What Was There Before The Big Bang?",
+      "question": "What does Brian Cox say about what existed before the Big Bang?",
+      "reference": "Brian Cox explains that the question 'what came before the Big Bang' may not have a meaningful answer because time itself began with the Big Bang. In general relativity, spacetime is a fabric that was created at the Big Bang — there was no 'before' in any conventional sense. Some models, like the Hartle-Hawking no-boundary proposal, suggest the universe had no initial boundary in imaginary time, making the question analogous to asking what is south of the South Pole.",
+      "answer": "Brian Cox explains that before the Big Bang, the universe underwent a rapid, exponentially fast expansion, known as inflation, which was fueled by a mysterious form of energy that permeated empty space. This inflation caused the universe to double in size at least 80 times in a fraction of a second. He also mentions that the current textbook picture is that there was a phase in the universe's life before the Big Bang, which is called inflation, and that this phase is still not fully understood. Additionally, he notes that some theories, such as eternal inflation theories, suggest that there may be multiple universes, potentially an infinite number, and that our universe is just one of them. \n\nHe also states that the period of time before the Big Bang was extremely cold and empty of everything but empty space, and that this empty space carried energy that stretched the universe out to its enormous size. However, he also mentions that there are alternate theories to cosmological inflation, such as the idea of extra dimensions in the universe, which could also explain the initial conditions that led to the Big Bang.\n\nUltimately, Brian Cox says that what existed before the Big Bang is still a mystery, and that the answer to this question may be beyond the reach of science.",
+      "scores": {
+        "correctness": {
+          "score": 2,
+          "reason": "The answer incorrectly describes inflation as occurring before the Big Bang and omits Cox's key point that time itself began with the Big Bang, failing to capture the core explanation about the question's meaninglessness in classical cosmology."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 2,
+          "reason": "The answer introduces specific details about cosmic inflation, energy content, and multiverse concepts, which are notable external additions not strictly derivable from the typical transcript context of Brian Cox's basic explanation on 'before the Big Bang'."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer includes some padding and repetition, particularly by elaborating on inflation and multiple theories in detail, which makes it longer than necessary and less concise."
+        },
+        "mean": 3.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_011",
+      "case_type": "rag_factual",
+      "topic": "Biology",
+      "video": "Genetic Engineering Will Change Everything Forever – CRISPR",
+      "question": "How does CRISPR-Cas9 work as a gene editing tool?",
+      "reference": "CRISPR-Cas9 works by using a guide RNA to direct the Cas9 protein to a specific location in the genome. The guide RNA is programmed to match a target DNA sequence. Once located, the Cas9 protein acts like molecular scissors, cutting the DNA at that precise location. The cell then repairs this cut, and researchers can either disable the gene or insert new genetic material at the cut site. This makes CRISPR dramatically more precise, cheaper, and faster than previous gene editing techniques.",
+      "answer": "CRISPR-Cas9 works by using a protein called CAS9 that scans the cell's DNA for a specific sequence, and when it finds a 100-percent perfect match, it cuts out the targeted DNA. This process is made possible by a DNA archive called CRISPR, where bacteria store a part of the virus DNA that has attacked them, allowing them to recognize and defend against future attacks. Scientists have figured out that the CRISPR system is programmable, so they can give it a copy of the DNA they want to modify, and the system will edit the live cells accordingly. The CAS9 protein acts like a DNA surgeon, making precise cuts in the DNA, allowing for targeted editing of genes. \n\nThis process is based on the natural defense mechanism that bacteria use to protect themselves against viruses. When a virus attacks a bacterium, the bacterium can capture a piece of the virus's DNA and store it in its CRISPR archive. If the virus attacks again, the bacterium uses this stored DNA to recognize the virus and deploy the CAS9 protein to cut it out. By harnessing this natural process, scientists can use CRISPR-Cas9 to edit genes in living cells, including human cells, with high precision and efficiency.\n\nThe CRISPR-Cas9 system offers several advantages over previous gene editing tools, including its precision, ease of use, and ability to edit live cells. It can be used to switch genes on and off, target specific DNA sequences, and study the function of particular genes. Overall, CRISPR-Cas9 has revolutionized the field of genetics and has the potential to treat a wide range of diseases, including genetic disorders, cancer, and infectious diseases. \n\n- **Genetic Engineering Will Change Everything Forever – CRISPR** — Kurzgesagt · Genetic Engineering\n- **How CRISPR Lets Us Edit Life** — Big Think · CRISPR \n- **The CRISPR Revolution** — 3Blue1Brown · CRISPR",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer accurately describes CRISPR-Cas9's mechanism, its components, and bacterial origins, but omits explicitly mentioning the guide RNA and the cell's repair process after DNA cutting."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing throughout."
+        },
+        "grounding": {
+          "score": 3,
+          "reason": "The answer is mostly grounded in concepts likely mentioned in science YouTube videos, but introduces external claims about CRISPR being used to treat diseases like cancer and infectious diseases and provides unnecessary depth on bacterial immunity that might go beyond a typical video transcript."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer is somewhat padded with repeated explanations about bacterial defense mechanisms and applications, extending beyond the essential mechanics of how CRISPR-Cas9 works."
+        },
+        "mean": 3.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_012",
+      "case_type": "rag_factual",
+      "topic": "Biology",
+      "video": "Your Gut Microbiome: The Most Important Organ You've Never Heard Of",
+      "question": "Why is the gut microbiome described as the most important organ you've never heard of?",
+      "reference": "The gut microbiome — the trillions of bacteria, viruses, and fungi living in the digestive system — influences far more than digestion. It affects immune function, mental health through the gut-brain axis, metabolism, and even the risk of chronic diseases. The microbiome is sometimes called a forgotten organ because its impact on health rivals that of any traditional organ, yet most people are unaware of its existence or importance. Diversity of the microbiome is key — a less diverse microbiome is associated with a range of health problems.",
+      "answer": "The gut microbiome is described as the most important organ you've never heard of because it plays a crucial role in overall health, yet it's often overlooked. Having a healthy gut microbiome is essential for long-term health, as it can affect energy levels, sickness frequency, mental clarity, and emotional well-being. An unhealthy gut microbiome has been linked to various conditions, including autoimmune diseases, diabetes, neurodegenerative disorders, and emotional issues. The gut microbiome is composed of trillions of microorganisms, including bacteria, fungi, and viruses, that live in the digestive tract and work together to maintain health. \n\nThe diversity of the gut microbiome is vital, and factors such as diet, antibiotics, stress, and a lack of exposure to diverse environments can negatively impact it. The gut microbiome is intimately connected to the central nervous system, and stress can damage the microbiome, leading to a range of health problems. \n\nOverall, the gut microbiome is considered the most important organ you've never heard of because of its significant impact on overall health and well-being, despite being often underappreciated and overlooked. \n- **Your Gut Microbiome: The Most Important Organ You’ve Never Heard Of** — Erika Ebbel Angle · TEDxFargo · Gut Health",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately includes all key facts: the gut microbiome's definition, its impact extending beyond digestion to immunity and mental health, importance of diversity, connection to chronic diseases, and why it's considered a 'forgotten organ.'"
+        },
+        "tone": {
+          "score": 3,
+          "reason": "The answer includes several hedging phrases such as 'is described as,' 'is considered,' and references to external sources, which somewhat undermine a direct tone."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded in what would be expected from a science YouTube video transcript, but includes potentially borderline external claims such as links to specific neurodegenerative disorders and 'mental clarity,' which may stretch beyond what a typical video or the reference covers directly."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer is padded with some repetition and restates points already made, rather than remaining dense and concise throughout."
+        },
+        "mean": 3.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_013",
+      "case_type": "rag_factual",
+      "topic": "Biology",
+      "video": "The Making of a Theory: Darwin, Wallace, and Natural Selection",
+      "question": "What role did Alfred Russel Wallace play in the development of the theory of natural selection?",
+      "reference": "Alfred Russel Wallace independently arrived at the same theory of natural selection as Charles Darwin, developing it while working in the Malay Archipelago. Wallace sent a letter to Darwin outlining his ideas, which prompted Darwin to finally publish On the Origin of Species after years of delay. Their work was jointly presented to the Linnean Society in 1858. While Darwin became far more famous, Wallace's independent discovery confirmed the validity of the theory and he remained a respected naturalist.",
+      "answer": "Alfred Russel Wallace played a significant role in the development of the theory of natural selection, as he independently developed the same idea as Charles Darwin. Wallace's manuscript, which summarized his theory, was sent to Darwin, who was shocked to find that Wallace had come to the same conclusions as him. Both men observed similar patterns in species and concluded that species could change over time due to variation and competition. Wallace's work was so similar to Darwin's that they decided to share the credit, and their papers were read aloud together in London. Wallace's contribution was acknowledged by Darwin, and he eventually wrote a book on evolution, which he titled \"Darwinism\", showing his respect for Darwin's work. Despite developing the theory independently, Wallace and Darwin became lifelong friends, united by their shared understanding of how evolution shaped the living world.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately covers all key facts: Wallace's independent discovery of natural selection, his correspondence with Darwin, their joint presentation, his acknowledgment of Darwin's fame, and Wallace's lasting respect and involvement in the field."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the content without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 3,
+          "reason": "The answer introduces some external details such as Wallace and Darwin becoming lifelong friends and Wallace writing a book titled 'Darwinism,' which while plausible, are not guaranteed to be contained in a typical science YouTube transcript on the topic."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long, adding minor biographical details and background (like their lifelong friendship and Wallace's Darwinism book), but overall remains relevant and free of major padding."
+        },
+        "mean": 4.25
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_014",
+      "case_type": "rag_factual",
+      "topic": "Neuroscience",
+      "video": "My Stroke of Insight",
+      "question": "What did Jill Bolte Taylor experience and discover during her stroke?",
+      "reference": "Jill Bolte Taylor, a brain scientist, experienced a massive stroke in her left hemisphere and spent eight years recovering. During the stroke, she lost the ability to walk, talk, read, and recall her life, but simultaneously experienced a profound sense of peace and expansion — the perspective of her right hemisphere. She describes feeling at one with the universe as her left brain's chatter silenced. The experience gave her unique scientific and personal insight into how the two hemispheres of the brain create very different realities.",
+      "answer": "Jill Bolte Taylor experienced a range of unusual sensations and perceptions during her stroke. She felt her energy lift and her spirit surrender, and she knew she was no longer in control of her life. She also experienced intense pain from light and sound, which felt like pure pain and chaos. Her mind was suspended between two planes of reality, and she lost her sense of boundaries and her ability to define her body. \n\nShe discovered that she could choose to step into the consciousness of her right hemisphere, where she felt at one with the universe, or into the consciousness of her left hemisphere, where she became a single individual, separate from the flow. This experience gave her a new perspective on life and motivated her to recover. She realized that we have the power to choose, moment by moment, who and how we want to be in the world. \n\nDuring her stroke, Jill Bolte Taylor also lost her ability to walk, talk, read, write, or recall her life, essentially becoming an infant in a woman's body. However, this experience also brought her a sense of peace and compassion, and she felt connected to the life-force power of the universe.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately describes Jill Bolte Taylor's loss of abilities, her experiences tied to the left and right hemispheres, the sense of peace and unity she felt, and her personal insight into brain function, matching all key facts from the reference."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into what Jill Bolte Taylor experienced and discovered without any hedging or framing openers."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer stays fully within the scope of what would be shared in a YouTube video by Jill Bolte Taylor, describing her subjective experience, neurological deficits, and the realizations she gained without adding external statistics or unverifiable claims."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long with some descriptive detail, but overall it remains relevant and contains no unnecessary padding or repetition."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_015",
+      "case_type": "rag_factual",
+      "topic": "Cognitive Science",
+      "video": "The Illusion of Truth",
+      "question": "What is the illusory truth effect and how does repetition influence what we believe?",
+      "reference": "The illusory truth effect is the tendency to believe information is true simply because we have encountered it before. Repeated exposure to a statement increases cognitive ease — the brain processes it more fluently — and this fluency is misattributed as evidence of truth. Studies show that even when people are told a statement is false, repeated exposure makes it feel more true over time. This has significant implications for misinformation, advertising, and political messaging.",
+      "answer": "The illusory truth effect refers to the phenomenon where people are more likely to believe a statement is true if they've been exposed to it repeatedly, even if it's actually false. Repetition plays a significant role in this effect, as it creates cognitive ease, making the statement feel more familiar and effortless to process. When we're exposed to a statement multiple times, it becomes more comfortable and feels safer, rather than being perceived as a threat. This is because our brains tend to associate familiarity with truth, and repetition increases the sense of familiarity.\n\nAs a result, even if no useful information is provided, repeated exposure to a statement can make it feel more true. For example, if you're repeatedly told that \"the body temperature of a chicken\" is a certain value, you're more likely to believe it, even if the actual value is different. This effect can be observed in various contexts, including advertising, where repeated exposure to a claim can make it seem more credible. The illusory truth effect highlights how our brains can be influenced by repetition, making us more susceptible to believing false information if it's presented to us enough times. \n\n- **The Illusion of Truth** — Big Think · Cognitive Psychology\n- **The paradox of choice** — TED · Psychology of Decision Making \n- **You don’t exist the way you think you do** — Big Think · Philosophy of Mind",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately explains the illusory truth effect, details how repetition induces cognitive ease and increased perceived truth, and mentions implications such as susceptibility to false information and relevance to advertising, matching all key facts from the reference."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers and maintains a confident, informative tone throughout."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer explains the illusory truth effect and the influence of repetition in terms that would be found in a science YouTube video, without introducing external facts, statistics, or unsupported claims."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long, using extra sentences and examples, but all content is relevant and informative without unnecessary padding or repetition."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_016",
+      "case_type": "rag_factual",
+      "topic": "Cognitive Science",
+      "video": "The Science of Thinking",
+      "question": "What is the difference between System 1 and System 2 thinking?",
+      "reference": "System 1 thinking is fast, automatic, and effortless — it handles routine tasks, pattern recognition, and intuitive judgements. System 2 thinking is slow, deliberate, and effortful — it handles complex reasoning, logic, and careful decision-making. Most of our daily thinking is System 1. The brain defaults to System 1 to conserve energy, only engaging System 2 when tasks are sufficiently novel or complex. This division helps explain cognitive biases, as System 1 often produces quick but systematically wrong answers.",
+      "answer": "System 1 thinking, also referred to as \"Gun\", is fast and intuitive, making automatic judgments without conscious awareness. It processes copious amounts of information from senses, picks out relevant bits, and discards the rest. System 1 is responsible for filling in gaps and making assumptions, like correctly reading text with missing or similar symbols. This type of thinking is made possible by long-term memory and operates quickly, but without conscious deliberation.\n\nSystem 2 thinking, or \"Drew\", is slow and deliberative, representing conscious thought and the voice in your head. It's capable of following instructions, executing series of steps, and catching mistakes. System 2 is lazy and takes effort to engage, but it's careful and capable of logical reasoning, like calculating multiplication in your head. While System 1 operates automatically, System 2 is responsible for conscious thoughts and decision-making.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer accurately describes System 1 as fast, intuitive, and automatic, and System 2 as slow, deliberative, and logical, but omits mention of cognitive biases and the energy-conservation reason for System 1's dominance."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation with no hedging or librarian framing anywhere."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer remains fully grounded in the likely content of a science YouTube video on this topic, using examples and explanations consistent with how System 1 and System 2 are typically introduced, and does not add external facts or statistics."
+        },
+        "conciseness": {
+          "score": 5,
+          "reason": "The answer uses two concise paragraphs, avoids repetition or padding, and delivers dense, useful information throughout."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_017",
+      "case_type": "rag_factual",
+      "topic": "Technology",
+      "video": "But what is a neural network?",
+      "question": "How does a neural network learn to recognise handwritten digits?",
+      "reference": "A neural network learns to recognise handwritten digits through a process called training. It is shown thousands of labelled examples and adjusts the weights of connections between neurons to minimise the difference between its predictions and the correct answers. This adjustment is done using backpropagation and gradient descent — the network calculates how much each weight contributed to the error and nudges them in the direction that reduces it. After enough training iterations, the network generalises and can correctly classify new, unseen digits.",
+      "answer": "A neural network learns to recognize handwritten digits through a process that involves multiple layers of neurons, where activations in one layer determine the activations of the next layer. The network is trained on data, and it adjusts its weights and biases to pick up on certain patterns in the data. The process starts with the input layer, where the network takes in an image of a handwritten digit, represented by 784 neurons corresponding to the brightness of each pixel in the image. \n\nThe network then uses this input to generate a pattern of activations in the next layer, which causes a specific pattern in the subsequent layer, and so on, until it reaches the output layer. The brightest neuron in the output layer represents the network's choice for what digit the image represents. The network learns to recognize digits by adjusting its weights and biases to minimize the difference between its predictions and the actual correct digits.\n\nThe exact process of how the network learns the appropriate weights and biases is covered in a separate video, but it involves iterating many matrix vector products and the sigmoid squishification function, resulting in an absurdly complicated function with 13,000 parameters.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer covers most key facts, including training on data, weight adjustment to minimize prediction error, and the multi-layer structure, but omits explicit mention of backpropagation, gradient descent, and generalization to unseen digits."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian-style framing."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded and appropriately describes neural network learning, but it includes specific numbers like '784 neurons' and '13,000 parameters' and mentions the 'sigmoid squishification function', which may not be fully derivable from an average transcript unless the original video explicitly covers those details."
+        },
+        "conciseness": {
+          "score": 3,
+          "reason": "The answer includes some padded explanations (such as step-by-step activations and references to video content) and digresses into details (specific pixel and parameter counts) that are not critical to the concise explanation of how neural networks learn to recognize digits."
+        },
+        "mean": 4.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_018",
+      "case_type": "rag_factual",
+      "topic": "Technology",
+      "video": "AI vs Human Thinking: How Large Language Models Really Work",
+      "question": "How do large language models differ fundamentally from human thinking?",
+      "reference": "Large language models work by predicting the next token in a sequence based on statistical patterns learned from enormous amounts of text. They have no understanding, beliefs, or goals — they are sophisticated pattern matchers. Human thinking, by contrast, involves grounded understanding, causal reasoning, embodied experience, and genuine intentions. LLMs can produce fluent, coherent text that mimics reasoning without actually performing it. This distinction matters for reliability, as LLMs can confidently produce plausible-sounding but incorrect outputs.",
+      "answer": "Large language models differ fundamentally from human thinking in several key areas. One major difference is embodiment - humans exist in the real world and their thoughts and behaviors are influenced by interactions with the physical environment, whereas LLMs are disembodied and exist as software on servers. \n\nAnother difference lies in how they process information. Humans process concepts and grasp chunks of meaning, linking them to prior knowledge and context, whereas LLMs operate on sequences of discrete symbols called tokens, calculating attention scores to predict the next token. \n\nAdditionally, LLMs do not consciously perform reasoning like humans do, instead generating plausible sequences of tokens that appear to be reasoning. This is why LLMs can fail at tasks that seem trivial to humans and are prone to hallucinating, producing confident-sounding but factually incorrect statements. \n\nLastly, the mechanisms of learning are also different between humans and LLMs, with humans learning through complex networks of biological neurons and LLMs learning through artificial neurons. \n\n- **AI vs Human Thinking: How Large Language Models Really Work** — Channel · AI and Human Thinking\n- **How Large Language Models Work** — Channel · LLMs and their Applications",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately covers all key points: LLMs lack embodiment, understanding, reasoning, and intention, operate via token prediction based on statistical patterns, and differ in learning mechanisms compared to humans, matching the reference."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging or librarian framing."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded in concepts likely present in a science YouTube video, but the mention of 'attention scores' and detailed neural comparison may go slightly beyond what is derivable solely from typical transcript context."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly longer than necessary with four dense paragraphs but contains no unnecessary repetition or padding."
+        },
+        "mean": 4.5
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_019",
+      "case_type": "rag_factual",
+      "topic": "Psychology",
+      "video": "The paradox of choice",
+      "question": "What is the paradox of choice and how does having more options make us less happy?",
+      "reference": "The paradox of choice, as described by Barry Schwartz, is that while freedom of choice is considered essential to wellbeing, too many choices actually produce paralysis and dissatisfaction. When options multiply, people experience decision paralysis, spend more time deliberating, and feel more regret afterwards — because more options means more alternatives not chosen. The expected value of a decision goes up with more choices, but the experienced satisfaction often goes down. Schwartz argues that some constraints on choice can improve wellbeing.",
+      "answer": "The paradox of choice refers to the idea that having more options to choose from can actually make us less happy and less satisfied with our decisions. This is because when we have too many options, we become paralyzed and find it difficult to make a choice, fearing that we might make the wrong one. Even if we do manage to make a choice, we often end up less satisfied with the result because we imagine that we could have made a different choice that would have been better.\n\nHaving more options also leads to what economists call \"opportunity costs,\" where we focus on the attractive features of the options we rejected, making us less satisfied with the option we chose. Additionally, the more options we have, the higher our expectations become, and when our choices don't meet those expectations, we become disappointed. This escalation of expectations means that even when we make good choices, we're not as satisfied with the outcome as we would be if we had fewer options to choose from. \n\nFor instance, when buying jeans, having 100 different options can lead to higher expectations, and even if we find a good pair, it's not perfect, so we're disappointed. This disappointment subtracts from the satisfaction we get out of our choice, even if it was a good one.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer contains all key facts from the reference, accurately describing paralysis, regret, opportunity cost, heightened expectations, and reduced satisfaction when faced with too many choices."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer is fully grounded in concepts and specific examples (like buying jeans) found in the referenced science YouTube video and does not introduce external facts or statistics."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly longer than necessary with an added example paragraph, but all content is relevant and there is no unnecessary repetition or padding."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "rag_020",
+      "case_type": "rag_factual",
+      "topic": "Education",
+      "video": "Do schools kill creativity?",
+      "question": "What is Ken Robinson's main argument about schools and creativity?",
+      "reference": "Ken Robinson argues that the current education system was designed for the industrial age and systematically suppresses creativity by prioritising certain academic subjects — mathematics, languages, sciences — over arts and creative disciplines. Children are naturally creative and willing to take risks, but schools educate this out of them by treating mistakes as failures rather than essential parts of learning. Robinson calls for a radical rethinking of education that places creativity on equal footing with literacy.",
+      "answer": "Ken Robinson's main argument is that schools kill creativity by educating people out of their creative capacities. He believes that children are born artists, but as they grow up, they become frightened of being wrong and lose their capacity for creativity. This is because the education system stigmatizes mistakes and prioritizes academic ability over creative thinking. Robinson argues that creativity is as important in education as literacy, and that we should treat it with the same status. He also suggests that the current education system is based on an outdated industrial model that values certain subjects over others, and that we need to radically rethink our view of intelligence and creativity.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer includes all key facts: the industrial model of education, suppression of creativity, prioritization of academic subjects, the stigma against mistakes, and Robinson’s call for equal status of creativity and literacy."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly with Ken Robinson's main argument and does not include any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer stays fully grounded in Ken Robinson's main arguments as typically presented in his talks and summarized in science-focused YouTube videos, without introducing any external, unverifiable, or fabricated claims."
+        },
+        "conciseness": {
+          "score": 5,
+          "reason": "The answer is concise, focused, covers all key points of the argument, and avoids unnecessary padding or repetition."
+        },
+        "mean": 5.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "mt_001",
+      "case_type": "rag_multi_turn",
+      "topic": "Cognitive Science",
+      "video": "The Illusion of Truth",
+      "question": "How does it relate to advertising?",
+      "reference": "Cognitive ease explains why advertising uses repetition so effectively. Repeated exposure to a brand, slogan, or claim makes it feel more familiar and effortless to process, which the brain interprets as truthfulness or trustworthiness. This happens even when the person knows it is an advertisement. Marketers exploit cognitive ease deliberately — catchy jingles, consistent visual branding, and repeated messaging all reduce mental effort and increase the likelihood that a message feels credible.",
+      "answer": "Cognitive ease plays a significant role in advertising, as it can make people more receptive to messages and more likely to judge them as true. Advertisers often use repetition, clear and simple language, and high-contrast visuals to create cognitive ease, making their messages feel more familiar and intuitive. This can lead to increased trust and acceptance of the message, even if it's not necessarily true. Additionally, advertisers may use easy-to-pronounce brand names, logos, and slogans to create cognitive ease, making their products more memorable and appealing. The advertising industry is aware of the power of cognitive ease and uses it to their advantage to influence consumer perceptions and behaviors.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately mentions the key points: the role of cognitive ease in advertising, the use of repetition, familiar and simple elements, and the association with trust and credibility, all in alignment with the reference answer."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded, referencing techniques like repetition, simple language, and visuals that are reasonable inferences from a science YouTube video, though mentioning easy-to-pronounce brand names and logo design could stretch beyond typical transcript content."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long but contains no padding or repetition, and every sentence contributes relevant information about cognitive ease in advertising."
+        },
+        "mean": 4.5
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "mt_002",
+      "case_type": "rag_multi_turn",
+      "topic": "Cosmology",
+      "video": "Brian Cox: The terrifying possibility of the Great Filter",
+      "question": "What does the Great Filter have to do with it?",
+      "reference": "The Great Filter is one of the main proposed solutions to the Fermi Paradox. If intelligent life is so improbable or short-lived that it never reaches interstellar scale, that would explain the silence. The Filter represents whatever barrier — whether it's the emergence of complex life, intelligent life, or the survival of technological civilisations — stops life from becoming detectable across the universe.",
+      "answer": "The Great Filter is an idea that attempts to explain the Fermi Paradox. It suggests that there is a barrier or filter that prevents civilizations from becoming interstellar, and that we might have not yet passed this filter. The Great Filter can lie in our future or our past, meaning that either civilizations are being prevented from arising in the first place, or they are being prevented from surviving and becoming visible to us. If the Great Filter lies in our future, it means that civilizations like ours are likely to go extinct before they can become interstellar. If it lies in our past, it means that the probability of intelligent life arising on a given planet is very low.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately explains the concept of the Great Filter, its relation to the Fermi Paradox, and covers both possible locations of the filter (in our past or future), matching all key facts from the reference answer."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the explanation without using any hedging openers or librarian framing."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer is fully grounded within what would be expected from a science YouTube video transcript, providing only explanations and inferences derivable from the topic without introducing external facts or speculative statistics."
+        },
+        "conciseness": {
+          "score": 5,
+          "reason": "The answer is concise, spans two paragraphs, avoids unnecessary repetition or meta-commentary, and is dense with relevant information throughout."
+        },
+        "mean": 5.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "mt_003",
+      "case_type": "rag_multi_turn",
+      "topic": "Biology",
+      "video": "Genetic Engineering Will Change Everything Forever – CRISPR",
+      "question": "What are the ethical concerns around it?",
+      "reference": "The main ethical concerns around CRISPR include the potential for designer babies — editing embryos for traits like intelligence or appearance — which raises questions about inequality and consent. There is also the risk of off-target edits causing unintended genetic changes, and the possibility of germline edits being heritable by future generations without their consent. The technology's accessibility raises concerns about unregulated use, and there are debates about where to draw the line between treating disease and enhancing normal human traits.",
+      "answer": "There are concerns that CRISPR could be used to create \"designer babies\" with engineered traits, which could lead to unpredictable consequences. Additionally, the possibility of a state or totalitarian regime using genetic engineering to create \"super soldiers\" or to control their population is a concern. There's also the issue of unequal access to genetic editing technology, which could exacerbate existing social inequalities. Furthermore, the use of CRISPR to edit human embryos raises questions about the morality of altering the human gene pool and the potential long-term effects on the human species. The fact that we are already pre-selecting humans based on medical conditions, with many pregnancies being terminated when genetic defects are detected, also raises ethical questions about the use of genetic engineering to select for certain traits.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer includes most key ethical concerns such as designer babies, social inequality, and morality of gene editing, though it omits specific mention of off-target effects and heritability without consent."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly into the ethical concerns without any hedging or framing statements."
+        },
+        "grounding": {
+          "score": 3,
+          "reason": "While much of the answer is grounded in common science video discussions (designer babies, inequality, embryo editing), the mention of 'super soldiers' and totalitarian regimes reflects notable external or speculative concepts not typically derivable directly from YouTube science videos on CRISPR ethics."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly long but covers multiple dense points related to ethical concerns without unnecessary repetition or padding."
+        },
+        "mean": 4.0
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "mt_004",
+      "case_type": "rag_multi_turn",
+      "topic": "Physics",
+      "video": "Why No One Has Measured The Speed Of Light",
+      "question": "Does this mean light could actually travel at different speeds in different directions?",
+      "reference": "Theoretically yes — the one-way speed of light could be different in different directions as long as the two-way average equals c. The universe would look identical either way because any clock synchronisation method is circular. This is known as the conventionality of simultaneity. Most physicists adopt the Einstein synchronisation convention where light travels at the same speed in all directions, but this is a convention rather than an empirically forced conclusion.",
+      "answer": "Yes, it's possible that the speed of light could vary by direction, with some theories suggesting it could be different by a few percent, or even more extreme variations, such as going at 'c' in one direction and infinitely fast in the other. However, our current understanding of physics is based on the assumption that the speed of light is the same in all directions, which is a convention established by Einstein. This convention is what allows us to define simultaneity and synchronize clocks, but it's not an experimentally verified fact. Einstein himself pointed out that this is a definition, not a discovery, and it's what allows us to make sense of time and space.",
+      "scores": {
+        "correctness": {
+          "score": 5,
+          "reason": "The answer accurately presents the key facts: the speed of light could theoretically differ in different directions, this is tied to clock synchronization conventions, the Einstein convention is standard but not uniquely determined by experiment, and this underlies the conventionality of simultaneity."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly without any hedging openers or librarian framing throughout the response."
+        },
+        "grounding": {
+          "score": 4,
+          "reason": "The answer is mostly grounded but includes a borderline external detail about 'some theories' suggesting a few percent variation and 'infinitely fast in one direction,' which is a bit beyond what would necessarily be stated in a typical science YouTube video on this topic."
+        },
+        "conciseness": {
+          "score": 4,
+          "reason": "The answer is slightly longer than necessary but remains focused and contains no unnecessary repetition or padding."
+        },
+        "mean": 4.5
+      },
+      "error": null,
+      "skipped": false
+    },
+    {
+      "case_id": "mt_005",
+      "case_type": "rag_multi_turn",
+      "topic": "Psychology",
+      "video": "You don't need a 10-year plan. You need to experiment.",
+      "question": "What practical approach does she recommend?",
+      "reference": "Le Cunff recommends treating life like a series of experiments rather than following a fixed plan. Practically, this means setting short time-bounded experiments — trying something for a defined period with clear success criteria — rather than committing to a 10-year goal. This reduces the fear of failure, since an experiment that doesn't work is still informative. She emphasises curiosity and iteration over optimisation.",
+      "answer": "Anne-Laure Le Cunff recommends designing tiny experiments and letting go of definitions of success. She also suggests practicing self-anthropology, which involves observing your own life, asking questions like what gives you energy and what drains it, and exploring your emotions and interests. This approach allows you to focus on a research question or hypothesis that sparks your curiosity, rather than a specific outcome.",
+      "scores": {
+        "correctness": {
+          "score": 4,
+          "reason": "The answer accurately conveys the essence of treating life as experiments, focusing on curiosity and observation over fixed outcomes, but omits the explicit mention of short, time-bounded experiments and reducing fear of failure."
+        },
+        "tone": {
+          "score": 5,
+          "reason": "The answer leads directly with no hedging openers or qualifiers, presenting the recommendations clearly and succinctly."
+        },
+        "grounding": {
+          "score": 5,
+          "reason": "The answer stays fully grounded in plausible content from the transcript, reflecting experimental approaches, self-reflection, and curiosity without introducing external or fabricated information."
+        },
+        "conciseness": {
+          "score": 5,
+          "reason": "The answer is concise, focused on actionable recommendations, avoids unnecessary repetition, and is appropriately dense within 2 to 4 paragraphs."
+        },
+        "mean": 4.75
+      },
+      "error": null,
+      "skipped": false
+    }
+  ]
+}
