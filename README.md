@@ -28,10 +28,13 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engin
 User query
     │
     ▼
-LangGraph Agent  ── keyword routing ──►  RAG chain  ──►  Pinecone (corpus + live)
+LangGraph Agent  ── keyword routing ──►  RAG chain  ──►  Pinecone top-10 (corpus + live)
                                     │                          │
                                     └──►  Metadata tool        ▼
-                                                          Groq LLM (llama-3.3-70b)
+                                                      Cohere Rerank v3.5
+                                                               │
+                                                               ▼ top-3
+                                                      Groq LLM (llama-3.3-70b)
                                                                │
                                                                ▼
                                                      Streaming answer + sources
@@ -46,6 +49,7 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 |---|---|
 | LLM | Groq — `llama-3.3-70b-versatile` |
 | Embeddings | Cohere `embed-multilingual-v3.0` (1024d, asymmetric) |
+| Reranker | Cohere Rerank v3.5 |
 | Vector DB | Pinecone Serverless (cosine, AWS us-east-1) |
 | Orchestration | LangChain LCEL + LangGraph |
 | Tracing | LangSmith |
@@ -54,12 +58,17 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 
 ## Evaluation
 
-Evaluated on a 30-case QA set (20 factual, 5 multi-turn, 5 adversarial) with GPT-4.1 as judge:
+Evaluated on 25 automated cases (20 factual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually.
 
-| Prompt version | Correctness | Tone | Grounding | Conciseness | Mean |
+| Checkpoint | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|
-| v1 | 4.56 | 4.76 | 3.92 | 3.72 | 4.24 |
-| v2 | 4.28 | 4.88 | 4.04 | 4.36 | **4.39** |
+| Bootcamp — MiniLM, prompt v1 | 4.56 | 4.76 | 3.92 | 3.72 | 4.24 |
+| Bootcamp — MiniLM, prompt v2 | 4.28 | 4.88 | **4.04** | **4.36** | 4.39 |
+| Phase 3 — Cohere embeddings | — | — | — | — | — |
+| Phase 4 — Cohere Rerank v3.5 | **4.40** | 4.84 | 3.64 | 4.12 | 4.25 |
+| Phase 5 — tuned retrieval | 4.36 | **4.84** | 3.88 | 3.80 | 4.22 |
+
+Phase 3 re-indexed the full corpus into a new embedding space (MiniLM → Cohere); scores are not comparable across that boundary. Phase 4 added the reranker. Phase 5 calibrated `RETRIEVER_FETCH_K`, `RETRIEVER_TOP_N`, and `SCORE_THRESHOLD` via a two-stage parameter sweep — details in [`docs/retrieval_sweep_results.md`](docs/retrieval_sweep_results.md).
 
 ---
 
@@ -123,13 +132,17 @@ streamlit run app/streamlit_app.py
 GROQ_API_KEY=
 COHERE_API_KEY=
 PINECONE_API_KEY=
-PINECONE_INDEX_NAME=youtube-qa-bot
+PINECONE_INDEX_NAME=scienceq
 PINECONE_NAMESPACE_CORPUS=corpus
 PINECONE_NAMESPACE_LIVE=live
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=scienceq
 LANGSMITH_ENDPOINT=https://api.smith.langchain.com
 LANGCHAIN_TRACING_V2=true
+RERANKER_ENABLED=true
+RETRIEVER_FETCH_K=10
+RETRIEVER_TOP_N=3
+SCORE_THRESHOLD=0.25
 ```
 
 ---
@@ -172,8 +185,8 @@ python tests/run_all_tests.py
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
 ├── app/                # Streamlit UI
 ├── data/               # metadata.json, per-video transcript/chunk/embedding files
-├── docs/               # ARCHITECTURE.md, DATASET.md, implementation plan
-├── eval/               # Eval set, LangSmith runner, threshold calibration, results
+├── docs/               # ARCHITECTURE.md, DATASET.md, retrieval_sweep_results.md
+├── eval/               # Eval set, sweep scripts, LangSmith runner, results
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
 ├── Dockerfile              # App image (Streamlit)
@@ -194,7 +207,5 @@ python tests/run_all_tests.py
 
 ## Next steps
 
-- Reranker pass using Cohere Rerank v3 after initial retrieval for better precision
-- Retrieval parameter sweeps (top-k, threshold) using the eval set as benchmark
 - Whisper integration for videos without captions
-- Multilingual corpus expansion (embed-multilingual-v3.0 already in place)
+- Multilingual corpus expansion (embed-multilingual-v3.0 already supports 100+ languages)
