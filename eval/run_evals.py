@@ -349,6 +349,7 @@ def _push_experiment_results(
 def run(
     dry_run:         bool          = False,
     case_filter:     Optional[str] = None,
+    type_filter:     Optional[str] = None,
     experiment_name: Optional[str] = None,
 ) -> None:
 
@@ -367,6 +368,14 @@ def run(
         if not all_cases:
             log.error(f"No case found with id={case_filter!r}")
             sys.exit(1)
+
+    # Apply type filter
+    if type_filter:
+        all_cases = [c for c in all_cases if c["type"] == type_filter]
+        if not all_cases:
+            log.error(f"No cases found with type={type_filter!r}")
+            sys.exit(1)
+        log.info(f"Type filter applied: {len(all_cases)} case(s) with type={type_filter!r}")
 
     # Split adversarial out for manual review
     automated = [c for c in all_cases if c["type"] != "adversarial"]
@@ -564,10 +573,16 @@ if __name__ == "__main__":
         metavar="NAME",
         help="Override the LangSmith experiment name (default: auto-timestamped).",
     )
+    parser.add_argument(
+        "--type",
+        metavar="TYPE",
+        help="Run only cases of this type (e.g. rag_multilingual, rag_factual, rag_multi_turn).",
+    )
     args = parser.parse_args()
 
     run(
         dry_run         = args.dry_run,
         case_filter     = args.case,
+        type_filter     = args.type,
         experiment_name = args.experiment_name,
     )

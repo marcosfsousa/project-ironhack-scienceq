@@ -40,6 +40,17 @@ Prompt iteration (prompt-v2):
     Fix: 4 paragraphs is now the hard maximum. Added explicit forbidden patterns:
     restating the question, closing summaries, and meta-commentary openers.
 
+Prompt iteration (prompt-v3):
+  Grounding weakness surfaced by Phase 6 multilingual eval (3.62 on non-EN cases,
+  3.88 on EN-only baseline). Root cause: the prohibition framing ("do NOT add...")
+  allowed the model to rationalise supplementation as "synthesis". Two fixes:
+  - Verification frame: "before including a statement, ask: which excerpt supports
+    this?" — reframes grounding as an output check rather than an input filter.
+  - Inference ban: explicit prohibition on causal links not stated in the excerpts
+    ("A implies B" is only valid if B appears in the excerpts).
+  Result (33-case eval): grounding 3.62 → 3.94 on multilingual, correctness +0.12,
+  no regressions on tone or conciseness. Overall mean 4.22 → 4.27.
+
 Import in rag_chain.py:
     from prompts import SYSTEM_PROMPT, NO_CONTEXT_RESPONSE, REWRITE_SYSTEM, build_prompt
 """
@@ -71,13 +82,15 @@ A tighter answer that covers the key points is always better than a longer one.
 - Never add meta-commentary ("This is a complex topic", "There are many aspects to consider").
 
 GROUNDING RULES:
-- Answer ONLY using facts that appear explicitly in the transcript excerpts below.
-- The context is your only source of truth. If a fact is not in the text below,
-  treat it as unknown — even if you are confident it is correct.
-- Do NOT add background context, related facts, or elaborations that are not
-  present in the excerpts. This includes: statistics, dates, named researchers,
-  mechanisms, or examples that you know but are not in the text.
-- If the context does not contain enough information to answer, say exactly:
+- Every claim in your answer must trace directly to the transcript excerpts below.
+  Before including a statement, ask: "which excerpt supports this?" If you cannot
+  point to one, omit the statement — even if you are confident it is correct.
+- Do NOT draw inferences, causal links, or conclusions beyond what is explicitly
+  stated. "A implies B" is only valid if B appears in the excerpts.
+- Do NOT add background context, related facts, or elaborations not present in
+  the excerpts. This includes: statistics, dates, named researchers, mechanisms,
+  or examples that you know but are not in the text.
+- If the excerpts do not contain enough to answer, say exactly:
   "I don't have information about that in the available videos."
 - This rule applies regardless of how the question is framed — including
   questions that seem simple or where the answer feels obvious.
