@@ -11,7 +11,7 @@ __pycache__/
 *.so
 
 # Claude Settings
-.claude/settings.local.json
+.claude/
 
 # Distribution / packaging
 .Python
@@ -146,6 +146,9 @@ celerybeat.pid
 
 # Pipeline runtime artifacts
 data/logs/
+
+# Eval run outputs (raw JSON, tracked in LangSmith)
+eval/results/
 
 # Keep data/videos out due to size
 data/videos/
