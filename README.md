@@ -1,6 +1,6 @@
 # ScienceQ
 
-A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of 42 curated videos, or paste any YouTube URL to ingest and query it on the fly.
+A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of 50 curated videos (English, Spanish, German, French, and Portuguese), or paste any YouTube URL to ingest and query it on the fly.
 
 Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engineering course.
 
@@ -16,7 +16,7 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engin
 
 ## What it does
 
-- Answers factual questions from a corpus of 42 science explainer videos (Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, Big Think, and more)
+- Answers factual questions from a corpus of 50 science explainer videos in 5 languages (English, Spanish, German, French, Portuguese) — Veritasium, Kurzgesagt, 3Blue1Brown, PBS Space Time, Big Think, CuriosaMente, Terra X Lesch, Science Étonnante, Ciência Todo Dia, and more
 - Pastes a YouTube URL → ingests it in real time → answers questions about it
 - Streams answers token by token with clickable source timestamp pills
 - Maintains 5-turn conversation memory with query rewriting for follow-up questions
@@ -58,7 +58,7 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 
 ## Evaluation
 
-Evaluated on 25 automated cases (20 factual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually.
+Evaluated on 33 automated cases (20 English factual + 8 cross-lingual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually.
 
 | Checkpoint | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|
@@ -67,8 +67,9 @@ Evaluated on 25 automated cases (20 factual + 5 multi-turn) with GPT-4.1 as judg
 | Phase 3 — Cohere embeddings | — | — | — | — | — |
 | Phase 4 — Cohere Rerank v3.5 | **4.40** | 4.84 | 3.64 | 4.12 | 4.25 |
 | Phase 5 — tuned retrieval | 4.36 | **4.84** | 3.88 | 3.80 | 4.22 |
+| Phase 6 — multilingual corpus | — | — | — | — | — |
 
-Phase 3 re-indexed the full corpus into a new embedding space (MiniLM → Cohere); scores are not comparable across that boundary. Phase 4 added the reranker. Phase 5 calibrated `RETRIEVER_FETCH_K`, `RETRIEVER_TOP_N`, and `SCORE_THRESHOLD` via a two-stage parameter sweep — details in [`docs/retrieval_sweep_results.md`](docs/retrieval_sweep_results.md).
+Phase 3 re-indexed the full corpus into a new embedding space (MiniLM → Cohere); scores are not comparable across that boundary. Phase 4 added the reranker. Phase 5 calibrated `RETRIEVER_FETCH_K`, `RETRIEVER_TOP_N`, and `SCORE_THRESHOLD` via a two-stage parameter sweep — details in [`docs/retrieval_sweep_results.md`](docs/retrieval_sweep_results.md). Phase 6 added 8 non-English videos; cross-lingual retrieval validated 4/4 PASS (scores 0.52–0.70). GPT-4.1 scoring for Phase 6 is pending.
 
 ---
 
@@ -208,4 +209,5 @@ python tests/run_all_tests.py
 ## Next steps
 
 - Whisper integration for videos without captions
-- Multilingual corpus expansion (embed-multilingual-v3.0 already supports 100+ languages)
+- Expand non-English corpus beyond the current ES/DE/FR/PT pilot (embed-multilingual-v3.0 supports 100+ languages)
+- GPT-4.1 evaluation run for Phase 6 cross-lingual cases

@@ -2,7 +2,9 @@
 
 ## Overview
 
-The corpus consists of 42 curated science and education YouTube videos, totalling approximately 674 vectors in Pinecone. Videos were selected to maximize topic diversity, explanation density, and retrieval reliability.
+The corpus consists of 50 curated science and education YouTube videos (42 English + 8 non-English), totalling approximately 800 vectors in Pinecone. Videos were selected to maximize topic diversity, explanation density, and retrieval reliability.
+
+Non-English languages covered: Spanish (ES), German (DE), French (FR), Portuguese (PT). Cross-lingual retrieval works natively — English queries surface relevant chunks in all four languages via Cohere `embed-multilingual-v3.0`'s shared embedding space.
 
 ---
 
@@ -10,10 +12,11 @@ The corpus consists of 42 curated science and education YouTube videos, totallin
 
 | Attribute | Value |
 |---|---|
-| Total videos | 42 |
-| Total chunks (vectors) | ~674 |
+| Total videos | 50 (42 EN + 8 non-EN) |
+| Languages | English, Spanish, German, French, Portuguese |
+| Total chunks (vectors) | ~800 |
 | Chunk window | ~60 seconds |
-| Embedding dimensions | 384 |
+| Embedding dimensions | 1024 |
 | Pinecone namespace | `corpus` |
 
 ---
@@ -21,6 +24,8 @@ The corpus consists of 42 curated science and education YouTube videos, totallin
 ## Channel Selection
 
 Videos were sourced from channels known for scripted, explanation-dense content with reliable closed captions:
+
+**English channels:**
 
 | Channel | Videos | Notes |
 |---|---|---|
@@ -32,7 +37,17 @@ Videos were sourced from channels known for scripted, explanation-dense content 
 | TED / TEDx | 4 | Psychology, education, neuroscience, biology |
 | Vsauce | 2 | Philosophy, mathematics |
 | Quanta Magazine | 2 | Mathematics, physics |
-| Other (CGP Grey, IBM, HHMI, Science Time) | 11 | Philosophy, technology, biology, cosmology, cognitive science |
+| Other (CGP Grey, IBM, HHMI, Science Time, Vox) | 11 | Philosophy, technology, biology, cosmology, cognitive science |
+
+**Non-English channels (Phase 6 pilot):**
+
+| Channel | Language | Videos | Notes |
+|---|---|---|---|
+| CuriosaMente | ES | 2 | Mathematics (Gödel), Psychology (neurodivergence) |
+| Terra X Lesch & Co | DE | 2 | Physics (time), Philosophy (math discovered/invented) |
+| Science Étonnante | FR | 1 | Physics (quantum mechanics) |
+| e-penser | FR | 1 | Neuroscience (handedness) |
+| Ciência Todo Dia | PT | 2 | Psychology (10k hour rule), Biology (microplastics) |
 
 **Selection criteria:**
 - One main concept per video (avoids retrieval ambiguity)
@@ -47,17 +62,17 @@ Videos were sourced from channels known for scripted, explanation-dense content 
 
 | Topic | Videos |
 |---|---|
+| Physics | 7 |
+| Psychology | 7 |
+| Biology | 6 |
 | Cosmology | 6 |
-| Biology | 5 |
-| Physics | 5 |
-| Psychology | 5 |
-| Philosophy | 4 |
+| Philosophy | 5 |
 | Technology | 4 |
-| Mathematics | 4 |
+| Mathematics | 5 |
+| Neuroscience | 4 |
 | Education | 3 |
-| Neuroscience | 3 |
 | Cognitive Science | 3 |
-| **Total** | **42** |
+| **Total** | **50** |
 
 ---
 
@@ -93,6 +108,7 @@ Normalizes raw transcripts without altering meaning:
 - Removes sponsor segment markers
 - Handles `\u00a0` non-breaking spaces (common in auto-generated captions)
 - Flags empty segments rather than deleting — downstream stages skip them
+- **Language-aware filler removal** — per-language regex dicts (`en`, `es`, `de`, `fr`, `pt`); locale variants (`es-419`, `de-DE`) are normalised to the base code before lookup. Falls back to English rules for unknown codes.
 
 Timestamps are preserved exactly. The original transcript is never modified.
 
@@ -119,12 +135,12 @@ Splits cleaned transcripts into time-window chunks:
 
 ### Stage 4 — Embedding (`pipeline/embedder.py`)
 
-Embeds each chunk using `sentence-transformers/all-MiniLM-L6-v2`:
+Embeds each chunk using Cohere `embed-multilingual-v3.0`:
 
-- **Dimensions:** 384
+- **Dimensions:** 1024
 - **Similarity metric:** cosine
-- **Encoding:** chunks are embedded as `"{title} | {chunk_text}"` — the video title is prepended to bake topical context into each vector. This improves retrieval precision for topic-adjacent queries where the chunk text alone is ambiguous.
-- **Query encoding:** plain query text (no title prepend) — the asymmetry is intentional and works well with cosine similarity
+- **Input types:** `search_document` at index time, `search_query` at retrieval time (asymmetric retrieval)
+- **Multilingual:** a single shared embedding space covers 100+ languages — English queries retrieve semantically relevant chunks in Spanish, German, French, Portuguese, and any other supported language without a model swap or language detection step
 - Vectors are persisted to `embeddings.json` per video to avoid re-embedding during re-indexing
 
 ### Stage 5 — Indexing (`pipeline/indexer.py`)
@@ -132,7 +148,7 @@ Embeds each chunk using `sentence-transformers/all-MiniLM-L6-v2`:
 Upserts vectors to Pinecone Serverless (AWS us-east-1, cosine similarity):
 
 - **Namespace:** `corpus` for the pre-built corpus, `live` for on-the-fly ingestion
-- **Metadata stored per vector:** `chunk_id`, `video_id`, `title`, `channel`, `topic`, `start`, `end`, `chunk_text`
+- **Metadata stored per vector:** `chunk_id`, `video_id`, `title`, `channel`, `topic`, `language`, `start`, `end`, `chunk_text`
 - Note: the embedded text includes the title prefix, but only the plain `chunk_text` is stored in metadata — this keeps LLM context clean
 - Resume logic: skips videos already indexed unless `--force` flag is passed
 
@@ -146,8 +162,9 @@ Builds `data/metadata.json` — a flat catalog of all indexed videos used by the
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| `top_k` | 5 | Sufficient context without exceeding prompt budget |
-| `score_threshold` | 0.28 | Lowered from 0.35 on Day 5 — asymmetric embedding (title-prepended chunks vs plain query text) depresses cosine scores. Single-word queries score 0.27–0.28, fuller questions score ~0.31 — both below the original gate. On-topic queries clear 0.28 reliably; off-topic fall below it. |
+| `RETRIEVER_FETCH_K` | 10 | Over-retrieve from Pinecone before reranking |
+| `RETRIEVER_TOP_N` | 3 | Chunks passed to the LLM after reranking |
+| `SCORE_THRESHOLD` | 0.40 | Calibrated post-Cohere re-indexing: factual queries score 0.49–0.78; adversarial out-of-corpus queries fall below 0.40. Multilingual chunks (EN query → non-EN chunk) consistently score 0.52–0.70, comfortably above the gate. |
 | Multi-namespace | True | Corpus + live queried together at runtime |
 
 ---
@@ -165,12 +182,13 @@ Each video was verified through:
 
 ## Eval Set
 
-A separate evaluation dataset of 30 cases was constructed alongside the corpus:
+A separate evaluation dataset of 38 cases is stored in `eval/eval_set.json`:
 
-| Type | Count |
-|---|---|
-| Factual RAG | 20 |
-| Multi-turn (pronoun resolution) | 5 |
-| Adversarial (prompt injection, out-of-scope) | 5 |
+| Type | Count | Description |
+|---|---|---|
+| Factual RAG | 20 | English questions answered from English corpus chunks |
+| Cross-lingual RAG | 8 | English questions answered from non-English corpus chunks (ES/DE/FR/PT) |
+| Multi-turn | 5 | Pronoun resolution across conversation turns |
+| Adversarial | 5 | Prompt injection, out-of-scope, hallucination bait |
 
-Cases cover a representative sample of corpus videos. Adversarial cases are excluded from automated scoring and reviewed manually in `eval/manual_review.json`.
+Adversarial cases are excluded from automated scoring and reviewed manually. The 8 cross-lingual cases validate that English queries retrieve semantically relevant chunks in all four non-English languages above the 0.40 score threshold.

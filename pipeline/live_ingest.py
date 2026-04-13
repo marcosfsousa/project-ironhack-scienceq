@@ -318,11 +318,11 @@ def _normalise_segments(fetched) -> list[dict]:
 
 # ── Cleaning (reuses cleaner.py logic on raw segments) ────────────────────────
 
-def _clean_segments(segments: list[dict]) -> list[dict]:
+def _clean_segments(segments: list[dict], language: str = "en") -> list[dict]:
     """Apply cleaner.clean_text() to each segment; add flags, never delete."""
     cleaned = []
     for seg in segments:
-        text = clean_text(seg["text"])
+        text = clean_text(seg["text"], language=language)
         out  = {**seg, "text": text}
         flags = []
         if not text:
@@ -342,6 +342,7 @@ def _embed_and_upsert(
     title: str,
     channel: str,
     topic: str,
+    language: str,
     index,
     live_namespace: str,
     dry_run: bool = False,
@@ -364,6 +365,7 @@ def _embed_and_upsert(
                 "title":      title,
                 "channel":    channel,
                 "topic":      topic,
+                "language":   language,
                 "start":      chunk["start"],
                 "end":        chunk["end"],
                 "chunk_text": chunk["text"],
@@ -449,7 +451,8 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
         # ── 5. Extract transcript ──────────────────────────────────────────────
         log.info("  Extracting transcript...")
         try:
-            segments, language, is_generated = _extract_transcript(video_id)
+            segments, lang_raw, is_generated = _extract_transcript(video_id)
+            language = lang_raw.split("-")[0].lower()  # "es-419" → "es"
         except (NoTranscriptFound, TranscriptsDisabled):
             result.error = (
                 "No captions are available for this video. "
@@ -461,7 +464,7 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
             return result
 
         log.info(
-            f"  ✓ {len(segments)} segments | language: {language} | "
+            f"  ✓ {len(segments)} segments | language: {lang_raw} | "
             f"{'auto-generated' if is_generated else 'human'} captions"
         )
 
@@ -486,7 +489,7 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
         log.info(f"  Topic:   {result.topic}")
 
         # ── 8. Clean segments ─────────────────────────────────────────────────
-        cleaned_segments = _clean_segments(segments)
+        cleaned_segments = _clean_segments(segments, language=language)
 
         # ── 9. Chunk ──────────────────────────────────────────────────────────
         chunks = chunk_segments(
@@ -507,6 +510,7 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
             title          = result.title,
             channel        = result.channel,
             topic          = result.topic,
+            language       = language,
             index          = index,
             live_namespace = live_namespace,
             dry_run        = dry_run,

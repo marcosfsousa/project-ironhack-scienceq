@@ -87,6 +87,7 @@ Wraps Pinecone with namespace-aware querying. Embeddings are generated using Coh
 - Multi-namespace merge (`retrieve_multi_namespace`) — embeds the query once and fans out to both namespaces, then merges and returns top-k globally by score
 - Optional metadata filters by topic or channel
 - Optional Cohere Rerank layer (see below)
+- **Cross-lingual retrieval** — the shared multilingual embedding space means English queries retrieve semantically relevant chunks in Spanish, German, French, Portuguese, and any other Cohere-supported language without additional configuration. Each `RetrievedChunk` carries a `language` field populated from Pinecone metadata, surfaced in source citations.
 
 **Retrieval flow with reranker enabled:**
 
@@ -125,10 +126,11 @@ End-to-end pipeline triggered when the user pastes a YouTube URL:
 1. Fetch video metadata (title, channel) via `yt-dlp`
 2. Infer topic via `llama-3.1-8b-instant` on the first 500 words of the transcript
 3. Extract transcript via `youtube-transcript-api`
-4. Clean and normalize text
-5. Chunk into ~60s windows
-6. Embed with Cohere `embed-multilingual-v3.0` (`search_document` input_type)
-7. Upsert to Pinecone `live` namespace
+4. Detect transcript language; normalise locale variants (`es-419` → `es`)
+5. Clean and normalize text with language-aware filler removal
+6. Chunk into ~60s windows
+7. Embed with Cohere `embed-multilingual-v3.0` (`search_document` input_type)
+8. Upsert to Pinecone `live` namespace with `language` stored in vector metadata
 
 Note: `yt-dlp` is used only for metadata resolution in the live path. The corpus pipeline does not use `yt-dlp` — titles and channels are manually curated in `metadata.json`.
 
@@ -203,7 +205,7 @@ All 76 tests pass. Run via `python tests/run_all_tests.py`. Tests cover duplicat
 
 ## Evaluation
 
-Evaluated using a 30-case eval set (`eval/eval_set.json`): 20 factual RAG cases, 5 multi-turn cases, and 5 adversarial cases for manual review. GPT-4.1 is used as the judge across 4 dimensions.
+Evaluated using a 38-case eval set (`eval/eval_set.json`): 20 English factual RAG cases, 8 cross-lingual RAG cases, 5 multi-turn cases, and 5 adversarial cases for manual review. GPT-4.1 is used as the judge across 4 dimensions.
 
 | Experiment | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|
@@ -211,8 +213,9 @@ Evaluated using a 30-case eval set (`eval/eval_set.json`): 20 factual RAG cases,
 | prompt-v2 | 4.28 | 4.88 | 4.04 | 4.36 | **4.39** |
 | Phase 3 — Cohere embeddings (reranker off) | 4.12 | 4.76 | 3.60 | 3.60 | 4.02 |
 | Phase 4 — Cohere Rerank v3.5 (reranker on) | 4.40 | 4.84 | 3.64 | 4.12 | **4.25** |
+| Phase 6 — Multilingual corpus | — | — | — | — | — |
 
-Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 4 is the new baseline for Phase 5 parameter sweeps. Biggest reranker gain: conciseness (+0.52), driven by tighter chunk selection reducing LLM context noise. Grounding (3.64) remains the weakest dimension — a generation-side issue, not retrieval.
+Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 6 added 8 non-English videos (ES/DE/FR/PT); cross-lingual retrieval validated via `eval/validate_multilingual.py` — 4/4 validation queries PASS with all non-English target chunks scoring above the 0.40 threshold (range: 0.52–0.70). GPT-4.1 scoring for Phase 6 is pending.
 
 Results are tracked in LangSmith under the `scienceq` project.
 

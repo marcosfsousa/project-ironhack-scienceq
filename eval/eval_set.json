@@ -1,10 +1,12 @@
 {
   "metadata": {
-    "version": "1.0",
+    "version": "1.1",
     "created": "2026-03-08",
-    "total": 30,
+    "updated": "2026-04-13",
+    "total": 38,
     "breakdown": {
       "rag_factual": 20,
+      "rag_multilingual": 8,
       "rag_multi_turn": 5,
       "adversarial": 5
     },
@@ -386,6 +388,118 @@
       ],
       "reference_answer": "Le Cunff recommends treating life like a series of experiments rather than following a fixed plan. Practically, this means setting short time-bounded experiments — trying something for a defined period with clear success criteria — rather than committing to a 10-year goal. This reduces the fear of failure, since an experiment that doesn't work is still informative. She emphasises curiosity and iteration over optimisation.",
       "expected_behaviour": "Practical follow-up answer grounded in Le Cunff's framing of experiments and iteration."
+    },
+
+    {
+      "id": "ml_001",
+      "type": "rag_multilingual",
+      "topic": "Mathematics",
+      "source_language": "es",
+      "query_language": "en",
+      "video_id": "_WM4XMwhRBE",
+      "video_title": "¡Las matemáticas no son perfectas! Los teoremas de incompletitud de Gödel",
+      "channel": "CuriosaMente",
+      "question": "What is Gödel's incompleteness theorem and what does it say about mathematics?",
+      "reference_answer": "Gödel's incompleteness theorems establish that in any sufficiently powerful formal mathematical system there are true statements that cannot be proven within that system. Mathematics is therefore fundamentally incomplete — no single set of axioms can capture all mathematical truths. Gödel constructed a self-referential statement equivalent to 'this statement is unprovable', creating a paradox that shook the foundations of 20th-century mathematics and ended Hilbert's programme of formalising all of mathematics.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces Spanish-language CuriosaMente chunks above threshold. Answer is grounded in those chunks."
+    },
+
+    {
+      "id": "ml_002",
+      "type": "rag_multilingual",
+      "topic": "Philosophy",
+      "source_language": "de",
+      "query_language": "en",
+      "video_id": "zUyItDq2JAk",
+      "video_title": "Mathematik: Entdeckt oder erfunden? — Harald Lesch",
+      "channel": "Terra X Lesch & Co",
+      "question": "Is mathematics discovered or invented?",
+      "reference_answer": "The debate centres on whether mathematical structures exist independently of human minds (discovery) or are human-constructed tools (invention). Platonists argue that mathematics reveals pre-existing truths — the universe follows mathematical laws regardless of who formulates them. Formalists counter that mathematics is a language we invented to describe patterns. Harald Lesch examines both positions and concludes the question may be unanswerable, since mathematics is both unreasonably effective at describing nature and yet clearly shaped by human choices about axioms and notation.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces German-language Terra X Lesch chunks. Answer engages with both sides of the discovery/invention debate."
+    },
+
+    {
+      "id": "ml_003",
+      "type": "rag_multilingual",
+      "topic": "Physics",
+      "source_language": "fr",
+      "query_language": "en",
+      "video_id": "Rj3jTw2DxXQ",
+      "video_title": "La mécanique quantique en 7 idées — Sciences Inattendues #16",
+      "channel": "Science Étonnante",
+      "question": "What are the core ideas of quantum mechanics?",
+      "reference_answer": "Quantum mechanics rests on several counterintuitive principles: quantization (energy comes in discrete packets called quanta), wave-particle duality (particles behave as waves until observed), the uncertainty principle (position and momentum cannot both be known precisely at the same time), superposition (particles exist in multiple states simultaneously until measured), and entanglement (correlated particles remain linked regardless of distance). Together these ideas overturn classical determinism and locality, replacing them with probabilistic predictions that are nevertheless extraordinarily accurate.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces French-language Science Étonnante chunks. Answer covers multiple core quantum ideas."
+    },
+
+    {
+      "id": "ml_004",
+      "type": "rag_multilingual",
+      "topic": "Psychology",
+      "source_language": "pt",
+      "query_language": "en",
+      "video_id": "QSTLljIWJ1U",
+      "video_title": "O MITO das 10.000 HORAS",
+      "channel": "Ciência Todo Dia",
+      "question": "Is the 10000 hour rule true?",
+      "reference_answer": "The 10,000 hour rule, popularised by Malcolm Gladwell, claims expertise requires 10,000 hours of practice. The original deliberate practice research by Anders Ericsson was misrepresented: practice type matters far more than raw hours. Deliberate, focused practice with expert feedback produces expertise far more efficiently than passive repetition. The rule also ignores natural ability, starting age, access to quality coaching, and strong variation across domains — in some fields far fewer hours separate novices from experts.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces Portuguese-language Ciência Todo Dia chunks. Answer debunks the rule and explains what the research actually shows."
+    },
+
+    {
+      "id": "ml_005",
+      "type": "rag_multilingual",
+      "topic": "Physics",
+      "source_language": "de",
+      "query_language": "en",
+      "video_id": "fy8jTiECCWI",
+      "video_title": "Physiker hassen die Zeit — Harald Lesch",
+      "channel": "Terra X Lesch & Co",
+      "question": "Why do physicists find time so problematic?",
+      "reference_answer": "Physicists find time puzzling because the fundamental laws of physics are almost entirely time-symmetric — they work identically whether run forward or backward. Yet everyday experience has a clear arrow of time: the past differs from the future. This asymmetry is explained by thermodynamics and the second law (entropy increases), not by fundamental mechanics. General relativity treats time as a dimension of spacetime rather than a universal clock, and quantum mechanics raises further puzzles about temporal order during measurement. The origin of time's directionality remains one of the deepest open questions in physics.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces German-language Terra X Lesch chunks on time symmetry and the arrow of time."
+    },
+
+    {
+      "id": "ml_006",
+      "type": "rag_multilingual",
+      "topic": "Neuroscience",
+      "source_language": "fr",
+      "query_language": "en",
+      "video_id": "Adm-8rNBrCU",
+      "video_title": "Gaucher ou Droitier — Quickie #07",
+      "channel": "e-penser",
+      "question": "What determines whether a person is left-handed or right-handed?",
+      "reference_answer": "Handedness is determined by a combination of genetic predisposition and developmental factors rather than a single dominant gene. About 10% of people are left-handed. Brain lateralisation plays a key role — in most right-handers the left hemisphere controls language and fine motor skills, while the pattern is more varied in left-handers. Identical twins can differ in handedness, suggesting random developmental variation contributes alongside genetics. Historically forced switching from left to right hand has no neurological benefit and can interfere with learning.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces French-language e-penser chunks. Answer covers genetics, brain lateralisation, and twin evidence."
+    },
+
+    {
+      "id": "ml_007",
+      "type": "rag_multilingual",
+      "topic": "Biology",
+      "source_language": "pt",
+      "query_language": "en",
+      "video_id": "4Yqe2j2Iw-Q",
+      "video_title": "Microplásticos já estão DENTRO de VOCÊ. E agora?",
+      "channel": "Ciência Todo Dia",
+      "question": "What are microplastics and are they dangerous to human health?",
+      "reference_answer": "Microplastics are plastic fragments under 5 mm produced by the breakdown of larger plastics or manufactured at micro scale. They are now found everywhere — in ocean water, soil, the air, and inside human bodies, including blood, lungs, and placentas. Research suggests potential risks including inflammation, endocrine disruption from chemical additives, and accumulation in tissues over time, though the full health impact is still under active investigation. Reducing single-use plastics and improving waste management are the primary mitigation strategies available now.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces Portuguese-language Ciência Todo Dia chunks. Answer covers what microplastics are, where they are found, and health risks."
+    },
+
+    {
+      "id": "ml_008",
+      "type": "rag_multilingual",
+      "topic": "Psychology",
+      "source_language": "es",
+      "query_language": "en",
+      "video_id": "QmToxMOEls0",
+      "video_title": "¿Estrés, depresión o ansiedad? ¡Podrías ser neurodivergente!",
+      "channel": "CuriosaMente",
+      "question": "What is neurodivergence and how does it relate to anxiety and depression?",
+      "reference_answer": "Neurodivergence refers to neurological development that differs from the typical pattern, encompassing conditions such as ADHD, autism, and dyslexia. Neurodivergent individuals often experience elevated stress, anxiety, or depression not because of their neurodivergence itself but because they are navigating educational, professional, and social systems designed for neurotypical people. Chronic mismatch between environment and neurological needs generates exhaustion and mental health difficulties. Early identification and appropriate accommodations — rather than pressure to perform neurotypically — significantly improve long-term wellbeing.",
+      "expected_behaviour": "Cross-lingual retrieval: English query surfaces Spanish-language CuriosaMente chunks. Answer links neurodivergence to environmental mismatch rather than treating it as a disorder."
     },
 
     {

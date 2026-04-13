@@ -71,6 +71,7 @@ class RetrievedChunk:
     title:      str
     channel:    str
     topic:      str
+    language:   str
     start:      float
     end:        float
     text:       str
@@ -228,6 +229,7 @@ def _query_pinecone(
             title     = meta.get("title",      "Unknown"),
             channel   = meta.get("channel",    "Unknown"),
             topic     = meta.get("topic",      "Unknown"),
+            language  = meta.get("language",   "en"),
             start     = float(meta.get("start", 0.0)),
             end       = float(meta.get("end",   0.0)),
             text      = meta.get("chunk_text", ""),

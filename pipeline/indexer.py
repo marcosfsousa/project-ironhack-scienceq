@@ -23,6 +23,7 @@ Pinecone vector record:
       "title":      "What is Entropy?",
       "channel":    "Veritasium",
       "topic":      "Physics",
+      "language":   "en",
       "start":      0.0,
       "end":        61.3,
       "chunk_text": "Energy cannot be created or destroyed..."
@@ -194,9 +195,10 @@ def index_video(
         log.info(f"  Already indexed, skipping: {video_id}  (use --force to re-index)")
         return {"video_id": video_id, "skipped": True, "reason": "already_indexed"}
 
-    title   = meta_entry["title"]
-    channel = meta_entry["channel"]
-    topic   = meta_entry["topic"]
+    title    = meta_entry["title"]
+    channel  = meta_entry["channel"]
+    topic    = meta_entry["topic"]
+    language = meta_entry.get("language", "en")
 
     # Load chunks
     data   = json.loads(chunks_path.read_text(encoding="utf-8"))
@@ -237,6 +239,7 @@ def index_video(
                 "title":      title,
                 "channel":    channel,
                 "topic":      topic,
+                "language":   language,
                 "start":      chunk["start"],
                 "end":        chunk["end"],
                 "chunk_text": chunk["text"],   # plain text, not enriched

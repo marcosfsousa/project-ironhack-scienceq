@@ -55,12 +55,17 @@ CLEAN_LOG  = LOGS_DIR / "cleaning_log.json"
 # Non-speech tags: [Music], [Applause], [Laughter], [MUSIC], etc.
 NON_SPEECH_PATTERN = re.compile(r"\[[\w\s]+\]", re.IGNORECASE)
 
-# Filler words — whole word matches only, case-insensitive
-# Uses word boundaries to avoid clipping "umbrella" → "brella"
-FILLER_PATTERN = re.compile(
-    r"\b(uh+|um+|uh-huh|mm-hmm|hmm+|mhm|uhm)\b[\s,]*",
-    re.IGNORECASE,
-)
+# Filler words — per-language, whole-word matches only (re.IGNORECASE + Unicode).
+# Word boundaries (\b) work correctly for accented characters in Python 3.
+# Conservative sets: only unambiguous hesitation sounds.
+# Sponsor patterns remain English-only (flag-only, never delete) — safe for pilot.
+_FILLER_PATTERNS: dict[str, re.Pattern] = {
+    "en": re.compile(r"\b(uh+|um+|uh-huh|mm-hmm|hmm+|mhm|uhm)\b[\s,]*",  re.IGNORECASE),
+    "es": re.compile(r"\b(eh+|mmm+|eee+)\b[\s,]*",                         re.IGNORECASE),
+    "de": re.compile(r"\b(ähm+|äh+|hmm+|hm+)\b[\s,]*",                    re.IGNORECASE),
+    "fr": re.compile(r"\b(euh+|hmm+|hm+)\b[\s,]*",                         re.IGNORECASE),
+    "pt": re.compile(r"\b(ã+|hmm+|hm+|né)\b[\s,]*",                        re.IGNORECASE),
+}
 
 # Sponsor signal phrases — used for FLAGGING only, never deletion
 # Covers common YouTube sponsor patterns
@@ -83,19 +88,22 @@ SPONSOR_PATTERNS = [
 
 # ── Per-segment cleaning ───────────────────────────────────────────────────────
 
-def clean_text(text: str) -> str:
+def clean_text(text: str, language: str = "en") -> str:
     """
     Apply all text cleaning operations to a single segment string.
     Order matters — decode first, strip tags, then fillers, then whitespace.
+    language selects the filler-word ruleset; falls back to English for unknown codes.
     """
     # 1. HTML entity decoding
     text = html.unescape(text)
 
     # 2. Strip non-speech tags  [Music], [Applause], etc.
+    #    YouTube inserts these in English even for non-English videos.
     text = NON_SPEECH_PATTERN.sub("", text)
 
     # 3. Remove filler words
-    text = FILLER_PATTERN.sub("", text)
+    filler_pattern = _FILLER_PATTERNS.get(language, _FILLER_PATTERNS["en"])
+    text = filler_pattern.sub("", text)
 
     # 4. Normalise whitespace — replace non-breaking spaces, collapse multiples
     text = text.replace("\u00a0", " ")  # non-breaking space → regular space
@@ -132,6 +140,9 @@ def clean_transcript(video_id: str, dry_run: bool = False, force: bool = False) 
     raw_text = raw_text.replace("\u00a0", " ").replace("\ufffd", " ")
     raw = json.loads(raw_text)
 
+    # Normalise locale variants to base code ("es-419" → "es", "de-DE" → "de")
+    language = raw.get("language", "en").split("-")[0].lower()
+
     stats = {
         "video_id":          video_id,
         "total_segments":    len(raw["transcript"]),
@@ -144,7 +155,7 @@ def clean_transcript(video_id: str, dry_run: bool = False, force: bool = False) 
 
     for seg in raw["transcript"]:
         original_text = seg["text"]
-        cleaned_text  = clean_text(original_text)
+        cleaned_text  = clean_text(original_text, language=language)
 
         segment = {
             "start":    seg["start"],

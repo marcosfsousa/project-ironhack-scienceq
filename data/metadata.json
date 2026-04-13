@@ -1,7 +1,7 @@
 {
   "created_at": "2026-03-05T11:23:17.886334Z",
-  "updated_at": "2026-03-09T15:56:16.808138Z",
-  "video_count": 42,
+  "updated_at": "2026-04-13T12:55:05.278948Z",
+  "video_count": 50,
   "videos": {
     "HeQX2HjkcNo": {
       "title": "Math's Fundamental Flaw",
@@ -9,7 +9,8 @@
       "topic": "Mathematics",
       "url": "https://www.youtube.com/watch?v=HeQX2HjkcNo",
       "indexed": true,
-      "video_id": "HeQX2HjkcNo"
+      "video_id": "HeQX2HjkcNo",
+      "language": "en"
     },
     "MBRqu0YOH14": {
       "title": "Optimistic Nihilism",
@@ -17,7 +18,8 @@
       "topic": "Philosophy",
       "url": "https://www.youtube.com/watch?v=MBRqu0YOH14",
       "indexed": true,
-      "video_id": "MBRqu0YOH14"
+      "video_id": "MBRqu0YOH14",
+      "language": "en"
     },
     "UyyjU8fzEYU": {
       "title": "My Stroke of insight | Jill Bolte Taylor | TED",
@@ -25,7 +27,8 @@
       "topic": "Neuroscience",
       "url": "https://www.youtube.com/watch?v=UyyjU8fzEYU",
       "indexed": true,
-      "video_id": "UyyjU8fzEYU"
+      "video_id": "UyyjU8fzEYU",
+      "language": "en"
     },
     "aircAruvnKk": {
       "title": "But what is a neural network? | Deep learning chapter 1",
@@ -33,7 +36,8 @@
       "topic": "Technology",
       "url": "https://www.youtube.com/watch?v=aircAruvnKk",
       "indexed": true,
-      "video_id": "aircAruvnKk"
+      "video_id": "aircAruvnKk",
+      "language": "en"
     },
     "094y1Z2wpJg": {
       "title": "The Simplest Math Problem No One Can Solve - Collatz Conjecture",
@@ -41,7 +45,8 @@
       "topic": "Mathematics",
       "url": "https://www.youtube.com/watch?v=094y1Z2wpJg",
       "indexed": true,
-      "video_id": "094y1Z2wpJg"
+      "video_id": "094y1Z2wpJg",
+      "language": "en"
     },
     "7Pq-S557XQU": {
       "title": "Humans Are Becoming Horses",
@@ -49,7 +54,8 @@
       "topic": "Philosophy",
       "url": "https://www.youtube.com/watch?v=7Pq-S557XQU",
       "indexed": true,
-      "video_id": "7Pq-S557XQU"
+      "video_id": "7Pq-S557XQU",
+      "language": "en"
     },
     "B9RruLkAUm8": {
       "title": "Your Gut Microbiome: The Most Important Organ You’ve Never Heard Of | Erika Ebbel Angle | TEDxFargo",
@@ -57,7 +63,8 @@
       "topic": "Biology",
       "url": "https://www.youtube.com/watch?v=B9RruLkAUm8",
       "indexed": true,
-      "video_id": "B9RruLkAUm8"
+      "video_id": "B9RruLkAUm8",
+      "language": "en"
     },
     "UBVV8pch1dM": {
       "title": "The Science of Thinking",
@@ -65,7 +72,8 @@
       "topic": "Cognitive Science",
       "url": "https://www.youtube.com/watch?v=UBVV8pch1dM",
       "indexed": true,
-      "video_id": "UBVV8pch1dM"
+      "video_id": "UBVV8pch1dM",
+      "language": "en"
     },
     "VO6XEQIsCoM": {
       "title": "The paradox of choice | Barry Schwartz | TED",
@@ -73,7 +81,8 @@
       "topic": "Psychology",
       "url": "https://www.youtube.com/watch?v=VO6XEQIsCoM",
       "indexed": true,
-      "video_id": "VO6XEQIsCoM"
+      "video_id": "VO6XEQIsCoM",
+      "language": "en"
     },
     "WUvTyaaNkzM": {
       "title": "The essence of calculus",
@@ -81,7 +90,8 @@
       "topic": "Mathematics",
       "url": "https://www.youtube.com/watch?v=WUvTyaaNkzM",
       "indexed": true,
-      "video_id": "WUvTyaaNkzM"
+      "video_id": "WUvTyaaNkzM",
+      "language": "en"
     },
     "aeWyp2vXxqA": {
       "title": "Black Hole Star - The Star That Shouldn't Exist",
@@ -89,7 +99,8 @@
       "topic": "Cosmology",
       "url": "https://www.youtube.com/watch?v=aeWyp2vXxqA",
       "indexed": true,
-      "video_id": "aeWyp2vXxqA"
+      "video_id": "aeWyp2vXxqA",
+      "language": "en"
     },
     "cebFWOlx848": {
       "title": "The Illusion of Truth",
@@ -97,7 +108,8 @@
       "topic": "Cognitive Science",
       "url": "https://www.youtube.com/watch?v=cebFWOlx848",
       "indexed": true,
-      "video_id": "cebFWOlx848"
+      "video_id": "cebFWOlx848",
+      "language": "en"
     },
     "fG8SwAFQFuU": {
       "title": "Do people understand the scale of the universe?",
@@ -105,7 +117,8 @@
       "topic": "Cosmology",
       "url": "https://www.youtube.com/watch?v=fG8SwAFQFuU",
       "indexed": true,
-      "video_id": "fG8SwAFQFuU"
+      "video_id": "fG8SwAFQFuU",
+      "language": "en"
     },
     "gSKzgpt4HBU": {
       "title": "The True Nature of Matter and Mass | Space Time | PBS Digital Studios",
@@ -113,7 +126,8 @@
       "topic": "Physics",
       "url": "https://www.youtube.com/watch?v=gSKzgpt4HBU",
       "indexed": true,
-      "video_id": "gSKzgpt4HBU"
+      "video_id": "gSKzgpt4HBU",
+      "language": "en"
     },
     "iG9CE55wbtY": {
       "title": "Do schools kill creativity? | Sir Ken Robinson | TED",
@@ -121,7 +135,8 @@
       "topic": "Education",
       "url": "https://www.youtube.com/watch?v=iG9CE55wbtY",
       "indexed": true,
-      "video_id": "iG9CE55wbtY"
+      "video_id": "iG9CE55wbtY",
+      "language": "en"
     },
     "jAhjPd4uNFY": {
       "title": "Genetic Engineering Will Change Everything Forever – CRISPR",
@@ -129,7 +144,8 @@
       "topic": "Biology",
       "url": "https://www.youtube.com/watch?v=jAhjPd4uNFY",
       "indexed": true,
-      "video_id": "jAhjPd4uNFY"
+      "video_id": "jAhjPd4uNFY",
+      "language": "en"
     },
     "pTn6Ewhb27k": {
       "title": "Why No One Has Measured The Speed Of Light",
@@ -137,7 +153,8 @@
       "topic": "Physics",
       "url": "https://www.youtube.com/watch?v=pTn6Ewhb27k",
       "indexed": true,
-      "video_id": "pTn6Ewhb27k"
+      "video_id": "pTn6Ewhb27k",
+      "language": "en"
     },
     "tlTKTTt47WE": {
       "title": "Is Reality Real? The Simulation Argument",
@@ -145,7 +162,8 @@
       "topic": "Philosophy",
       "url": "https://www.youtube.com/watch?v=tlTKTTt47WE",
       "indexed": true,
-      "video_id": "tlTKTTt47WE"
+      "video_id": "tlTKTTt47WE",
+      "language": "en"
     },
     "-ovM0daP6bw": {
       "title": "AI vs Human Thinking: How Large Language Models Really Work",
@@ -153,7 +171,8 @@
       "topic": "Technology",
       "url": "https://www.youtube.com/watch?v=-ovM0daP6bw",
       "indexed": true,
-      "video_id": "-ovM0daP6bw"
+      "video_id": "-ovM0daP6bw",
+      "language": "en"
     },
     "1Ou1MckZHTA": {
       "title": "Neutron Stars: The Most Extreme Objects in the Universe",
@@ -161,7 +180,8 @@
       "topic": "Cosmology",
       "url": "https://www.youtube.com/watch?v=1Ou1MckZHTA",
       "indexed": true,
-      "video_id": "1Ou1MckZHTA"
+      "video_id": "1Ou1MckZHTA",
+      "language": "en"
     },
     "1YFrISfN7jo": {
       "title": "The Geometry of Causality",
@@ -169,7 +189,8 @@
       "topic": "Physics",
       "url": "https://www.youtube.com/watch?v=1YFrISfN7jo",
       "indexed": true,
-      "video_id": "1YFrISfN7jo"
+      "video_id": "1YFrISfN7jo",
+      "language": "en"
     },
     "7yLeDg_KuOA": {
       "title": "The #1 antidote to aging | Daniel Lieberman, Morgan Levine & more",
@@ -177,7 +198,8 @@
       "topic": "Biology",
       "url": "https://www.youtube.com/watch?v=7yLeDg_KuOA",
       "indexed": true,
-      "video_id": "7yLeDg_KuOA"
+      "video_id": "7yLeDg_KuOA",
+      "language": "en"
     },
     "BD0r2Xfgh_E": {
       "title": "Brian Cox - What Was There Before The Big Bang?",
@@ -185,7 +207,8 @@
       "topic": "Cosmology",
       "url": "https://www.youtube.com/watch?v=BD0r2Xfgh_E",
       "indexed": true,
-      "video_id": "BD0r2Xfgh_E"
+      "video_id": "BD0r2Xfgh_E",
+      "language": "en"
     },
     "R_TnZJpCULI": {
       "title": "You don’t need a 10-year plan. You need to experiment. | Anne-Laure Le Cunff",
@@ -193,7 +216,8 @@
       "topic": "Psychology",
       "url": "https://www.youtube.com/watch?v=R_TnZJpCULI",
       "indexed": true,
-      "video_id": "R_TnZJpCULI"
+      "video_id": "R_TnZJpCULI",
+      "language": "en"
     },
     "XOiUZ3ycZwU": {
       "title": "The Making of a Theory: Darwin, Wallace, and Natural Selection — HHMI BioInteractive Video",
@@ -201,7 +225,8 @@
       "topic": "Biology",
       "url": "https://www.youtube.com/watch?v=XOiUZ3ycZwU",
       "indexed": true,
-      "video_id": "XOiUZ3ycZwU"
+      "video_id": "XOiUZ3ycZwU",
+      "language": "en"
     },
     "o9g49L-MmeE": {
       "title": "Everything you need to know about semiconductors, in 16 mins | Chris Miller",
@@ -209,7 +234,8 @@
       "topic": "Physics",
       "url": "https://www.youtube.com/watch?v=o9g49L-MmeE",
       "indexed": true,
-      "video_id": "o9g49L-MmeE"
+      "video_id": "o9g49L-MmeE",
+      "language": "en"
     },
     "t0qq9R__XiQ": {
       "title": "Your brain wasn't built to hold this much information | Richard Cytowic",
@@ -217,7 +243,8 @@
       "topic": "Biology",
       "url": "https://www.youtube.com/watch?v=t0qq9R__XiQ",
       "indexed": true,
-      "video_id": "t0qq9R__XiQ"
+      "video_id": "t0qq9R__XiQ",
+      "language": "en"
     },
     "rXfFACs24zU": {
       "title": "Brian Cox: The terrifying possibility of the Great Filter",
@@ -225,7 +252,8 @@
       "topic": "Cosmology",
       "url": "https://www.youtube.com/watch?v=rXfFACs24zU",
       "indexed": true,
-      "video_id": "rXfFACs24zU"
+      "video_id": "rXfFACs24zU",
+      "language": "en"
     },
     "5MgBikgcWnY": {
       "title": "The first 20 hours -- how to learn anything | Josh Kaufman | TEDxCSU",
@@ -233,7 +261,8 @@
       "topic": "Education",
       "url": "https://www.youtube.com/watch?v=5MgBikgcWnY",
       "indexed": true,
-      "video_id": "5MgBikgcWnY"
+      "video_id": "5MgBikgcWnY",
+      "language": "en"
     },
     "5sLYAQS9sWQ": {
       "title": "How Large Language Models Work",
@@ -241,7 +270,8 @@
       "topic": "Technology",
       "url": "https://www.youtube.com/watch?v=5sLYAQS9sWQ",
       "indexed": true,
-      "video_id": "5sLYAQS9sWQ"
+      "video_id": "5sLYAQS9sWQ",
+      "language": "en"
     },
     "M0yhHKWUa0g": {
       "title": "Don't eat the marshmallow! | Joachim de Posada",
@@ -249,7 +279,8 @@
       "topic": "Psychology",
       "url": "https://www.youtube.com/watch?v=M0yhHKWUa0g",
       "indexed": true,
-      "video_id": "M0yhHKWUa0g"
+      "video_id": "M0yhHKWUa0g",
+      "language": "en"
     },
     "QuR969uMICM": {
       "title": "A beginner's guide to quantum computing | Shohini Ghose",
@@ -257,7 +288,8 @@
       "topic": "Technology",
       "url": "https://www.youtube.com/watch?v=QuR969uMICM",
       "indexed": true,
-      "video_id": "QuR969uMICM"
+      "video_id": "QuR969uMICM",
+      "language": "en"
     },
     "SN8nTQiWOYY": {
       "title": "What If Space And Time Are NOT Real?",
@@ -265,7 +297,8 @@
       "topic": "Philosophy",
       "url": "https://www.youtube.com/watch?v=SN8nTQiWOYY",
       "indexed": true,
-      "video_id": "SN8nTQiWOYY"
+      "video_id": "SN8nTQiWOYY",
+      "language": "en"
     },
     "TNQsmPf24go": {
       "title": "How Does the Internet Work? - Glad You Asked S1",
@@ -273,7 +306,8 @@
       "topic": "Technology",
       "url": "https://www.youtube.com/watch?v=TNQsmPf24go",
       "indexed": true,
-      "video_id": "TNQsmPf24go"
+      "video_id": "TNQsmPf24go",
+      "language": "en"
     },
     "Ua13CLOgZis": {
       "title": "Annaka Harris: You don’t exist the way you think you do",
@@ -281,7 +315,8 @@
       "topic": "Neuroscience",
       "url": "https://www.youtube.com/watch?v=Ua13CLOgZis",
       "indexed": true,
-      "video_id": "Ua13CLOgZis"
+      "video_id": "Ua13CLOgZis",
+      "language": "en"
     },
     "fXIeFJCqsPs": {
       "title": "Mihaly Csikszentmihalyi: Flow, the secret to happiness",
@@ -289,7 +324,8 @@
       "topic": "Psychology",
       "url": "https://www.youtube.com/watch?v=fXIeFJCqsPs",
       "indexed": true,
-      "video_id": "fXIeFJCqsPs"
+      "video_id": "fXIeFJCqsPs",
+      "language": "en"
     },
     "fjbWr3ODbAo": {
       "title": "The illusion of consciousness | Dan Dennett",
@@ -297,7 +333,8 @@
       "topic": "Cognitive Science",
       "url": "https://www.youtube.com/watch?v=fjbWr3ODbAo",
       "indexed": true,
-      "video_id": "fjbWr3ODbAo"
+      "video_id": "fjbWr3ODbAo",
+      "language": "en"
     },
     "hmVOV7xvl58": {
       "title": "Are We Living in an Ancestor Simulation? ft. Neil deGrasse Tyson | Space Time",
@@ -305,7 +342,8 @@
       "topic": "Philosophy",
       "url": "https://www.youtube.com/watch?v=hmVOV7xvl58",
       "indexed": true,
-      "video_id": "hmVOV7xvl58"
+      "video_id": "hmVOV7xvl58",
+      "language": "en"
     },
     "iCvmsMzlF7o": {
       "title": "The Power of Vulnerability | Brené Brown | TED",
@@ -313,7 +351,8 @@
       "topic": "Psychology",
       "url": "https://www.youtube.com/watch?v=iCvmsMzlF7o",
       "indexed": true,
-      "video_id": "iCvmsMzlF7o"
+      "video_id": "iCvmsMzlF7o",
+      "language": "en"
     },
     "lyu7v7nWzfo": {
       "title": "Your Brain Hallucinates Your Conscious Reality | Anil Seth | TED",
@@ -321,7 +360,8 @@
       "topic": "Neuroscience",
       "url": "https://www.youtube.com/watch?v=lyu7v7nWzfo",
       "indexed": true,
-      "video_id": "lyu7v7nWzfo"
+      "video_id": "lyu7v7nWzfo",
+      "language": "en"
     },
     "s86-Z-CbaHA": {
       "title": "The Banach–Tarski Paradox",
@@ -329,7 +369,8 @@
       "topic": "Physics",
       "url": "https://www.youtube.com/watch?v=s86-Z-CbaHA",
       "indexed": true,
-      "video_id": "s86-Z-CbaHA"
+      "video_id": "s86-Z-CbaHA",
+      "language": "en"
     },
     "zlm1aajH6gY": {
       "title": "The Riemann Hypothesis, Explained",
@@ -337,7 +378,80 @@
       "topic": "Mathematics",
       "url": "https://www.youtube.com/watch?v=zlm1aajH6gY",
       "indexed": true,
-      "video_id": "zlm1aajH6gY"
+      "video_id": "zlm1aajH6gY",
+      "language": "en"
+    },
+    "QmToxMOEls0": {
+      "title": "¿Estrés, depresión o ansiedad? ¡Podrías ser neurodivergente!",
+      "channel": "CuriosaMente",
+      "topic": "Psychology",
+      "language": "es",
+      "url": "https://www.youtube.com/watch?v=QmToxMOEls0",
+      "indexed": true,
+      "video_id": "QmToxMOEls0"
+    },
+    "_WM4XMwhRBE": {
+      "title": "¡Las matemáticas no son perfectas! Los teoremas de incompletitud de Gödel",
+      "channel": "CuriosaMente",
+      "topic": "Mathematics",
+      "language": "es",
+      "url": "https://www.youtube.com/watch?v=_WM4XMwhRBE",
+      "indexed": true,
+      "video_id": "_WM4XMwhRBE"
+    },
+    "fy8jTiECCWI": {
+      "title": "Physiker hassen die Zeit — Harald Lesch",
+      "channel": "Terra X Lesch & Co",
+      "topic": "Physics",
+      "language": "de",
+      "url": "https://www.youtube.com/watch?v=fy8jTiECCWI",
+      "indexed": true,
+      "video_id": "fy8jTiECCWI"
+    },
+    "zUyItDq2JAk": {
+      "title": "Mathematik: Entdeckt oder erfunden? — Harald Lesch",
+      "channel": "Terra X Lesch & Co",
+      "topic": "Philosophy",
+      "language": "de",
+      "url": "https://www.youtube.com/watch?v=zUyItDq2JAk",
+      "indexed": true,
+      "video_id": "zUyItDq2JAk"
+    },
+    "Rj3jTw2DxXQ": {
+      "title": "La mécanique quantique en 7 idées — Sciences Inattendues #16",
+      "channel": "Science Étonnante",
+      "topic": "Physics",
+      "language": "fr",
+      "url": "https://www.youtube.com/watch?v=Rj3jTw2DxXQ",
+      "indexed": true,
+      "video_id": "Rj3jTw2DxXQ"
+    },
+    "Adm-8rNBrCU": {
+      "title": "Gaucher ou Droitier — Quickie #07",
+      "channel": "e-penser",
+      "topic": "Neuroscience",
+      "language": "fr",
+      "url": "https://www.youtube.com/watch?v=Adm-8rNBrCU",
+      "indexed": true,
+      "video_id": "Adm-8rNBrCU"
+    },
+    "QSTLljIWJ1U": {
+      "title": "O MITO das 10.000 HORAS",
+      "channel": "Ciência Todo Dia",
+      "topic": "Psychology",
+      "language": "pt",
+      "url": "https://www.youtube.com/watch?v=QSTLljIWJ1U",
+      "indexed": true,
+      "video_id": "QSTLljIWJ1U"
+    },
+    "4Yqe2j2Iw-Q": {
+      "title": "Microplásticos já estão DENTRO de VOCÊ. E agora?",
+      "channel": "Ciência Todo Dia",
+      "topic": "Biology",
+      "language": "pt",
+      "url": "https://www.youtube.com/watch?v=4Yqe2j2Iw-Q",
+      "indexed": true,
+      "video_id": "4Yqe2j2Iw-Q"
     }
   }
 }

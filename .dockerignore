@@ -35,7 +35,3 @@ notebooks/
 # Dev-only files
 requirements-dev.txt
 tests/
-
-# Mempalace
-entities.json
-mempalace.yaml
