@@ -6,7 +6,7 @@ All prompt templates and static response strings for the ScienceQ.
 Centralises:
   - SYSTEM_PROMPT         → main RAG answering prompt (injected via rag_chain._build_prompt)
   - NO_CONTEXT_RESPONSE   → static fallback when retrieval returns no chunks above threshold
-  - REWRITE_SYSTEM        → system instruction for the query-rewrite LLM (llama-3.1-8b-instant)
+  - REWRITE_SYSTEM        → system instruction for the query-rewrite LLM (openai/gpt-oss-20b)
 
 Design notes
 ~~~~~~~~~~~~

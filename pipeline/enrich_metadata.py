@@ -53,7 +53,7 @@ METADATA_PATH = DATA_DIR / "metadata.json"
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3/videos"
-GROQ_MODEL      = "llama-3.3-70b-versatile"
+GROQ_MODEL      = "openai/gpt-oss-120b"
 SAMPLE_CHARS    = 600   # transcript chars sent to Groq for topic classification
 YT_BATCH_SIZE   = 50   # YouTube Data API max IDs per request
 

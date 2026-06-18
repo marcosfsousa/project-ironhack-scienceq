@@ -10,7 +10,7 @@ Pipeline (in order):
   4. Extract transcript via youtube-transcript-api
   5. Clean transcript using cleaner.clean_text()
   6. Chunk transcript using chunker.chunk_segments()
-  7. Infer topic label via llama-3.1-8b-instant on first 500 words
+  7. Infer topic label via openai/gpt-oss-20b on first 500 words
   8. Embed chunks via Cohere embed-multilingual-v3.0 (search_document)
   9. Upsert to Pinecone 'live' namespace
 
@@ -188,7 +188,7 @@ def _fetch_metadata_yt_dlp(url: str) -> dict | None:
 
 def _infer_metadata_llm(first_500_words: str) -> dict:
     """
-    Ask llama-3.1-8b-instant to infer title and channel from transcript text.
+    Ask openai/gpt-oss-20b to infer title and channel from transcript text.
     Returns dict with keys: title, channel. Topic is inferred separately.
     Falls back to generic strings on any error.
     """
@@ -202,7 +202,7 @@ def _infer_metadata_llm(first_500_words: str) -> dict:
             f"Transcript excerpt:\n{first_500_words}"
         )
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=80,
             temperature=0.1,
@@ -224,7 +224,7 @@ def _infer_metadata_llm(first_500_words: str) -> dict:
 
 def _infer_topic_llm(first_500_words: str) -> str:
     """
-    Ask llama-3.1-8b-instant to classify the topic from TOPIC_CHOICES.
+    Ask openai/gpt-oss-20b to classify the topic from TOPIC_CHOICES.
     Returns the topic string, defaults to "Other" on any failure.
     """
     try:
@@ -237,7 +237,7 @@ def _infer_topic_llm(first_500_words: str) -> str:
             f"Transcript excerpt:\n{first_500_words}"
         )
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.0,
