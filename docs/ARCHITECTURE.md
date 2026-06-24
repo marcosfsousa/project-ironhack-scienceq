@@ -210,13 +210,14 @@ Evaluated using a 38-case eval set (`eval/eval_set.json`): 20 English factual RA
 | Experiment | Cases | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|---|
 | prompt-v1 | 25 | 4.56 | 4.76 | 3.92 | 3.72 | 4.24 |
-| prompt-v2 | 25 | 4.28 | 4.88 | 4.04 | 4.36 | **4.39** |
+| prompt-v2 | 25 | 4.28 | **4.88** | 4.04 | 4.36 | 4.39 |
 | Phase 3 — Cohere embeddings (reranker off) | 25 | 4.12 | 4.76 | 3.60 | 3.60 | 4.02 |
-| Phase 4 — Cohere Rerank v3.5 (reranker on) | 25 | 4.40 | 4.84 | 3.64 | 4.12 | **4.25** |
+| Phase 4 — Cohere Rerank v3.5 (reranker on) | 25 | 4.40 | 4.84 | 3.64 | 4.12 | 4.25 |
 | Phase 6 — Multilingual corpus | 33 | 4.38 | 4.62 | 3.62 | 4.25 | 4.22 |
-| **prompt-v3 — grounding tightened** | **33** | **4.48** | 4.79 | **3.94** | 3.88 | **4.27** |
+| prompt-v3 — grounding tightened | 33 | 4.48 | 4.79 | 3.94 | 3.88 | 4.27 |
+| **gpt-oss-120b — model swap** | **33** | **4.64** | 4.67 | **4.58** | **4.79** | **4.67** |
 
-Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 6 added 8 non-English videos (ES/DE/FR/PT); cross-lingual retrieval validated via `eval/validate_multilingual.py` — 4/4 validation queries PASS with all non-English target chunks scoring above the 0.40 threshold (range: 0.52–0.70). Frontend confirmed: English queries surface non-English source pills in the Streamlit UI alongside English results. prompt-v3 replaced the prohibition-framed grounding rule with a verification frame ("which excerpt supports this?") and an explicit inference ban — grounding +0.32 on multilingual cases, correctness +0.12 overall, no regressions on tone or conciseness. Two cases (ml_007 microplastics, ml_008 neurodivergence) remain at grounding=2 — a corpus data gap, not fixable by prompt alone.
+Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 6 added 8 non-English videos (ES/DE/FR/PT); cross-lingual retrieval validated via `eval/validate_multilingual.py` — 4/4 validation queries PASS with all non-English target chunks scoring above the 0.40 threshold (range: 0.52–0.70). Frontend confirmed: English queries surface non-English source pills in the Streamlit UI alongside English results. prompt-v3 replaced the prohibition-framed grounding rule with a verification frame ("which excerpt supports this?") and an explicit inference ban — grounding +0.32 on multilingual cases, correctness +0.12 overall, no regressions on tone or conciseness. Two cases (ml_007 microplastics, ml_008 neurodivergence) remained at grounding=2 — a corpus data gap, not fixable by prompt alone. gpt-oss-120b swapped the LLM from `llama-3.3-70b-versatile` to `openai/gpt-oss-120b` (via Groq) with no prompt or retrieval changes — the largest single-checkpoint gain in the table: grounding +0.64, conciseness +0.91, correctness +0.16, overall mean +0.40 vs. prompt-v3. Tone dipped -0.12. The two previously stuck multilingual cases (ml_007, ml_008) recovered: grounding 2 → 5 and 2 → 4 respectively.
 
 Results are tracked in LangSmith under the `scienceq` project.
 
