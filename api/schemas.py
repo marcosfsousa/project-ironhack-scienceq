@@ -10,7 +10,7 @@ session store). See api/service.py.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,3 +48,22 @@ class ChatResponse(BaseModel):
     answer: str
     sources: list[Source] = Field(default_factory=list)
     intent: str  # "rag" | "metadata" | "ingest"
+
+
+class IngestRequest(BaseModel):
+    url: str
+
+
+class IngestJobCreated(BaseModel):
+    job_id: str
+    status: Literal["pending"]
+
+
+class IngestStatusResponse(BaseModel):
+    status: str  # "pending" | "complete" | "failed"
+    title: Optional[str] = None
+    channel: Optional[str] = None
+    topic: Optional[str] = None
+    chunk_count: Optional[int] = None
+    already_indexed: Optional[bool] = None
+    error: Optional[str] = None

@@ -37,6 +37,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,7 +93,7 @@ def _get_proxy_config() -> tuple[str | None, GenericProxyConfig | None]:
     Expected format: http://username:password@geo.iproyal.com:12321
     Set via .env locally or Streamlit secrets on cloud.
     """
-    proxy_url = os.environ.get("IPROYAL_PROXY_URL")
+    proxy_url = os.environ.get("IPROYAL_PROXY_URL", "").strip() or None
     if proxy_url:
         log.info("  Proxy configured — routing YouTube requests via residential proxy.")
         proxy_config = GenericProxyConfig(
@@ -148,7 +150,33 @@ def _is_already_indexed(video_id: str, index, corpus_namespace: str, live_namesp
             return True, ns
     return False, ""
 
-# ── Real metadata via yt-dlp ───────────────────────────────────────────────────
+# ── Real metadata via YouTube oEmbed ──────────────────────────────────────────
+
+def _fetch_metadata_oembed(url: str) -> dict | None:
+    """
+    Fetch title and channel via the YouTube oEmbed endpoint.
+    No auth, no proxy required — accessible from any IP including Cloud Run.
+    Returns dict with keys: title, channel, duration (always 0 — oEmbed omits it).
+    Returns None on any failure.
+    """
+    try:
+        oembed_url = (
+            "https://www.youtube.com/oembed?format=json&url="
+            + urllib.parse.quote(url, safe="")
+        )
+        with urllib.request.urlopen(oembed_url, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        return {
+            "title":    data.get("title", "Unknown"),
+            "channel":  data.get("author_name", "Unknown"),
+            "duration": 0,
+        }
+    except Exception as e:
+        log.warning(f"oEmbed metadata fetch failed: {e} — falling back to yt-dlp.")
+        return None
+
+
+# ── Real metadata via yt-dlp (fallback) ───────────────────────────────────────
 
 def _fetch_metadata_yt_dlp(url: str) -> dict | None:
     """
@@ -444,9 +472,9 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
                 )
                 return result
 
-        # ── 4. Fetch real metadata via yt-dlp ──────────────────────────────────
-        log.info("  Fetching metadata via yt-dlp...")
-        meta = _fetch_metadata_yt_dlp(url)
+        # ── 4. Fetch metadata (oEmbed first, yt-dlp fallback) ─────────────────
+        log.info("  Fetching metadata...")
+        meta = _fetch_metadata_oembed(url) or _fetch_metadata_yt_dlp(url)
 
         # ── 5. Extract transcript ──────────────────────────────────────────────
         log.info("  Extracting transcript...")
