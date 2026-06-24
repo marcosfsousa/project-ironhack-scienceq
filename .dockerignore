@@ -33,5 +33,4 @@ docs/
 notebooks/
 
 # Dev-only files
-requirements-dev.txt
 tests/

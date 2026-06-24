@@ -98,6 +98,44 @@ The Streamlit UI remains live at [scienceq.streamlit.app](https://scienceq.strea
 
 ---
 
+## Cloud Run Pipeline Job (Phase 2)
+
+The corpus pipeline runs as a Cloud Run Job (`scienceq-pipeline`) backed by a GCS bucket (`gs://scienceq-data`) mounted via GCS FUSE at `/app/data`. The container filesystem is ephemeral, but the FUSE mount makes writes land directly in GCS — files produced by one execution persist for the next.
+
+**To add new videos to the corpus:**
+
+1. Append YouTube URLs to `gs://scienceq-data/video_urls.txt`
+2. Trigger the job:
+
+```bash
+gcloud run jobs execute scienceq-pipeline \
+  --project=scienceq-prod \
+  --region=europe-west1 \
+  --wait
+```
+
+The job runs all pipeline steps in order (`extract → clean → chunk → embed → bootstrap → enrich → index`). Steps are idempotent — already-processed videos are skipped automatically.
+
+**To rebuild the pipeline image** after code changes:
+
+```bash
+gcloud builds submit \
+  --project=scienceq-prod \
+  --region=europe-west1 \
+  --config=cloudbuild-pipeline.yaml \
+  .
+```
+
+**To update the job definition** (memory, CPU, env vars, secrets):
+
+```bash
+gcloud run jobs replace cloudrun-pipeline-job.yaml \
+  --project=scienceq-prod \
+  --region=europe-west1
+```
+
+---
+
 ## Running with Docker
 
 The root `Dockerfile` builds the **FastAPI API image**. For the Streamlit app use `Dockerfile.streamlit`.
@@ -223,13 +261,15 @@ python tests/run_all_tests.py
 ├── eval/               # Eval set, sweep scripts, LangSmith runner, results
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
-├── Dockerfile              # FastAPI API image (Cloud Run)
-├── Dockerfile.streamlit    # Streamlit app image (Streamlit Cloud)
-├── Dockerfile.pipeline     # Pipeline image (batch jobs)
+├── Dockerfile                   # FastAPI API image (Cloud Run serving)
+├── Dockerfile.streamlit         # Streamlit app image (Streamlit Cloud)
+├── Dockerfile.pipeline          # Pipeline image (Cloud Run Job)
+├── cloudbuild-pipeline.yaml     # Cloud Build config for pipeline image
+├── cloudrun-pipeline-job.yaml   # Cloud Run Job definition (Phase 2)
 ├── docker-compose.yml
 ├── .env.example
-├── requirements.txt        # Runtime deps (shared by Streamlit Cloud + Cloud Run)
-└── requirements-dev.txt    # Full dev + pipeline + eval dependencies
+├── requirements.txt             # Runtime deps (shared by Streamlit Cloud + Cloud Run)
+└── requirements-dev.txt         # Full dev + pipeline + eval dependencies
 ```
 
 ---
@@ -242,7 +282,6 @@ python tests/run_all_tests.py
 
 ## Next steps
 
-- **Cloud Run Phase 2** — deploy the corpus pipeline as a Cloud Run Job (`Dockerfile.pipeline`)
 - **Cloud Run Phase 3** — re-enable live URL ingestion on Cloud Run (blocked by YouTube's datacenter IP restriction; needs residential proxy + background task to avoid HTTP timeout)
 - **React SPA** — polished frontend consuming the FastAPI `/api/chat` endpoint; retire Streamlit once live
 - Whisper integration for videos without captions

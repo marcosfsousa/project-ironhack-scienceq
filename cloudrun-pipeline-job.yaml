@@ -1,0 +1,52 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: scienceq-pipeline
+  labels:
+    cloud.googleapis.com/location: europe-west1
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      template:
+        spec:
+          timeoutSeconds: 3600
+          containers:
+          - image: europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-pipeline:latest
+            resources:
+              limits:
+                cpu: "2"
+                memory: 4Gi
+            env:
+            - name: PINECONE_INDEX_NAME
+              value: scienceq
+            - name: PINECONE_NAMESPACE_CORPUS
+              value: corpus
+            - name: PINECONE_NAMESPACE_LIVE
+              value: live
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: GROQ_API_KEY
+                  key: latest
+            - name: COHERE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: COHERE_API_KEY
+                  key: latest
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: PINECONE_API_KEY
+                  key: latest
+            volumeMounts:
+            - name: data
+              mountPath: /app/data
+          volumes:
+          - name: data
+            csi:
+              driver: gcsfuse.run.googleapis.com
+              volumeAttributes:
+                bucketName: scienceq-data
