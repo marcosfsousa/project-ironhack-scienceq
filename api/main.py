@@ -23,7 +23,7 @@ app = FastAPI(title="ScienceQ API", version="1.0.0")
 app.include_router(router)
 
 
-@app.get("/healthz")
-def healthz() -> dict:
+@app.get("/health")
+def health() -> dict:
     """Liveness probe for Cloud Run."""
     return {"status": "ok"}
