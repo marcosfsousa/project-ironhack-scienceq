@@ -75,16 +75,46 @@ Phase 3 re-indexed the full corpus into a new embedding space (MiniLM → Cohere
 
 ---
 
+## Cloud Run API (Phase 1)
+
+The FastAPI service is deployed on Google Cloud Run:
+
+**Base URL:** `https://scienceq-api-886463515307.europe-west1.run.app`
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Liveness probe → `{"status":"ok"}` |
+| `/api/chat` | POST | RAG chat — returns answer, sources, intent |
+| `/docs` | GET | Swagger UI |
+
+**Example request:**
+```bash
+curl -X POST https://scienceq-api-886463515307.europe-west1.run.app/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"How does natural selection work?","history":[]}'
+```
+
+The Streamlit UI remains live at [scienceq.streamlit.app](https://scienceq.streamlit.app) in parallel until the React SPA is built.
+
+---
+
 ## Running with Docker
+
+The root `Dockerfile` builds the **FastAPI API image**. For the Streamlit app use `Dockerfile.streamlit`.
 
 **Prerequisites:** Docker installed, a `.env` file with your API keys (copy from `.env.example`).
 
 ```bash
-docker build -t scienceq .
-docker run --env-file .env -p 8501:8501 scienceq
+# FastAPI API
+docker build -t scienceq-api .
+docker run --env-file .env -p 8080:8080 scienceq-api
 ```
 
-Open [http://localhost:8501](http://localhost:8501).
+```bash
+# Streamlit app
+docker build -f Dockerfile.streamlit -t scienceq-streamlit .
+docker run --env-file .env -p 8501:8501 scienceq-streamlit
+```
 
 ---
 
@@ -186,17 +216,19 @@ python tests/run_all_tests.py
 
 ```
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
+├── api/                # FastAPI service (Cloud Run) — main, routes, service, schemas
 ├── app/                # Streamlit UI
 ├── data/               # metadata.json, per-video transcript/chunk/embedding files
 ├── docs/               # ARCHITECTURE.md, DATASET.md, retrieval_sweep_results.md
 ├── eval/               # Eval set, sweep scripts, LangSmith runner, results
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
-├── Dockerfile              # App image (Streamlit)
+├── Dockerfile              # FastAPI API image (Cloud Run)
+├── Dockerfile.streamlit    # Streamlit app image (Streamlit Cloud)
 ├── Dockerfile.pipeline     # Pipeline image (batch jobs)
 ├── docker-compose.yml
 ├── .env.example
-├── requirements.txt        # Runtime (Streamlit Cloud)
+├── requirements.txt        # Runtime deps (shared by Streamlit Cloud + Cloud Run)
 └── requirements-dev.txt    # Full dev + pipeline + eval dependencies
 ```
 
@@ -210,6 +242,8 @@ python tests/run_all_tests.py
 
 ## Next steps
 
+- **Cloud Run Phase 2** — deploy the corpus pipeline as a Cloud Run Job (`Dockerfile.pipeline`)
+- **Cloud Run Phase 3** — re-enable live URL ingestion on Cloud Run (blocked by YouTube's datacenter IP restriction; needs residential proxy + background task to avoid HTTP timeout)
+- **React SPA** — polished frontend consuming the FastAPI `/api/chat` endpoint; retire Streamlit once live
 - Whisper integration for videos without captions
 - Expand non-English corpus beyond the current ES/DE/FR/PT pilot (embed-multilingual-v3.0 supports 100+ languages)
-- GPT-4.1 evaluation run for Phase 6 cross-lingual cases
