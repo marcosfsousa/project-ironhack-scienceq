@@ -34,7 +34,7 @@ LangGraph Agent  ── keyword routing ──►  RAG chain  ──►  Pinecon
                                                       Cohere Rerank v3.5
                                                                │
                                                                ▼ top-3
-                                                      Groq LLM (llama-3.3-70b)
+                                                      OpenAI gpt-oss-120b (via Groq)
                                                                │
                                                                ▼
                                                      Streaming answer + sources
@@ -47,7 +47,7 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 
 | Layer | Technology |
 |---|---|
-| LLM | Groq — `llama-3.3-70b-versatile` |
+| LLM | OpenAI `gpt-oss-120b` (answers, via Groq), `gpt-oss-20b` (rewriting, via Groq) |
 | Embeddings | Cohere `embed-multilingual-v3.0` (1024d, asymmetric) |
 | Reranker | Cohere Rerank v3.5 |
 | Vector DB | Pinecone Serverless (cosine, AWS us-east-1) |

@@ -84,7 +84,7 @@ for p in [str(_AGENT_DIR), str(_PIPELINE_DIR)]:
 from agent import YouTubeQAAgent  # noqa: E402
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-JUDGE_MODEL    = "gpt-4.1"              # stronger than the evaluated model (llama-3.3-70b)
+JUDGE_MODEL    = "gpt-4.1"              # stronger than the evaluated model (gpt-oss-120b)
 EVAL_SET_PATH  = _EVAL_DIR / "eval_set.json"
 MANUAL_REVIEW_PATH = _EVAL_DIR / "manual_review.json"
 RATE_LIMIT_SLEEP   = 1.0               # seconds between judge calls (OpenAI safety)

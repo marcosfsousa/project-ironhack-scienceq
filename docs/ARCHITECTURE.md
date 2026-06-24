@@ -37,7 +37,7 @@ Streamlit App  (app/streamlit_app.py)
            [corpus + live namespaces]
                     │
                     ▼
-           Groq LLM  (llama-3.3-70b-versatile)
+           OpenAI gpt-oss-120b  (via Groq)
                     │
                     ▼
            Streaming answer + source citations
@@ -109,7 +109,7 @@ Two tools registered with the agent:
 
 **RAGRetrieverTool** — answers factual questions by calling the RAG chain. Always tried first.
 
-**VideoMetadataTool** — answers catalog queries ("what videos do you have on physics?") by searching `metadata.json`. Uses a three-pass matching strategy: exact match on topic/title/channel first, then a loose word match restricted to the topic field only to prevent cross-topic contamination. Returns a `METADATA_LIST:<json>` signal rather than a formatted string — the Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting entirely. All metadata queries are first resolved to a clean search keyword via `llama-3.1-8b-instant` before hitting the tool, normalising full sentences ("what videos do you have on mathematics?") to single terms ("mathematics").
+**VideoMetadataTool** — answers catalog queries ("what videos do you have on physics?") by searching `metadata.json`. Uses a three-pass matching strategy: exact match on topic/title/channel first, then a loose word match restricted to the topic field only to prevent cross-topic contamination. Returns a `METADATA_LIST:<json>` signal rather than a formatted string — the Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting entirely. All metadata queries are first resolved to a clean search keyword via `openai/gpt-oss-20b` before hitting the tool, normalising full sentences ("what videos do you have on mathematics?") to single terms ("mathematics").
 
 ### Prompts (`agent/prompts.py`)
 
@@ -124,7 +124,7 @@ Three prompt components:
 End-to-end pipeline triggered when the user pastes a YouTube URL:
 
 1. Fetch video metadata (title, channel) via `yt-dlp`
-2. Infer topic via `llama-3.1-8b-instant` on the first 500 words of the transcript
+2. Infer topic via `openai/gpt-oss-20b` on the first 500 words of the transcript
 3. Extract transcript via `youtube-transcript-api`
 4. Detect transcript language; normalise locale variants (`es-419` → `es`)
 5. Clean and normalize text with language-aware filler removal
@@ -182,7 +182,7 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **Custom `ConversationMemory`** — avoids `langchain-community` dependency, which had unstable versioning during development.
 
-**Two Groq models** — `llama-3.3-70b-versatile` for RAG answers, `llama-3.1-8b-instant` for query rewriting and metadata resolution. The smaller model uses a separate Groq rate limit bucket.
+**Two OpenAI models via Groq** — `openai/gpt-oss-120b` for RAG answers, `openai/gpt-oss-20b` for query rewriting and metadata resolution. The smaller model uses a separate Groq rate limit bucket.
 
 ---
 
@@ -226,7 +226,7 @@ Results are tracked in LangSmith under the `scienceq` project.
 
 | Layer | Technology |
 |---|---|
-| LLM | Groq — `llama-3.3-70b-versatile` (answers), `llama-3.1-8b-instant` (rewriting) |
+| LLM | OpenAI `gpt-oss-120b` (answers, via Groq), `gpt-oss-20b` (rewriting, via Groq) |
 | Embeddings | Cohere `embed-multilingual-v3.0` — 1024 dimensions, asymmetric |
 | Vector DB | Pinecone Serverless — cosine similarity, AWS us-east-1 |
 | Orchestration | LangChain LCEL + LangGraph |

@@ -6,7 +6,7 @@ Core RAG chain for the ScienceQ Bot.
 Wires together:
   - retriever.py       → Pinecone similarity search
   - prompts.py         → system + QA prompt templates  (Day 5: extracted to own module)
-  - Groq LLM           → Llama 3.1 70B (fast, free)
+  - Groq LLM           → openai/gpt-oss-120b (answers), openai/gpt-oss-20b (rewriting)
   - LangSmith tracing  → automatic via LANGCHAIN_* env vars
 
 Exposes two public functions:
