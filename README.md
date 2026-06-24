@@ -136,6 +136,35 @@ gcloud run jobs replace cloudrun-pipeline-job.yaml \
 
 ---
 
+## Live URL Ingestion (Phase 3)
+
+Paste any YouTube URL and ScienceQ ingests it on the fly — transcript extracted, chunked, embedded, and indexed into Pinecone's `live` namespace alongside the corpus.
+
+Because YouTube blocks transcript requests from datacenter IPs, the ingestion pipeline routes through a residential proxy (`IPROYAL_PROXY_URL`). To avoid HTTP timeouts on what is a 60–90 second operation, the API uses an async fire-and-poll pattern:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/ingest` | POST | Submit a URL — returns `job_id` immediately (202) |
+| `/api/ingest/{job_id}` | GET | Poll for status: `pending` → `complete` or `failed` |
+
+**Example:**
+
+```bash
+# Submit
+curl -X POST https://scienceq-api-886463515307.europe-west1.run.app/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://www.youtube.com/watch?v=VIDEO_ID"}'
+# → {"job_id":"a1b2c3d4","status":"pending"}
+
+# Poll until complete
+curl https://scienceq-api-886463515307.europe-west1.run.app/api/ingest/a1b2c3d4
+# → {"status":"complete","title":"...","channel":"...","topic":"...","chunk_count":12,...}
+```
+
+Video metadata (title, channel) is fetched via the YouTube oEmbed API — no auth, no proxy, ~80ms. The residential proxy is used only for transcript extraction via `youtube-transcript-api`.
+
+---
+
 ## Running with Docker
 
 The root `Dockerfile` builds the **FastAPI API image**. For the Streamlit app use `Dockerfile.streamlit`.
@@ -278,11 +307,10 @@ python tests/run_all_tests.py
 
 - Retrieval quality depends on transcript verbosity — visually-heavy videos without verbal explanation retrieve poorly
 - Multi-turn pronoun resolution occasionally drifts on short follow-ups
-- Live URL ingestion requires a video with available captions (auto-generated accepted). On Streamlit Community Cloud, a residential proxy is used to route transcript requests around YouTube's AWS IP blocks.
+- Live URL ingestion requires a video with available captions (auto-generated accepted). Both the Streamlit and Cloud Run deployments route transcript requests through a residential proxy to bypass YouTube's datacenter IP blocks.
 
 ## Next steps
 
-- **Cloud Run Phase 3** — re-enable live URL ingestion on Cloud Run (blocked by YouTube's datacenter IP restriction; needs residential proxy + background task to avoid HTTP timeout)
-- **React SPA** — polished frontend consuming the FastAPI `/api/chat` endpoint; retire Streamlit once live
+- **React SPA** — polished frontend consuming the FastAPI `/api/chat` and `/api/ingest` endpoints; retire Streamlit once live
 - Whisper integration for videos without captions
 - Expand non-English corpus beyond the current ES/DE/FR/PT pilot (embed-multilingual-v3.0 supports 100+ languages)
