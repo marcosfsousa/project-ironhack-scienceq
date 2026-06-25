@@ -24,8 +24,10 @@ app = FastAPI(title="ScienceQ API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://scienceq-web-[a-zA-Z0-9-]+\.europe-west1\.run\.app",
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "https://scienceq-web-886463515307.europe-west1.run.app",
+        "http://localhost:5173",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
