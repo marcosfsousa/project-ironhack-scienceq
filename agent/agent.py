@@ -376,6 +376,8 @@ class YouTubeQAAgent:
                 full_answer += token
                 yield token
             self._streamed_chunks = chunks
+            if full_answer.startswith("I don't have information"):
+                self._streamed_chunks = []
         except Exception as e:
             log.error(f"Streaming failed, falling back to blocking chat(): {e}")
             resp = self.chat(question)
