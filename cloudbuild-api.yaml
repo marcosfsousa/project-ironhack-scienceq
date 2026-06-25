@@ -1,0 +1,24 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
+      - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - gcloud
+      - run
+      - deploy
+      - scienceq-api
+      - --image=europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
+      - --region=europe-west1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --project=scienceq-prod
