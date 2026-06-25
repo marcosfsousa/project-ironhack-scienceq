@@ -73,7 +73,7 @@ export const CATALOG_FIXTURE: CatalogVideo[] = [
 export const SUGGESTIONS: string[] = [
   "Why has no one measured the speed of light?",
   "How does natural selection actually work?",
-  "What happens at the edge of the observable universe?",
+  "What was there before the Big Bang?",
   "What videos do you have on mathematics?",
 ];
 
