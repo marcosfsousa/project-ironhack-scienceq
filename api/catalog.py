@@ -82,9 +82,15 @@ def _live_videos() -> list[dict]:
     if not first_chunk_ids:
         return []
 
-    resp = index.fetch(ids=first_chunk_ids, namespace=_NS_LIVE)
+    # Pinecone fetch accepts at most 1,000 IDs per call.
+    _FETCH_BATCH = 1_000
+    all_vectors: dict = {}
+    for i in range(0, len(first_chunk_ids), _FETCH_BATCH):
+        batch_resp = index.fetch(ids=first_chunk_ids[i : i + _FETCH_BATCH], namespace=_NS_LIVE)
+        all_vectors.update(batch_resp.vectors)
+
     out  = []
-    for vec in resp.vectors.values():
+    for vec in all_vectors.values():
         m        = vec.metadata or {}
         video_id = m.get("video_id", "")
         out.append({

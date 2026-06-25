@@ -26,6 +26,3 @@ steps:
       - --set-env-vars=API_URL=https://scienceq-api-886463515307.europe-west1.run.app
       - --port=8080
       - --project=scienceq-prod
-
-images:
-  - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:latest

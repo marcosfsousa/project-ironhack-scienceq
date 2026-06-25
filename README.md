@@ -293,6 +293,7 @@ python tests/run_all_tests.py
 ├── Dockerfile                   # FastAPI API image (Cloud Run serving)
 ├── Dockerfile.streamlit         # Streamlit app image (Streamlit Cloud)
 ├── Dockerfile.pipeline          # Pipeline image (Cloud Run Job)
+├── Dockerfile.web               # React SPA image — nginx + Vite build (Cloud Run serving)
 ├── cloudbuild-pipeline.yaml     # Cloud Build config for pipeline image
 ├── cloudrun-pipeline-job.yaml   # Cloud Run Job definition (Phase 2)
 ├── docker-compose.yml

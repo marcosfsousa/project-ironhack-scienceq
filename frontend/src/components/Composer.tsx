@@ -32,6 +32,7 @@ export function Composer({ onSend, onIngest }: ComposerProps) {
         <div className="flex items-end gap-2.5 rounded-[15px] border border-line-strong bg-ink-panel py-2 pl-3.5 pr-2">
           <button
             onClick={() => onIngest("")}
+            aria-label="Index a YouTube video"
             title="Index a YouTube video"
             className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-line bg-ink-chip text-[17px] leading-none text-mut-400 hover:bg-[#222a33] hover:text-accent"
           >
@@ -56,6 +57,7 @@ export function Composer({ onSend, onIngest }: ComposerProps) {
           />
           <button
             onClick={submit}
+            aria-label="Send message"
             className="flex h-[34px] w-[34px] shrink-0 cursor-pointer items-center justify-center rounded-[10px] bg-accent text-[16px] font-bold text-ink hover:brightness-110"
           >
             ↑

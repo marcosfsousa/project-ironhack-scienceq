@@ -17,6 +17,9 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
     <div className="overflow-hidden rounded-[10px] border border-line bg-ink-card">
       <button
         onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={`source-${index}-player`}
+        aria-label={isOpen ? `Collapse source ${index + 1}` : `Expand source ${index + 1}`}
         className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-3 py-2.5 text-left font-sans hover:bg-ink-hover"
       >
         <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md border border-accent-bd bg-accent-soft font-mono text-[11px] font-bold text-accent">
@@ -46,7 +49,7 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
       </button>
 
       {isOpen && (
-        <div className="aspect-video border-t border-line bg-black">
+        <div id={`source-${index}-player`} className="aspect-video border-t border-line bg-black">
           <iframe
             src={embedUrl(source.link, { autoplay: true, startSec: start })}
             title={source.title}

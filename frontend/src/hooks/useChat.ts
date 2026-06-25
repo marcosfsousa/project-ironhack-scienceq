@@ -47,7 +47,10 @@ export function useChat() {
           history
         );
       } catch (e) {
-        if ((e as Error).name === "AbortError") return;
+        if ((e as Error).name === "AbortError") {
+          patch(aId, (m) => ({ ...m, status: "done" }));
+          return;
+        }
         patch(aId, (m) => ({ ...m, status: "error", error: String(e) }));
       }
     },

@@ -15,6 +15,11 @@ COPY agent/ agent/
 COPY pipeline/ pipeline/
 COPY data/metadata.json data/metadata.json
 
+RUN addgroup --system --gid 1001 appuser && \
+    adduser --system --uid 1001 --gid 1001 appuser && \
+    chown -R appuser:appuser /app
+USER appuser
+
 # Cloud Run injects $PORT; default to 8080 for local `docker run`.
 ENV PORT=8080
 EXPOSE 8080

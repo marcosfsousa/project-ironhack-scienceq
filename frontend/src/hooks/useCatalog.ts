@@ -31,7 +31,16 @@ export function useCatalog(extra: CatalogVideo[] = []) {
   }, []);
 
   const groups = useMemo<TopicGroup[]>(() => {
-    const all = [...extra, ...videos];
+    // extra takes precedence; deduplicate by video_id so the same video
+    // doesn't appear in both extra (just-ingested) and videos (catalog fetch).
+    const seen = new Set<string>();
+    const all: CatalogVideo[] = [];
+    for (const v of [...extra, ...videos]) {
+      if (!seen.has(v.video_id)) {
+        seen.add(v.video_id);
+        all.push(v);
+      }
+    }
     const byTopic = new Map<string, CatalogVideo[]>();
     for (const v of all) {
       if (!byTopic.has(v.topic)) byTopic.set(v.topic, []);
@@ -45,6 +54,9 @@ export function useCatalog(extra: CatalogVideo[] = []) {
     return ordered.map((topic) => ({ topic, videos: byTopic.get(topic)! }));
   }, [videos, extra]);
 
-  const total = videos.length + extra.length;
+  const total = useMemo(() => {
+    const ids = new Set([...extra.map((v) => v.video_id), ...videos.map((v) => v.video_id)]);
+    return ids.size;
+  }, [videos, extra]);
   return { groups, total, loading };
 }

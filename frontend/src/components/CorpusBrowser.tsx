@@ -22,6 +22,8 @@ export function CorpusBrowser({ groups, density, onPickVideo, defaultOpen }: Cor
           <div key={g.topic} className="mb-0.5">
             <button
               onClick={() => setExpanded((e) => ({ ...e, [g.topic]: !e[g.topic] }))}
+              aria-expanded={isOpen}
+              aria-controls={`topic-${g.topic}`}
               className="flex w-full cursor-pointer items-center gap-2 rounded-lg border-0 bg-transparent px-2 py-2.5 text-left font-sans hover:bg-white/[0.035]"
             >
               <span className="w-3 text-[10px] text-accent">{isOpen ? "▾" : "▸"}</span>
@@ -30,7 +32,7 @@ export function CorpusBrowser({ groups, density, onPickVideo, defaultOpen }: Cor
             </button>
 
             {isOpen && (
-              <div className="ml-[5px] border-l border-line py-0.5 pb-2 pl-5">
+              <div id={`topic-${g.topic}`} className="ml-[5px] border-l border-line py-0.5 pb-2 pl-5">
                 {g.videos.map((v) => (
                   <button
                     key={v.video_id}

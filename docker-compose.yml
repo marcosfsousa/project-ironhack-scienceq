@@ -1,7 +1,7 @@
 services:
 
   # ── FastAPI service ───────────────────────────────────────────────────────────
-  # Phase 1 serving app — the target for Cloud Run.
+  # Phase 4 serving app — the target for Cloud Run.
   # Run: docker compose up api   →   http://localhost:8080
   api:
     build:
