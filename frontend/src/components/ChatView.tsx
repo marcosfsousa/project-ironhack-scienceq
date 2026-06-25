@@ -30,6 +30,7 @@ export function ChatView({
   onIngest,
 }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<Accent, HTMLButtonElement>>(new Map());
 
   // Auto-stick to the bottom while a conversation is active.
   useEffect(() => {
@@ -39,6 +40,7 @@ export function ChatView({
   }, [messages]);
 
   // Roving tabIndex for the accent radio group: arrow keys move focus+selection.
+  // Focus must follow selection so repeated keypresses continue to cycle.
   const handleAccentKeyDown = useCallback(
     (e: React.KeyboardEvent, current: Accent) => {
       const idx = ACCENTS.indexOf(current);
@@ -47,7 +49,9 @@ export function ChatView({
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + ACCENTS.length) % ACCENTS.length;
       if (next === -1) return;
       e.preventDefault();
-      onAccentChange(ACCENTS[next]);
+      const nextAccent = ACCENTS[next];
+      onAccentChange(nextAccent);
+      buttonRefs.current.get(nextAccent)?.focus();
     },
     [onAccentChange]
   );
@@ -59,6 +63,7 @@ export function ChatView({
           {ACCENTS.map((a) => (
             <button
               key={a}
+              ref={(el) => { if (el) buttonRefs.current.set(a, el); else buttonRefs.current.delete(a); }}
               aria-label={a}
               aria-checked={accent === a}
               role="radio"

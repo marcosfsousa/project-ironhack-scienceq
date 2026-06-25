@@ -93,7 +93,7 @@ VITE_API_TARGET=http://localhost:8080 npm run dev
 **Files:** `Dockerfile.web`, `cloudbuild-web.yaml`, `frontend/nginx.conf.template`
 
 - `Dockerfile.web` — two-stage: `node:20-alpine` build (`vite build`) → `nginx:alpine` serve
-- `frontend/nginx.conf.template` — `add_header X-Accel-Buffering "off"` required for SSE through nginx; serve `index.html` for all non-API routes (SPA fallback)
+- `frontend/nginx.conf.template` — `add_header X-Accel-Buffering "no"` required for SSE through nginx; serve `index.html` for all non-API routes (SPA fallback)
 - `cloudbuild-web.yaml` — `VITE_API_URL` substitution baked at `vite build` time
 - Add to `.dockerignore`: `frontend/node_modules`, `frontend/.env.local`
 

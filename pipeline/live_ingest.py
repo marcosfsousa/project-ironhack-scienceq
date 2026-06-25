@@ -474,9 +474,11 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
 
         # ── 4. Fetch metadata (oEmbed first, yt-dlp fallback) ─────────────────
         log.info("  Fetching metadata...")
-        meta = _fetch_metadata_oembed(url) or _fetch_metadata_yt_dlp(url)
-        # oEmbed returns duration=0; supplement with yt-dlp duration when possible.
-        if meta is not None and meta.get("duration", 0) == 0:
+        oembed_meta = _fetch_metadata_oembed(url)
+        meta = oembed_meta or _fetch_metadata_yt_dlp(url)
+        # oEmbed omits duration (always 0); supplement with yt-dlp only when
+        # oEmbed was the source — if yt-dlp was the fallback it already has duration.
+        if oembed_meta is not None and meta.get("duration", 0) == 0:
             ytdlp_meta = _fetch_metadata_yt_dlp(url)
             if ytdlp_meta:
                 meta["duration"] = ytdlp_meta.get("duration", 0)
