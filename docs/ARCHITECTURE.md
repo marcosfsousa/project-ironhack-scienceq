@@ -2,7 +2,7 @@
 
 ## Overview
 
-ScienceQ is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion, served through a streaming Streamlit chat interface.
+ScienceQ is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion. The primary interface is a React SPA served by a Cloud Run nginx container, backed by a FastAPI service on a separate Cloud Run instance. The original Streamlit frontend remains deployed in parallel.
 
 ---
 
@@ -12,52 +12,83 @@ ScienceQ is a retrieval-augmented generation (RAG) system that answers questions
 User (Browser)
      │
      ▼
-Streamlit App  (app/streamlit_app.py)
+React SPA  (frontend/src/)
+nginx reverse proxy  (Dockerfile.web / scienceq-web Cloud Run)
      │
-     ├── Paste YouTube URL ──► Live Ingest Pipeline
-     │                              │
-     │                         youtube-transcript-api
-     │                         cleaner → chunker → embedder
-     │                              │
-     │                              ▼
-     │                         Pinecone [live namespace]
+     ├── Paste YouTube URL ──► POST /api/ingest ──► FastAPI  (scienceq-api Cloud Run)
+     │                                                   │
+     │                                            Live Ingest Pipeline
+     │                                            youtube-transcript-api
+     │                                            cleaner → chunker → embedder
+     │                                                   │
+     │                                                   ▼
+     │                                            Pinecone [live namespace]
      │
-     └── Ask a question ──► LangGraph Agent  (agent/agent.py)
-                                  │
-                    ┌─────────────┼─────────────┐
-                    ▼             ▼             ▼
-              RAG intent    Metadata intent  Ingest intent
-                    │             │
-                    ▼             ▼
-           RAGRetrieverTool  VideoMetadataTool
-           (rag_chain.py)    (tools.py / metadata.json)
-                    │
-                    ▼
-           Pinecone similarity search
-           [corpus + live namespaces]
-                    │
-                    ▼
-           OpenAI gpt-oss-120b  (via Groq)
-                    │
-                    ▼
-           Streaming answer + source citations
-                    │
-                    ▼
-           LangSmith  (tracing + evaluation)
+     ├── GET /api/catalog ──────────────────────► FastAPI
+     │                                                   │
+     │                                        GCS metadata.json (corpus)
+     │                                      + Pinecone list/fetch (live)
+     │
+     └── Ask a question ──► POST /api/chat/stream ──► FastAPI
+                                                          │
+                                                    LangGraph Agent  (agent/agent.py)
+                                                          │
+                                          ┌───────────────┼───────────────┐
+                                          ▼               ▼               ▼
+                                    RAG intent    Metadata intent   Ingest intent
+                                          │               │
+                                          ▼               ▼
+                                 RAGRetrieverTool  VideoMetadataTool
+                                 (rag_chain.py)    (metadata.json + Pinecone live)
+                                          │
+                                          ▼
+                                 Pinecone similarity search
+                                 [corpus + live namespaces]
+                                          │
+                                          ▼
+                                 OpenAI gpt-oss-120b  (via Groq)
+                                          │
+                                          ▼
+                                 SSE token stream → React SPA
+                                 [SOURCES] frame + [DONE] frame
+                                          │
+                                          ▼
+                                 LangSmith  (tracing + evaluation)
 ```
 
 ---
 
 ## Components
 
-### Streamlit App (`app/streamlit_app.py`)
+### React SPA (`frontend/src/`)
 
-The web interface manages session state, renders streaming responses, and handles both chat input and starter button interactions. Key behaviours:
+The primary frontend — a React 18 + Vite + TypeScript SPA served by nginx on Cloud Run (`scienceq-web`). Key behaviours:
 
-- **Intent detection** runs before the agent via `_classify_intent_fast()` to decide whether to use the streaming (RAG) or blocking (metadata/ingest) path
+- **SSE streaming** — `lib/sse.ts` opens a `fetch` stream to `POST /api/chat/stream`, accumulates `data:` lines within each SSE event per spec, and dispatches one `onToken` call per event so multi-line responses (e.g. metadata lists) arrive with newlines intact
+- **Corpus browser** — `useCatalog` fetches `GET /api/catalog` on mount; videos are deduplicated by `video_id`, grouped by topic, and rendered in a collapsible sidebar; live-ingested videos appear with a LIVE badge
+- **Ingest panel** — `useIngest` opens an idle panel (URL input), calls `POST /api/ingest`, then polls `GET /api/ingest/:job_id` with a presentational stepper until complete or failed
+- **Source pills + video embed** — `lib/citations.tsx` parses `[Title, mm:ss]` markers in the streamed answer; the top source embeds as a YouTube iframe directly below the answer
+- **Accessibility** — aria roles, `aria-expanded`, `aria-controls`, roving `tabIndex` on accent selector, `aria-label` on icon-only buttons
+
+nginx uses `proxy_set_header Host $proxy_host` (not `$host`) so Cloud Run routes the proxied `/api/*` requests by the upstream hostname rather than the frontend's hostname.
+
+### FastAPI Service (`api/`)
+
+The Cloud Run API service (`scienceq-api`) is the stateless seam between the React SPA and the LangGraph agent.
+
+- **`POST /api/chat/stream`** — builds a fresh agent per request, replays client-supplied history into `ConversationMemory`, then streams tokens via `StreamingResponse(media_type="text/event-stream")`. Multi-line tokens are encoded as multiple consecutive `data:` lines within one SSE event; `[SOURCES]` and `[DONE]` frames close the stream
+- **`GET /api/catalog`** — merges corpus metadata from GCS (`gs://scienceq-data/metadata.json`) with live videos fetched from Pinecone's `live` namespace via `list()` + `fetch()` on `*_000` chunk IDs, deduplicates by `video_id`, and returns the combined list
+- **`POST /api/ingest` / `GET /api/ingest/:job_id`** — fire-and-poll pattern for live ingestion (see Phase 3)
+- **CORS** locked to the exact `scienceq-web` Cloud Run URL + `http://localhost:5173` for local dev
+
+### Streamlit App (`app/streamlit_app.py`) — legacy parallel deployment
+
+The original web interface, still live at `scienceq.streamlit.app`. Key behaviours:
+
+- **Intent detection** via `_classify_intent_fast()` to route to streaming (RAG) or blocking (metadata/ingest) path
 - **Streaming** renders tokens incrementally using a placeholder with a cursor character (`▌`)
 - **Source pills** render as clickable HTML links with deep-linked YouTube timestamps
-- **Video embed** persists in `st.session_state` to survive `st.rerun()` between responses, rendered in a 2-column layout (chat 60%, embed 40%) when a RAG source exists
+- **Video embed** persists in `st.session_state`, rendered in a 2-column layout (chat 60%, embed 40%) when a RAG source exists
 - **Sidebar** displays the corpus catalog grouped by topic in collapsible `st.expander` sections, each showing title, channel, and duration
 
 ### LangGraph Agent (`agent/agent.py`)
@@ -109,7 +140,7 @@ Two tools registered with the agent:
 
 **RAGRetrieverTool** — answers factual questions by calling the RAG chain. Always tried first.
 
-**VideoMetadataTool** — answers catalog queries ("what videos do you have on physics?") by searching `metadata.json`. Uses a three-pass matching strategy: exact match on topic/title/channel first, then a loose word match restricted to the topic field only to prevent cross-topic contamination. Returns a `METADATA_LIST:<json>` signal rather than a formatted string — the Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting entirely. All metadata queries are first resolved to a clean search keyword via `openai/gpt-oss-20b` before hitting the tool, normalising full sentences ("what videos do you have on mathematics?") to single terms ("mathematics").
+**VideoMetadataTool** — answers catalog queries ("what videos do you have on physics?"). Uses a three-pass matching strategy: exact match on topic/title/channel first, then a loose word match restricted to the topic field only to prevent cross-topic contamination. Merges two sources before filtering: `metadata.json` (corpus, loaded from disk) and the Pinecone `live` namespace (fetched via `list()` + `fetch()` on `*_000` chunk IDs), so the metadata list matches the sidebar count including recently ingested videos. Returns a `METADATA_LIST:<json>` signal — `service.py` intercepts this before the SSE stream and converts it to grouped plain text via `_format_metadata_list()`, which also filters by topic keyword extracted from the original question. The React client never sees the `METADATA_LIST:` prefix.
 
 ### Prompts (`agent/prompts.py`)
 
@@ -136,7 +167,7 @@ Note: `yt-dlp` is used only for metadata resolution in the live path. The corpus
 
 Includes cross-namespace duplicate detection — checks both `corpus` and `live` before indexing to avoid re-indexing videos already in the corpus.
 
-**Deployment note:** on Streamlit Community Cloud, YouTube blocks transcript requests from AWS IP ranges. This is resolved via an IPRoyal residential proxy: `youtube-transcript-api` is initialised with `GenericProxyConfig(http_url, https_url)` and `yt-dlp` receives a `--proxy` flag. The `_get_proxy_config()` helper reads `IPROYAL_PROXY_URL` from the environment and returns `None` when absent, so local development works unchanged.
+**Deployment note:** YouTube blocks transcript requests from datacenter IP ranges (AWS, GCP). Both the Streamlit Community Cloud and Cloud Run deployments route transcript requests through an IPRoyal residential proxy: `youtube-transcript-api` is initialised with `GenericProxyConfig(http_url, https_url)` and `yt-dlp` receives a `--proxy` flag. The `_get_proxy_config()` helper reads `IPROYAL_PROXY_URL` from the environment and returns `None` when absent, so local development works unchanged.
 
 ---
 
@@ -178,7 +209,9 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **Cohere Rerank v3.5 (optional)** — a cross-encoder reranker sits between Pinecone retrieval and the LLM. Bi-encoder cosine similarity (used at Pinecone query time) is fast but imprecise — it encodes query and document independently. A cross-encoder like Cohere Rerank jointly attends to both, producing more accurate relevance scores at the cost of one additional API call per query. The design over-retrieves 10 candidates from Pinecone, reranks them, and passes the top 5 to the LLM. Toggled via `RERANKER_ENABLED` env var to enable A/B comparison without code changes. Impact is quantified by `eval/sweep_reranker.py`, which runs the full eval set with and without the reranker and outputs a per-dimension side-by-side table.
 
-**METADATA_LIST signal pattern** — `VideoMetadataTool` returns a structured `METADATA_LIST:<json>` prefix rather than a formatted string. The Streamlit app detects this prefix and renders the list directly, bypassing LLM reformatting which was producing inconsistent output. Plain-text fallbacks (no results found) are still passed through `st.markdown` as-is.
+**SSE multi-line encoding** — tokens from the agent occasionally span multiple lines (the metadata list is always multi-line). The SSE spec allows multiple `data:` lines within one event; consumers must join them with `\n` before dispatching. `service.py` encodes multi-line tokens as consecutive `data:` lines in one event (`"\n".join(f"data: {l}" for l in token.split("\n"))`). `lib/sse.ts` accumulates lines within an event and dispatches a single `onToken` call on the blank-line boundary, so `whitespace-pre-wrap` in the chat bubble renders newlines correctly.
+
+**METADATA_LIST signal pattern** — `VideoMetadataTool` returns a `METADATA_LIST:<json>` prefix rather than a formatted string, bypassing LLM reformatting which produced inconsistent output. In the Streamlit path the app renders this directly. In the React path `service.py::_format_metadata_list()` intercepts the signal before the SSE stream and converts it to grouped plain text — topic headers with counts, then bullet lines — filtered by any topic keyword in the user's question. The React client never sees the prefix.
 
 **Custom `ConversationMemory`** — avoids `langchain-community` dependency, which had unstable versioning during development.
 
@@ -233,6 +266,8 @@ Results are tracked in LangSmith under the `scienceq` project.
 | Orchestration | LangChain LCEL + LangGraph |
 | Tracing | LangSmith |
 | Transcripts | `youtube-transcript-api` v1.2.4 |
-| Web App | Streamlit 1.55 |
-| Deployment | Streamlit Community Cloud |
+| Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
+| Web server | nginx (reverse proxy + SPA fallback) |
+| Legacy UI | Streamlit 1.55 |
+| Deployment | Google Cloud Run — `scienceq-api` (FastAPI) + `scienceq-web` (nginx/React) |
 | Python | 3.11.9 |

@@ -1,10 +1,10 @@
 # ScienceQ
 
-A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of 50 curated videos (English, Spanish, German, French, and Portuguese), or paste any YouTube URL to ingest and query it on the fly.
+A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of science videos (English, Spanish, German, French, and Portuguese), or paste any YouTube URL to ingest and query it on the fly.
 
 Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engineering course.
 
-**Live demo:** [scienceq.streamlit.app](https://scienceq.streamlit.app)
+**Live demo:** [scienceq-web-886463515307.europe-west1.run.app](https://scienceq-web-886463515307.europe-west1.run.app)
 
 ---
 
@@ -53,8 +53,9 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 | Vector DB | Pinecone Serverless (cosine, AWS us-east-1) |
 | Orchestration | LangChain LCEL + LangGraph |
 | Tracing | LangSmith |
-| UI | Streamlit |
-| Deployment | Streamlit Community Cloud |
+| UI | React 18 + Vite + TypeScript + Tailwind CSS |
+| Web server | nginx (reverse proxy + SPA fallback) |
+| Deployment | Google Cloud Run (API + React SPA as separate services) |
 
 ## Evaluation
 
@@ -84,7 +85,11 @@ The FastAPI service is deployed on Google Cloud Run:
 | Endpoint | Method | Description |
 |---|---|---|
 | `/health` | GET | Liveness probe → `{"status":"ok"}` |
-| `/api/chat` | POST | RAG chat — returns answer, sources, intent |
+| `/api/chat` | POST | RAG chat — blocking, returns answer, sources, intent |
+| `/api/chat/stream` | POST | RAG chat — SSE streaming, tokens + `[SOURCES]` + `[DONE]` |
+| `/api/catalog` | GET | Full video catalog (corpus + live-ingested) |
+| `/api/ingest` | POST | Submit a YouTube URL for live ingestion → `job_id` |
+| `/api/ingest/{job_id}` | GET | Poll ingest job status |
 | `/docs` | GET | Swagger UI |
 
 **Example request:**
@@ -94,7 +99,7 @@ curl -X POST https://scienceq-api-886463515307.europe-west1.run.app/api/chat \
   -d '{"message":"How does natural selection work?","history":[]}'
 ```
 
-The Streamlit UI remains live at [scienceq.streamlit.app](https://scienceq.streamlit.app) in parallel until the React SPA is built.
+The original Streamlit UI remains live at [scienceq.streamlit.app](https://scienceq.streamlit.app). The React SPA (Phase 4) is the primary interface going forward.
 
 ---
 
@@ -165,22 +170,70 @@ Video metadata (title, channel) is fetched via the YouTube oEmbed API — no aut
 
 ---
 
-## Running with Docker
+## React SPA (Phase 4)
 
-The root `Dockerfile` builds the **FastAPI API image**. For the Streamlit app use `Dockerfile.streamlit`.
+The production frontend is a React 18 + Vite + TypeScript SPA deployed as a separate Cloud Run service (`scienceq-web`) behind an nginx reverse proxy.
 
-**Prerequisites:** Docker installed, a `.env` file with your API keys (copy from `.env.example`).
+**Live URL:** `https://scienceq-web-886463515307.europe-west1.run.app`
+
+### Features
+
+- Token-by-token SSE streaming with a blinking cursor during generation
+- Corpus browser sidebar — videos grouped by topic, live-ingested videos shown with a LIVE badge
+- Ingest panel — click `+` or paste a YouTube URL in the composer; a slide-over panel shows live step progress and confirms chunk count on completion
+- Source pills and inline video embed — clickable timestamp links open the YouTube video at the right second; the top source embeds directly below the answer
+- Metadata queries return a grouped, topic-filtered list that matches the sidebar count (corpus + live namespace)
+- Keyboard and screen-reader accessible — `aria-expanded`, `aria-controls`, roving `tabIndex` on accent selector, `aria-label` on icon-only buttons
+
+### Local development
 
 ```bash
-# FastAPI API
+cd frontend
+npm install
+VITE_API_TARGET=http://localhost:8080 npm run dev
+# → http://localhost:5173 (proxies /api/* to the local FastAPI server)
+```
+
+### Deploy
+
+```bash
+gcloud builds submit --config cloudbuild-web.yaml --project=scienceq-prod
+```
+
+The build is two-stage: `node:20-alpine` runs `vite build`, then `nginx:alpine` serves the static bundle. `${API_URL}` is substituted at container startup via `envsubst`. Both stages run as non-root users (`nginx` user in the serving stage).
+
+---
+
+## Running with Docker
+
+Three Dockerfiles cover the three deployable services. All run as non-root users.
+
+**Prerequisites:** Docker Desktop (Linux containers mode), a `.env` file with your API keys (copy from `.env.example`).
+
+```bash
+# FastAPI API (runs as appuser)
 docker build -t scienceq-api .
 docker run --env-file .env -p 8080:8080 scienceq-api
 ```
 
 ```bash
-# Streamlit app
+# Streamlit app (runs as appuser)
 docker build -f Dockerfile.streamlit -t scienceq-streamlit .
 docker run --env-file .env -p 8501:8501 scienceq-streamlit
+```
+
+```bash
+# React SPA — nginx serves the Vite bundle (runs as nginx user)
+docker build -f Dockerfile.web -t scienceq-web .
+docker run -e API_URL=http://host.docker.internal:8080 -p 8081:8080 scienceq-web
+# → http://localhost:8081 (requires the FastAPI API running on port 8080)
+```
+
+To verify non-root users in built images:
+```bash
+docker inspect scienceq-api --format '{{.Config.User}}'      # → appuser
+docker inspect scienceq-streamlit --format '{{.Config.User}}' # → appuser
+docker inspect scienceq-web --format '{{.Config.User}}'       # → nginx
 ```
 
 ---
@@ -283,22 +336,24 @@ python tests/run_all_tests.py
 
 ```
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
-├── api/                # FastAPI service (Cloud Run) — main, routes, service, schemas
-├── app/                # Streamlit UI
+├── api/                # FastAPI service (Cloud Run) — main, routes, service, schemas, catalog
+├── app/                # Streamlit UI (original frontend)
 ├── data/               # metadata.json, per-video transcript/chunk/embedding files
-├── docs/               # ARCHITECTURE.md, DATASET.md, retrieval_sweep_results.md
+├── docs/               # ARCHITECTURE.md, DATASET.md, retrieval_sweep_results.md, PHASE4_PLAN.md
 ├── eval/               # Eval set, sweep scripts, LangSmith runner, results
+├── frontend/           # React SPA — src/, nginx.conf.template, Vite + Tailwind config
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
-├── Dockerfile                   # FastAPI API image (Cloud Run serving)
-├── Dockerfile.streamlit         # Streamlit app image (Streamlit Cloud)
+├── Dockerfile                   # FastAPI API image (Cloud Run serving, non-root appuser)
+├── Dockerfile.streamlit         # Streamlit app image (Streamlit Cloud, non-root appuser)
 ├── Dockerfile.pipeline          # Pipeline image (Cloud Run Job)
-├── Dockerfile.web               # React SPA image — nginx + Vite build (Cloud Run serving)
+├── Dockerfile.web               # React SPA — nginx + Vite build (Cloud Run serving, non-root nginx)
 ├── cloudbuild-pipeline.yaml     # Cloud Build config for pipeline image
+├── cloudbuild-web.yaml          # Cloud Build config for scienceq-web (React SPA)
 ├── cloudrun-pipeline-job.yaml   # Cloud Run Job definition (Phase 2)
 ├── docker-compose.yml
 ├── .env.example
-├── requirements.txt             # Runtime deps (shared by Streamlit Cloud + Cloud Run)
+├── requirements.txt             # Runtime deps (shared by API + Streamlit Cloud)
 └── requirements-dev.txt         # Full dev + pipeline + eval dependencies
 ```
 
@@ -312,6 +367,7 @@ python tests/run_all_tests.py
 
 ## Next steps
 
-- **React SPA** — polished frontend consuming the FastAPI `/api/chat` and `/api/ingest` endpoints; retire Streamlit once live
+- Citation pill rendering in streamed text — pills currently appear correctly below the answer but render as raw `[Title, mm:ss]` markers within the streamed text bubble
+- Conversation-aware retrieval — follow-up questions currently embed independently; incorporating prior turns into the retrieval query would improve pronoun resolution and topic continuity
 - Whisper integration for videos without captions
 - Expand non-English corpus beyond the current ES/DE/FR/PT pilot (embed-multilingual-v3.0 supports 100+ languages)
