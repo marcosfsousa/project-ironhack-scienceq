@@ -95,7 +95,9 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
                 continue
             if token.startswith("METADATA_LIST:"):
                 token = _format_metadata_list(token)
-            yield f"data: {token}\n\n"
+            # Encode multi-line tokens correctly: each line needs its own "data: " prefix.
+            sse_data = "\n".join(f"data: {line}" for line in token.split("\n"))
+            yield f"{sse_data}\n\n"
         chunks = agent._streamed_chunks
         if chunks:
             sources = [

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { IngestState } from "@/hooks/useIngest";
 import { INGEST_STEPS } from "@/hooks/useIngest";
 
@@ -5,12 +6,53 @@ interface IngestPanelProps {
   state: IngestState;
   onClose: () => void;
   onAsk: (title?: string) => void;
+  onStart: (url: string) => void;
 }
 
 /** Slides over the sidebar while a video is being indexed. */
-export function IngestPanel({ state, onClose, onAsk }: IngestPanelProps) {
+export function IngestPanel({ state, onClose, onAsk, onStart }: IngestPanelProps) {
+  const [inputUrl, setInputUrl] = useState("");
   const failed = state.phase === "failed";
   const complete = state.phase === "complete";
+
+  if (state.phase === "idle") {
+    const submit = () => {
+      const v = inputUrl.trim();
+      if (v) { onStart(v); setInputUrl(""); }
+    };
+    return (
+      <div className="absolute inset-0 z-20 flex animate-slideIn flex-col bg-ink-sidebar">
+        <div className="border-b border-line px-[18px] pb-3.5 pt-5">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold tracking-[0.02em] text-mut-100">
+              Index a video
+            </span>
+            <button
+              onClick={onClose}
+              className="flex h-[26px] w-[26px] cursor-pointer items-center justify-center rounded-[7px] border border-line-strong bg-transparent text-[14px] text-mut-500 hover:bg-[#181d24]"
+            >
+              ✕
+            </button>
+          </div>
+          <input
+            autoFocus
+            type="url"
+            value={inputUrl}
+            onChange={(e) => setInputUrl(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="Paste a YouTube URL…"
+            className="mt-3 w-full rounded-lg border border-line bg-ink-panel px-3 py-2 font-mono text-[11.5px] text-mut-200 outline-none placeholder:text-mut-700 focus:border-accent"
+          />
+          <button
+            onClick={submit}
+            className="mt-2 w-full cursor-pointer rounded-[9px] border-0 bg-accent py-2 text-[13px] font-semibold text-ink hover:brightness-110"
+          >
+            Index video
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0 z-20 flex animate-slideIn flex-col bg-ink-sidebar">

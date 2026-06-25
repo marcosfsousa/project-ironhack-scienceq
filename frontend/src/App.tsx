@@ -8,9 +8,6 @@ import { ChatView } from "@/components/ChatView";
 import { SUGGESTIONS } from "@/data/fixtures";
 import { uid } from "@/lib/format";
 
-// A sample URL used by the "+" button so the ingest flow is demoable without typing.
-const SAMPLE_URL = "https://www.youtube.com/watch?v=-UlxHPIEVqA";
-
 export default function App() {
   const [accent, setAccent] = useState<Accent>("Indigo");
   const [density] = useState<SidebarDensity>("Detailed");
@@ -42,7 +39,7 @@ export default function App() {
   const ingest = useIngest(onIngestComplete);
   const catalog = useCatalog(extra);
 
-  const handleIngest = (url: string) => ingest.start(url || SAMPLE_URL);
+  const handleIngest = (url: string) => { if (url) ingest.start(url); else ingest.open(); };
 
   const handleAskIngested = (title?: string) => {
     ingest.close();
@@ -62,6 +59,7 @@ export default function App() {
         ingest={ingest.ingest}
         onCloseIngest={ingest.close}
         onAskIngested={handleAskIngested}
+        onStartIngest={ingest.start}
       />
       <ChatView
         messages={chat.messages}

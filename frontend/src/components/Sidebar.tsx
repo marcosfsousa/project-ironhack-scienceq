@@ -13,6 +13,7 @@ interface SidebarProps {
   ingest: IngestState;
   onCloseIngest: () => void;
   onAskIngested: (title?: string) => void;
+  onStartIngest: (url: string) => void;
 }
 
 export function Sidebar({
@@ -24,6 +25,7 @@ export function Sidebar({
   ingest,
   onCloseIngest,
   onAskIngested,
+  onStartIngest,
 }: SidebarProps) {
   return (
     <aside className="relative flex h-full w-[312px] shrink-0 flex-col border-r border-line bg-ink-sidebar">
@@ -64,7 +66,7 @@ export function Sidebar({
       </div>
 
       {ingest.active && (
-        <IngestPanel state={ingest} onClose={onCloseIngest} onAsk={onAskIngested} />
+        <IngestPanel state={ingest} onClose={onCloseIngest} onAsk={onAskIngested} onStart={onStartIngest} />
       )}
     </aside>
   );

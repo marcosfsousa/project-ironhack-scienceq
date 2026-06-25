@@ -22,7 +22,7 @@ export interface IngestState {
   active: boolean;
   url: string;
   stepIndex: number; // 0..STEPS.length
-  phase: "running" | "complete" | "failed";
+  phase: "idle" | "running" | "complete" | "failed";
   result: IngestStatus | null;
 }
 
@@ -78,11 +78,15 @@ export function useIngest(onComplete?: (s: IngestStatus) => void) {
     [onComplete]
   );
 
+  const open = useCallback(() => {
+    setState({ active: true, url: "", stepIndex: 0, phase: "idle", result: null });
+  }, []);
+
   const close = useCallback(() => {
     clearTicker();
     aborter.current?.abort();
     setState(IDLE);
   }, []);
 
-  return { ingest: state, start, close };
+  return { ingest: state, start, open, close };
 }
