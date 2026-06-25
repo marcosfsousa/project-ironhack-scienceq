@@ -258,32 +258,51 @@ def _get_or_create_langsmith_dataset(
     Get existing LangSmith dataset by name or create it from eval_set cases.
     Returns the dataset ID.
     """
+    def _build_examples(subset: list[dict]) -> list[dict]:
+        out = []
+        for c in subset:
+            if c["type"] == "adversarial":
+                continue
+            question = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
+            out.append({
+                "inputs":  {"question": question, "case_id": c["id"]},
+                "outputs": {"reference_answer": c["reference_answer"]},
+            })
+        return out
+
     # Check if dataset already exists
     existing = list(ls_client.list_datasets(dataset_name=dataset_name))
     if existing:
-        log.info(f"Using existing LangSmith dataset: {dataset_name} (id={existing[0].id})")
-        return str(existing[0].id)
+        dataset_id = str(existing[0].id)
+        log.info(f"Using existing LangSmith dataset: {dataset_name} (id={dataset_id})")
+
+        # Append any cases that are missing from the dataset
+        existing_ids = {
+            ex.inputs.get("case_id")
+            for ex in ls_client.list_examples(dataset_id=dataset_id)
+        }
+        missing_cases = [c for c in cases if c["id"] not in existing_ids]
+        if missing_cases:
+            examples = _build_examples(missing_cases)
+            if examples:
+                ls_client.create_examples(
+                    inputs     = [e["inputs"]  for e in examples],
+                    outputs    = [e["outputs"] for e in examples],
+                    dataset_id = dataset_id,
+                )
+                log.info(f"Appended {len(examples)} missing examples to LangSmith dataset.")
+        return dataset_id
 
     log.info(f"Creating LangSmith dataset: {dataset_name}")
     dataset = ls_client.create_dataset(
         dataset_name = dataset_name,
-        description  = "ScienceQ eval set — 25 automated cases (20 factual + 5 multi-turn)",
+        description  = "ScienceQ eval set — automated cases (factual + multi-turn)",
     )
 
-    # Upload examples (skip adversarial — no reference answer)
-    examples = []
-    for c in cases:
-        if c["type"] == "adversarial":
-            continue
-        question = c["turns"][2]["content"] if c["type"] == "rag_multi_turn" else c["question"]
-        examples.append({
-            "inputs":  {"question": question, "case_id": c["id"]},
-            "outputs": {"reference_answer": c["reference_answer"]},
-        })
-
+    examples = _build_examples(cases)
     ls_client.create_examples(
-        inputs   = [e["inputs"]  for e in examples],
-        outputs  = [e["outputs"] for e in examples],
+        inputs     = [e["inputs"]  for e in examples],
+        outputs    = [e["outputs"] for e in examples],
         dataset_id = dataset.id,
     )
     log.info(f"Uploaded {len(examples)} examples to LangSmith dataset.")
@@ -397,7 +416,7 @@ def run(
     if dry_run:
         log.info("DRY RUN — listing automated cases only:")
         for c in automated:
-            q = c["turns"][2]["content"] if c["type"] == "rag_multi_turn" else c["question"]
+            q = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
             log.info(f"  [{c['id']}] ({c['type']}) {q[:80]}")
         return
 
@@ -446,7 +465,7 @@ def run(
         case_type = case["type"]
         question  = (
             case["turns"][2]["content"]
-            if case_type == "rag_multi_turn"
+            if case_type in ("rag_multi_turn", "rag_multi_turn_vague")
             else case["question"]
         )
         reference = case["reference_answer"]
@@ -459,7 +478,7 @@ def run(
 
         # ── Get bot answer ─────────────────────────────────────────────────────
         try:
-            if case_type == "rag_multi_turn":
+            if case_type in ("rag_multi_turn", "rag_multi_turn_vague"):
                 answer = run_multi_turn_case(case, agent)
             else:
                 answer = run_rag_case(case, agent)

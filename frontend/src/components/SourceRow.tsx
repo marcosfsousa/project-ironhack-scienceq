@@ -1,5 +1,6 @@
 import type { Source } from "@/types";
 import { embedUrl, tsToSec, youTubeId, youTubeStart } from "@/lib/format";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface SourceRowProps {
   source: Source;
@@ -10,6 +11,7 @@ interface SourceRowProps {
 
 /** A numbered source with a rerank-score bar that expands to an inline player. */
 export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
+  const isMobile = useIsMobile();
   const pct = Math.round((source.rerank_score ?? source.score) * 100);
   const start = youTubeStart(source.link) || tsToSec(source.timestamp);
   // Use the YouTube video ID to build a globally unique player element ID;
@@ -38,14 +40,23 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2.5">
-          <span className="font-mono text-[11px] text-mut-400">{source.timestamp}</span>
-          <span className="h-1 w-[38px] overflow-hidden rounded-[3px] bg-[#20262e]">
-            <span
-              className="block h-full origin-left animate-barGrow bg-accent"
-              style={{ width: `${pct}%` }}
-            />
-          </span>
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] border border-accent-bd bg-accent-soft text-[10px] text-accent">
+          {!isMobile && (
+            <>
+              <span className="font-mono text-[11px] text-mut-400">{source.timestamp}</span>
+              <span className="h-1 w-[38px] overflow-hidden rounded-[3px] bg-[#20262e]">
+                <span
+                  className="block h-full origin-left animate-barGrow bg-accent"
+                  style={{ width: `${pct}%` }}
+                />
+              </span>
+            </>
+          )}
+          {isMobile && (
+            <span className="font-mono text-[11px] text-mut-400">{source.timestamp}</span>
+          )}
+          <span
+            className={`flex shrink-0 items-center justify-center border border-accent-bd bg-accent-soft text-[10px] text-accent ${isMobile ? "h-9 w-9 rounded-[9px]" : "h-6 w-6 rounded-[7px]"}`}
+          >
             {isOpen ? "✕" : "▶"}
           </span>
         </span>

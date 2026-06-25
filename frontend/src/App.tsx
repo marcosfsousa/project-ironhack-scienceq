@@ -3,6 +3,7 @@ import type { Accent, CatalogVideo, IngestStatus, SidebarDensity } from "@/types
 import { useChat } from "@/hooks/useChat";
 import { useIngest } from "@/hooks/useIngest";
 import { useCatalog } from "@/hooks/useCatalog";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatView } from "@/components/ChatView";
 import { SUGGESTIONS } from "@/data/fixtures";
@@ -12,11 +13,17 @@ export default function App() {
   const [accent, setAccent] = useState<Accent>("Indigo");
   const [density] = useState<SidebarDensity>("Detailed");
   const [extra, setExtra] = useState<CatalogVideo[]>([]);
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Apply the accent at the document root so the CSS variables cascade.
   useEffect(() => {
     document.documentElement.dataset.accent = accent;
   }, [accent]);
+
+  // Close sidebar when viewport grows past the mobile breakpoint.
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(false);
+  }, [isMobile]);
 
   const chat = useChat();
 
@@ -39,27 +46,41 @@ export default function App() {
   const ingest = useIngest(onIngestComplete);
   const catalog = useCatalog(extra);
 
-  const handleIngest = (url: string) => { if (url) ingest.start(url); else ingest.open(); };
+  const handleIngest = (url: string) => {
+    if (url) ingest.start(url);
+    else ingest.open();
+  };
 
   const handleAskIngested = (title?: string) => {
     ingest.close();
     chat.send(
-      title ? `What is the key takeaway from “${title}”?` : "Summarize the video I just added."
+      title
+        ? `What is the key takeaway from "${title}"?`
+        : "Summarize the video I just added."
     );
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-ink text-mut-100">
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]"
+        />
+      )}
       <Sidebar
         groups={catalog.groups}
         total={catalog.total}
         density={density}
-        onPickVideo={(t) => chat.send(`Tell me about “${t}”`)}
+        onPickVideo={(t) => chat.send(`Tell me about "${t}"`)}
         onNewConversation={chat.reset}
         ingest={ingest.ingest}
         onCloseIngest={ingest.close}
         onAskIngested={handleAskIngested}
         onStartIngest={ingest.start}
+        isMobile={isMobile}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
       <ChatView
         messages={chat.messages}
@@ -68,6 +89,8 @@ export default function App() {
         onAccentChange={setAccent}
         onSend={chat.send}
         onIngest={handleIngest}
+        isMobile={isMobile}
+        onToggleSidebar={() => setSidebarOpen((o) => !o)}
       />
     </div>
   );

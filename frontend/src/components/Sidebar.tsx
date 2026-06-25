@@ -14,6 +14,9 @@ interface SidebarProps {
   onCloseIngest: () => void;
   onAskIngested: (title?: string) => void;
   onStartIngest: (url: string) => void;
+  isMobile: boolean;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function Sidebar({
@@ -26,20 +29,43 @@ export function Sidebar({
   onCloseIngest,
   onAskIngested,
   onStartIngest,
+  isMobile,
+  isOpen,
+  onClose,
 }: SidebarProps) {
+  const positionClasses = isMobile
+    ? `fixed left-0 top-0 z-50 h-full w-[284px] transition-transform duration-300 ease-[cubic-bezier(.22,.61,.36,1)] ${isOpen ? "translate-x-0" : "-translate-x-full"}`
+    : "relative h-full w-[312px] shrink-0";
+
   return (
-    <aside className="relative flex h-full w-[312px] shrink-0 flex-col border-r border-line bg-ink-sidebar">
-      <div className="px-[18px] pb-3.5 pt-5">
+    <aside
+      className={`flex flex-col border-r border-line bg-ink-sidebar ${positionClasses}`}
+      aria-hidden={isMobile && !isOpen ? "true" : undefined}
+      inert={isMobile && !isOpen ? true : undefined}
+    >
+      <div
+        className="px-[18px] pb-3.5 pt-5"
+        style={isMobile ? { paddingTop: "calc(1.25rem + env(safe-area-inset-top))" } : undefined}
+      >
         <div className="flex items-center gap-2.5">
           <BrandMark size={21} className="flex text-accent" />
           <span className="text-[18px] font-bold tracking-[-0.01em]">ScienceQ</span>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              aria-label="Close sidebar"
+              className="ml-auto flex h-[30px] w-[30px] shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-line-strong bg-transparent text-[15px] text-mut-500 hover:bg-ink-panel"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <p className="mt-2.5 text-[12.5px] leading-[1.5] text-mut-600">
           Ask questions across a curated library of science videos — grounded in the actual
           transcripts.
         </p>
         <button
-          onClick={onNewConversation}
+          onClick={() => { onNewConversation(); if (isMobile) onClose(); }}
           className="mt-3.5 flex w-full cursor-pointer items-center justify-center gap-[7px] rounded-[9px] border border-line-strong bg-ink-panel py-2.5 text-[13px] font-medium text-mut-200 hover:bg-[#1a1f27]"
         >
           <span className="relative inline-block h-[13px] w-[13px] rounded border-[1.5px] border-mut-500" />
@@ -57,7 +83,7 @@ export function Sidebar({
       <CorpusBrowser
         groups={groups}
         density={density}
-        onPickVideo={onPickVideo}
+        onPickVideo={(t) => { onPickVideo(t); if (isMobile) onClose(); }}
         defaultOpen="Biology"
       />
 

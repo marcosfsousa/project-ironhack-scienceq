@@ -132,9 +132,12 @@ NO_CONTEXT_RESPONSE = (
 REWRITE_SYSTEM = (
     "You are a query rewriter. Given a conversation history and a follow-up question, "
     "rewrite the question as a single fully self-contained search query. "
-    "Resolve all pronouns and references to their explicit meaning. "
+    "Resolve all pronouns and vague references ('it', 'that', 'this', 'they') to the most specific "
+    "concept or mechanism from the last assistant turn — not just the general topic. "
+    "For vague follow-ups ('tell me more', 'what else', 'can you elaborate', 'what can you tell me about that'), "
+    "construct a specific question about the most detailed concept mentioned in the last assistant turn. "
     "If the question is already self-contained, return it unchanged. "
-    "Return ONLY the rewritten question. No explanation, no preamble."
+    "Return ONLY the rewritten query. No explanation, no preamble."
 )
 
 

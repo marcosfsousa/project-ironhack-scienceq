@@ -3,11 +3,12 @@
     "version": "1.1",
     "created": "2026-03-08",
     "updated": "2026-04-13",
-    "total": 38,
+    "total": 41,
     "breakdown": {
       "rag_factual": 20,
       "rag_multilingual": 8,
       "rag_multi_turn": 5,
+      "rag_multi_turn_vague": 3,
       "adversarial": 5
     },
     "topics_covered": [
@@ -500,6 +501,84 @@
       "question": "What is neurodivergence and how does it relate to anxiety and depression?",
       "reference_answer": "Neurodivergence refers to neurological development that differs from the typical pattern, encompassing conditions such as ADHD, autism, and dyslexia. Neurodivergent individuals often experience elevated stress, anxiety, or depression not because of their neurodivergence itself but because they are navigating educational, professional, and social systems designed for neurotypical people. Chronic mismatch between environment and neurological needs generates exhaustion and mental health difficulties. Early identification and appropriate accommodations — rather than pressure to perform neurotypically — significantly improve long-term wellbeing.",
       "expected_behaviour": "Cross-lingual retrieval: English query surfaces Spanish-language CuriosaMente chunks. Answer links neurodivergence to environmental mismatch rather than treating it as a disorder."
+    },
+
+    {
+      "id": "mt_006",
+      "type": "rag_multi_turn_vague",
+      "subtype": "vague_follow_up",
+      "topic": "Cognitive Science",
+      "video_id": "cebFWOlx848",
+      "video_title": "The Illusion of Truth",
+      "channel": "Veritasium",
+      "turns": [
+        {
+          "role": "user",
+          "content": "What is the illusory truth effect?"
+        },
+        {
+          "role": "assistant",
+          "content": "[expected: repeated exposure makes statements feel more true due to cognitive ease and fluency misattribution]"
+        },
+        {
+          "role": "user",
+          "content": "What can you tell me about that?"
+        }
+      ],
+      "reference_answer": "The illusory truth effect works because repetition increases cognitive ease — the ease with which the brain processes a statement. This fluency is misattributed as a signal of truthfulness: familiar information feels true because it is easy to think about, not because it has been verified. Studies show this happens automatically and below conscious awareness, even when people are explicitly told a statement is false. The effect is exploited in advertising, political messaging, and propaganda, where repetition substitutes for evidence.",
+      "expected_behaviour": "Completely vague follow-up — rewriter must resolve 'that' to the illusory truth effect mechanism specifically (cognitive ease, fluency, repetition). Should NOT surface a different topic or video."
+    },
+
+    {
+      "id": "mt_007",
+      "type": "rag_multi_turn_vague",
+      "subtype": "vague_follow_up",
+      "topic": "Biology",
+      "video_id": "jAhjPd4uNFY",
+      "video_title": "Genetic Engineering Will Change Everything Forever – CRISPR",
+      "channel": "Kurzgesagt - In a Nutshell",
+      "turns": [
+        {
+          "role": "user",
+          "content": "How does the Cas9 protein cut DNA?"
+        },
+        {
+          "role": "assistant",
+          "content": "[expected: Cas9 is guided by a RNA molecule to a target DNA sequence where it makes a precise double-strand cut]"
+        },
+        {
+          "role": "user",
+          "content": "Tell me more."
+        }
+      ],
+      "reference_answer": "Once Cas9 cuts the DNA, the cell's own repair machinery takes over. There are two main pathways: non-homologous end joining, which is error-prone and often disables the gene, and homology-directed repair, which uses a supplied template to insert a desired sequence precisely. This two-step process — precise cutting followed by guided repair — is what makes CRISPR far more powerful than earlier gene editing techniques, which were slower, less accurate, and far more expensive.",
+      "expected_behaviour": "Vague 'Tell me more' should resolve to a specific query about CRISPR Cas9 DNA repair mechanisms — not drift to a different biology topic or generic CRISPR overview."
+    },
+
+    {
+      "id": "mt_008",
+      "type": "rag_multi_turn_vague",
+      "subtype": "vague_follow_up",
+      "topic": "Cognitive Science",
+      "video_id": "UBVV8pch1dM",
+      "video_title": "The Science of Thinking",
+      "channel": "Veritasium",
+      "turns": [
+        {
+          "role": "user",
+          "content": "What is System 1 thinking?"
+        },
+        {
+          "role": "assistant",
+          "content": "[expected: fast, automatic, effortless thinking that handles routine tasks and pattern recognition without conscious effort]"
+        },
+        {
+          "role": "user",
+          "content": "How does that lead to mistakes?"
+        }
+      ],
+      "reference_answer": "System 1 thinking leads to mistakes because it relies on heuristics — mental shortcuts that work most of the time but fail in systematic ways. It anchors on the first piece of information encountered, over-weights vivid or recent examples, and misreads statistical patterns. Because System 1 operates below conscious awareness, people are often unaware when it is leading them astray. System 2 can override these errors, but it requires effort the brain prefers to avoid, so many everyday decisions are made on autopilot with no error-checking.",
+      "expected_behaviour": "Follow-up 'How does that lead to mistakes?' must resolve 'that' to System 1 thinking specifically — not thinking in general — and retrieve content about cognitive biases and heuristics from The Science of Thinking."
     },
 
     {
