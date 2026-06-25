@@ -31,7 +31,7 @@ from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from rag_chain import answer, RAGResponse
-from retriever import PINECONE_NAMESPACE_CORPUS, PINECONE_NAMESPACE_LIVE
+from retriever import PINECONE_NAMESPACE_CORPUS, PINECONE_NAMESPACE_LIVE, _get_index
 
 SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "0.40"))
 
@@ -77,6 +77,37 @@ def _load_metadata() -> list[dict]:
             if isinstance(entry, dict)
         ]
     return data
+
+def _load_live_metadata() -> list[dict]:
+    """Return video metadata from the Pinecone live namespace (one entry per video)."""
+    try:
+        index = _get_index()
+        # list() returns paginated ID batches; _000 suffix = first chunk per video
+        ids = [
+            id_
+            for page in index.list(namespace=PINECONE_NAMESPACE_LIVE)
+            for id_ in page
+            if id_.endswith("_000")
+        ]
+        if not ids:
+            return []
+        resp = index.fetch(ids=ids, namespace=PINECONE_NAMESPACE_LIVE)
+        out = []
+        for vec in resp.vectors.values():
+            m = vec.metadata or {}
+            video_id = m.get("video_id", "")
+            out.append({
+                "video_id": video_id,
+                "title":    m.get("title",   ""),
+                "channel":  m.get("channel", ""),
+                "topic":    m.get("topic",   "Other"),
+                "duration": m.get("duration", ""),
+            })
+        return out
+    except Exception:
+        log.warning("Could not load live metadata from Pinecone", exc_info=True)
+        return []
+
 
 BROWSE_TRIGGERS = [
     "available videos", "all videos", "list videos", "what videos",
@@ -241,7 +272,11 @@ class VideoMetadataTool(BaseTool):
         """
         log.info(f"VideoMetadataTool called | query: {query!r}")
 
-        videos = _load_metadata()
+        corpus = _load_metadata()
+        live = _load_live_metadata()
+        # Live wins if the same video_id was somehow re-indexed in corpus too.
+        live_ids = {v.get("video_id") for v in live}
+        videos = live + [v for v in corpus if v.get("video_id") not in live_ids]
         if not videos:
             return "Video catalog not available."
 
