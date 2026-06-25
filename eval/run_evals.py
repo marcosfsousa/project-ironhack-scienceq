@@ -275,7 +275,7 @@ def _get_or_create_langsmith_dataset(
     for c in cases:
         if c["type"] == "adversarial":
             continue
-        question = c["turns"][2]["content"] if c["type"] == "rag_multi_turn" else c["question"]
+        question = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
         examples.append({
             "inputs":  {"question": question, "case_id": c["id"]},
             "outputs": {"reference_answer": c["reference_answer"]},
@@ -397,7 +397,7 @@ def run(
     if dry_run:
         log.info("DRY RUN — listing automated cases only:")
         for c in automated:
-            q = c["turns"][2]["content"] if c["type"] == "rag_multi_turn" else c["question"]
+            q = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
             log.info(f"  [{c['id']}] ({c['type']}) {q[:80]}")
         return
 
@@ -446,7 +446,7 @@ def run(
         case_type = case["type"]
         question  = (
             case["turns"][2]["content"]
-            if case_type == "rag_multi_turn"
+            if case_type in ("rag_multi_turn", "rag_multi_turn_vague")
             else case["question"]
         )
         reference = case["reference_answer"]
@@ -459,7 +459,7 @@ def run(
 
         # ── Get bot answer ─────────────────────────────────────────────────────
         try:
-            if case_type == "rag_multi_turn":
+            if case_type in ("rag_multi_turn", "rag_multi_turn_vague"):
                 answer = run_multi_turn_case(case, agent)
             else:
                 answer = run_rag_case(case, agent)

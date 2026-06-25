@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ChatMessage as Msg } from "@/types";
 import { renderCitations } from "@/lib/citations";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { BrandMark } from "./BrandMark";
 import { SourceRow } from "./SourceRow";
 import { VideoEmbed } from "./VideoEmbed";
@@ -10,6 +11,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const isMobile = useIsMobile();
   const [open, setOpen] = useState<Set<number>>(new Set());
   const toggle = (i: number) =>
     setOpen((prev) => {
@@ -21,7 +23,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
   if (message.role === "user") {
     return (
       <div className="mb-1 mt-[22px] flex animate-fadeUp justify-end">
-        <div className="max-w-[80%] rounded-[14px_14px_4px_14px] border border-accent-bd bg-accent-soft px-[15px] py-[11px] text-[14.5px] leading-normal text-mut-100">
+        <div
+          className="rounded-[14px_14px_4px_14px] border border-accent-bd bg-accent-soft px-[15px] py-[11px] text-[14.5px] leading-normal text-mut-100"
+          style={{ maxWidth: isMobile ? "90%" : "80%" }}
+        >
           {message.text}
         </div>
       </div>
@@ -32,10 +37,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const done = message.status === "done";
   const top = message.sources[0];
 
+  const avatarSize = isMobile ? "h-6 w-6" : "h-[30px] w-[30px]";
+  const avatarRadius = isMobile ? "rounded-[7px]" : "rounded-[9px]";
+  const msgGap = isMobile ? "gap-[9px]" : "gap-[13px]";
+
   return (
-    <div className="mb-1.5 mt-5 flex animate-fadeUp gap-[13px]">
-      <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px] border border-accent-bd bg-accent-soft text-accent">
-        <BrandMark size={17} className="flex text-accent" />
+    <div className={`mb-1.5 mt-5 flex animate-fadeUp ${msgGap}`}>
+      <div className={`flex ${avatarSize} shrink-0 items-center justify-center ${avatarRadius} border border-accent-bd bg-accent-soft text-accent`}>
+        <BrandMark size={isMobile ? 13 : 17} className="flex text-accent" />
       </div>
 
       <div className="min-w-0 flex-1 pt-[3px]">
@@ -46,9 +55,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         ) : (
           <div className="whitespace-pre-wrap text-[15.5px] leading-[1.78] text-mut-250">
-            {renderCitations(message.text, message.sources, (i) =>
-              setOpen((p) => new Set(p).add(i))
-            )}
+            {done
+              ? renderCitations(message.text, message.sources, (i) =>
+                  setOpen((p) => new Set(p).add(i))
+                )
+              : message.text}
             {streaming && (
               <span className="ml-px inline-block h-[15px] w-2 translate-y-0.5 animate-blink bg-accent align-[-2px]" />
             )}

@@ -19,6 +19,8 @@ interface ChatViewProps {
   onAccentChange: (a: Accent) => void;
   onSend: (text: string) => void;
   onIngest: (url: string) => void;
+  isMobile: boolean;
+  onToggleSidebar: () => void;
 }
 
 export function ChatView({
@@ -28,6 +30,8 @@ export function ChatView({
   onAccentChange,
   onSend,
   onIngest,
+  isMobile,
+  onToggleSidebar,
 }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<Accent, HTMLButtonElement>>(new Map());
@@ -58,34 +62,47 @@ export function ChatView({
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-ink">
-      <div className="flex h-[52px] shrink-0 items-center justify-end gap-2.5 border-b border-line px-[22px]">
-        <div className="flex items-center gap-1" role="radiogroup" aria-label="Accent color">
-          {ACCENTS.map((a) => (
-            <button
-              key={a}
-              ref={(el) => { if (el) buttonRefs.current.set(a, el); else buttonRefs.current.delete(a); }}
-              aria-label={a}
-              aria-checked={accent === a}
-              role="radio"
-              tabIndex={accent === a ? 0 : -1}
-              onClick={() => onAccentChange(a)}
-              onKeyDown={(e) => handleAccentKeyDown(e, a)}
-              className={
-                "h-4 w-4 rounded-full border transition " +
-                (accent === a ? "border-white/60" : "border-transparent")
-              }
-              style={{ background: SWATCH[a] }}
-            />
-          ))}
+      <div
+        className={`flex h-[52px] shrink-0 items-center gap-2.5 border-b border-line ${isMobile ? "px-[14px]" : "px-[22px]"}`}
+      >
+        {isMobile && (
+          <button
+            onClick={onToggleSidebar}
+            aria-label="Open sidebar"
+            className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[9px] border border-line bg-transparent text-[18px] leading-none text-mut-400 hover:bg-ink-panel hover:text-accent"
+          >
+            ☰
+          </button>
+        )}
+        <div className="flex flex-1 items-center justify-end gap-2.5">
+          <div className="flex items-center gap-1" role="radiogroup" aria-label="Accent color">
+            {ACCENTS.map((a) => (
+              <button
+                key={a}
+                ref={(el) => { if (el) buttonRefs.current.set(a, el); else buttonRefs.current.delete(a); }}
+                aria-label={a}
+                aria-checked={accent === a}
+                role="radio"
+                tabIndex={accent === a ? 0 : -1}
+                onClick={() => onAccentChange(a)}
+                onKeyDown={(e) => handleAccentKeyDown(e, a)}
+                className={
+                  "h-4 w-4 rounded-full border transition " +
+                  (accent === a ? "border-white/60" : "border-transparent")
+                }
+                style={{ background: SWATCH[a] }}
+              />
+            ))}
+          </div>
+          <span className="flex items-center gap-[7px] rounded-[20px] border border-line bg-ink-panel px-[11px] py-[5px] text-[11.5px] text-mut-600">
+            <span className="h-[6px] w-[6px] rounded-full bg-ok" />
+            GPT-OSS-120B · Groq
+          </span>
         </div>
-        <span className="flex items-center gap-[7px] rounded-[20px] border border-line bg-ink-panel px-[11px] py-[5px] text-[11.5px] text-mut-600">
-          <span className="h-[6px] w-[6px] rounded-full bg-ok" />
-          GPT-OSS-120B · Groq
-        </span>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[760px] px-6 pb-10 pt-[26px]">
+        <div className={`mx-auto max-w-[760px] pb-10 pt-[26px] ${isMobile ? "px-4" : "px-6"}`}>
           {messages.length === 0 ? (
             <Hero suggestions={suggestions} onPick={onSend} />
           ) : (
@@ -94,7 +111,7 @@ export function ChatView({
         </div>
       </div>
 
-      <Composer onSend={onSend} onIngest={onIngest} />
+      <Composer onSend={onSend} onIngest={onIngest} isMobile={isMobile} />
     </main>
   );
 }

@@ -13,6 +13,8 @@ __pycache__/
 
 # Claude Settings
 .claude/
+.agents/
+skills-lock.json
 
 # Distribution / packaging
 .Python
