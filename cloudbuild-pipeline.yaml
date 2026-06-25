@@ -1,0 +1,11 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -f
+      - Dockerfile.pipeline
+      - -t
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-pipeline:latest
+      - .
+images:
+  - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-pipeline:latest

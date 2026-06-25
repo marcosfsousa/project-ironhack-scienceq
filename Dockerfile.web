@@ -1,0 +1,18 @@
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+FROM nginx:alpine
+RUN apk add --no-cache gettext
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY frontend/nginx.conf.template /etc/nginx/nginx.conf.template
+# Allow the nginx user to write the rendered config and the pid file at startup.
+RUN chown -R nginx:nginx /etc/nginx/conf.d /var/cache/nginx && \
+    touch /var/run/nginx.pid && chown nginx:nginx /var/run/nginx.pid
+USER nginx
+EXPOSE 8080
+# envsubst substitutes ${API_URL} from the Cloud Run environment variable at startup.
+CMD ["sh", "-c", "envsubst '${API_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]

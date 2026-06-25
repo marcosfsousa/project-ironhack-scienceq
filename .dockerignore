@@ -33,5 +33,9 @@ docs/
 notebooks/
 
 # Dev-only files
-requirements-dev.txt
 tests/
+
+# Frontend build artifacts (not needed in API image)
+frontend/node_modules
+frontend/.env.local
+frontend/dist

@@ -1,9 +1,6 @@
+# ScienceQ FastAPI service — deployed to Cloud Run.
+# (The Streamlit image lives in Dockerfile.streamlit.)
 FROM python:3.11-slim
-
-# curl: required for HEALTHCHECK
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -11,20 +8,20 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY app/ app/
+# Copy application code. pipeline/ + data/metadata.json are required because
+# importing the agent pulls in live_ingest and the metadata tool.
+COPY api/ api/
 COPY agent/ agent/
 COPY pipeline/ pipeline/
-
-# corpus browser sidebar reads this file; returns [] gracefully if missing
 COPY data/metadata.json data/metadata.json
 
-EXPOSE 8501
+RUN addgroup --system --gid 1001 appuser && \
+    adduser --system --uid 1001 --gid 1001 appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 
-# start-period accounts for Streamlit's ~20s cold start
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+# Cloud Run injects $PORT; default to 8080 for local `docker run`.
+ENV PORT=8080
+EXPOSE 8080
 
-ENTRYPOINT ["streamlit", "run", "app/streamlit_app.py", \
-    "--server.port=8501", \
-    "--server.address=0.0.0.0"]
+CMD ["sh", "-c", "exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT}"]

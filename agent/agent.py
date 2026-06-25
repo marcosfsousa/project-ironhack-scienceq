@@ -160,7 +160,7 @@ def metadata_node(state: AgentState) -> AgentState:
     Use VideoMetadataTool to answer catalog/listing queries.
     Falls back gracefully if metadata.json is missing.
 
-    Always runs a fast LLM call (llama-3.1-8b-instant) to extract a clean
+    Always runs a fast LLM call (openai/gpt-oss-20b) to extract a clean
     search keyword from the user's question before hitting the tool.
     This normalises full sentences like "What videos do you have on mathematics?"
     down to a single term like "mathematics", preventing match failures.
@@ -192,7 +192,7 @@ def metadata_node(state: AgentState) -> AgentState:
             "Reply with only the search term, nothing else. No punctuation."
         )
         resp = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.0,

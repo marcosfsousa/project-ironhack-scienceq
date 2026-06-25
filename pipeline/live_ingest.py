@@ -10,7 +10,7 @@ Pipeline (in order):
   4. Extract transcript via youtube-transcript-api
   5. Clean transcript using cleaner.clean_text()
   6. Chunk transcript using chunker.chunk_segments()
-  7. Infer topic label via llama-3.1-8b-instant on first 500 words
+  7. Infer topic label via openai/gpt-oss-20b on first 500 words
   8. Embed chunks via Cohere embed-multilingual-v3.0 (search_document)
   9. Upsert to Pinecone 'live' namespace
 
@@ -37,6 +37,8 @@ import os
 import re
 import subprocess
 import sys
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,7 +93,7 @@ def _get_proxy_config() -> tuple[str | None, GenericProxyConfig | None]:
     Expected format: http://username:password@geo.iproyal.com:12321
     Set via .env locally or Streamlit secrets on cloud.
     """
-    proxy_url = os.environ.get("IPROYAL_PROXY_URL")
+    proxy_url = os.environ.get("IPROYAL_PROXY_URL", "").strip() or None
     if proxy_url:
         log.info("  Proxy configured — routing YouTube requests via residential proxy.")
         proxy_config = GenericProxyConfig(
@@ -148,7 +150,33 @@ def _is_already_indexed(video_id: str, index, corpus_namespace: str, live_namesp
             return True, ns
     return False, ""
 
-# ── Real metadata via yt-dlp ───────────────────────────────────────────────────
+# ── Real metadata via YouTube oEmbed ──────────────────────────────────────────
+
+def _fetch_metadata_oembed(url: str) -> dict | None:
+    """
+    Fetch title and channel via the YouTube oEmbed endpoint.
+    No auth, no proxy required — accessible from any IP including Cloud Run.
+    Returns dict with keys: title, channel, duration (always 0 — oEmbed omits it).
+    Returns None on any failure.
+    """
+    try:
+        oembed_url = (
+            "https://www.youtube.com/oembed?format=json&url="
+            + urllib.parse.quote(url, safe="")
+        )
+        with urllib.request.urlopen(oembed_url, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        return {
+            "title":    data.get("title", "Unknown"),
+            "channel":  data.get("author_name", "Unknown"),
+            "duration": 0,
+        }
+    except Exception as e:
+        log.warning(f"oEmbed metadata fetch failed: {e} — falling back to yt-dlp.")
+        return None
+
+
+# ── Real metadata via yt-dlp (fallback) ───────────────────────────────────────
 
 def _fetch_metadata_yt_dlp(url: str) -> dict | None:
     """
@@ -188,7 +216,7 @@ def _fetch_metadata_yt_dlp(url: str) -> dict | None:
 
 def _infer_metadata_llm(first_500_words: str) -> dict:
     """
-    Ask llama-3.1-8b-instant to infer title and channel from transcript text.
+    Ask openai/gpt-oss-20b to infer title and channel from transcript text.
     Returns dict with keys: title, channel. Topic is inferred separately.
     Falls back to generic strings on any error.
     """
@@ -202,7 +230,7 @@ def _infer_metadata_llm(first_500_words: str) -> dict:
             f"Transcript excerpt:\n{first_500_words}"
         )
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=80,
             temperature=0.1,
@@ -224,7 +252,7 @@ def _infer_metadata_llm(first_500_words: str) -> dict:
 
 def _infer_topic_llm(first_500_words: str) -> str:
     """
-    Ask llama-3.1-8b-instant to classify the topic from TOPIC_CHOICES.
+    Ask openai/gpt-oss-20b to classify the topic from TOPIC_CHOICES.
     Returns the topic string, defaults to "Other" on any failure.
     """
     try:
@@ -237,7 +265,7 @@ def _infer_topic_llm(first_500_words: str) -> str:
             f"Transcript excerpt:\n{first_500_words}"
         )
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=10,
             temperature=0.0,
@@ -444,9 +472,16 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
                 )
                 return result
 
-        # ── 4. Fetch real metadata via yt-dlp ──────────────────────────────────
-        log.info("  Fetching metadata via yt-dlp...")
-        meta = _fetch_metadata_yt_dlp(url)
+        # ── 4. Fetch metadata (oEmbed first, yt-dlp fallback) ─────────────────
+        log.info("  Fetching metadata...")
+        oembed_meta = _fetch_metadata_oembed(url)
+        meta = oembed_meta or _fetch_metadata_yt_dlp(url)
+        # oEmbed omits duration (always 0); supplement with yt-dlp only when
+        # oEmbed was the source — if yt-dlp was the fallback it already has duration.
+        if oembed_meta is not None and meta.get("duration", 0) == 0:
+            ytdlp_meta = _fetch_metadata_yt_dlp(url)
+            if ytdlp_meta:
+                meta["duration"] = ytdlp_meta.get("duration", 0)
 
         # ── 5. Extract transcript ──────────────────────────────────────────────
         log.info("  Extracting transcript...")

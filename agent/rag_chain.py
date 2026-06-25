@@ -6,7 +6,7 @@ Core RAG chain for the ScienceQ Bot.
 Wires together:
   - retriever.py       → Pinecone similarity search
   - prompts.py         → system + QA prompt templates  (Day 5: extracted to own module)
-  - Groq LLM           → Llama 3.1 70B (fast, free)
+  - Groq LLM           → openai/gpt-oss-120b (answers), openai/gpt-oss-20b (rewriting)
   - LangSmith tracing  → automatic via LANGCHAIN_* env vars
 
 Exposes two public functions:
@@ -70,13 +70,13 @@ else:
     log.warning("LANGSMITH_API_KEY not set — tracing disabled.")
 
 # ── LLM config ─────────────────────────────────────────────────────────────────
-GROQ_MODEL       = "llama-3.3-70b-versatile"
+GROQ_MODEL       = "openai/gpt-oss-120b"
 GROQ_TEMPERATURE = 0.2      # Low temp: factual, grounded responses
 GROQ_MAX_TOKENS  = 1024
 
 # -- Rewrite Model config ----------------------------------------------------
 
-REWRITE_MODEL       = "llama-3.1-8b-instant"
+REWRITE_MODEL       = "openai/gpt-oss-20b"
 REWRITE_TEMPERATURE = 0.0   # Temp set to 0 to prevent any creative deviations
 REWRITE_MAX_TOKENS  = 128
 

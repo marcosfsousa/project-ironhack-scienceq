@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Accent system -------------------------------------------------------
+   Set on <html data-accent="…"> by App.tsx. Static Tailwind classes
+   (text-accent / bg-accent-soft / border-accent-bd) resolve through these. */
+:root,
+[data-accent="Indigo"] {
+  --acc: #8b93f8;
+  --acc-soft: rgba(129, 140, 248, 0.15);
+  --acc-bd: rgba(129, 140, 248, 0.45);
+}
+[data-accent="Blue"] {
+  --acc: #4d96ff;
+  --acc-soft: rgba(77, 150, 255, 0.15);
+  --acc-bd: rgba(77, 150, 255, 0.45);
+}
+[data-accent="Amber"] {
+  --acc: #f6b73c;
+  --acc-soft: rgba(246, 183, 60, 0.16);
+  --acc-bd: rgba(246, 183, 60, 0.5);
+}
+[data-accent="Cyan"] {
+  --acc: #34d6ee;
+  --acc-soft: rgba(52, 214, 238, 0.15);
+  --acc-bd: rgba(52, 214, 238, 0.45);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: #0a0c0f;
+  color: #e7e9ec;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin dark scrollbars (matches prototype) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

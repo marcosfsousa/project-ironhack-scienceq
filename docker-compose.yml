@@ -1,10 +1,21 @@
 services:
 
-  # ── Streamlit app ─────────────────────────────────────────────────────────────
-  app:
+  # ── FastAPI service ───────────────────────────────────────────────────────────
+  # Phase 4 serving app — the target for Cloud Run.
+  # Run: docker compose up api   →   http://localhost:8080
+  api:
     build:
       context: .
       dockerfile: Dockerfile
+    env_file: .env
+    ports:
+      - "8080:8080"
+
+  # ── Streamlit app (legacy UI, kept until the SPA lands) ───────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
     env_file: .env
     ports:
       - "8501:8501"

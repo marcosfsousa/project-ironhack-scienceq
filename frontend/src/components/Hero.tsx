@@ -1,0 +1,46 @@
+import { BrandMark } from "./BrandMark";
+
+interface HeroProps {
+  suggestions: string[];
+  onPick: (q: string) => void;
+}
+
+export function Hero({ suggestions, onPick }: HeroProps) {
+  return (
+    <div className="animate-fadeUp pt-8">
+      <div className="flex items-center gap-[11px]">
+        <BrandMark size={32} className="flex text-accent" />
+        <h1 className="m-0 text-[30px] font-bold tracking-[-0.02em]">ScienceQ</h1>
+      </div>
+
+      <div className="my-[18px] h-0.5 w-full bg-gradient-to-r from-accent to-transparent" />
+
+      <p className="mb-3.5 text-[15px] leading-[1.65] text-mut-300">
+        Ask questions about science and ideas from{" "}
+        <b className="font-semibold text-mut-100">50 curated YouTube videos</b> — Veritasium,
+        Kurzgesagt, 3Blue1Brown, PBS Space Time, and more. Answers are grounded in the actual
+        transcripts, with source timestamps so you can jump straight to the moment.
+      </p>
+      <p className="mb-7 text-[14px] leading-[1.6] text-mut-500">
+        You can also paste any YouTube URL into the chat to index a video that isn't in the
+        library yet.
+      </p>
+
+      <div className="mb-[11px] text-[11px] font-semibold tracking-[0.12em] text-mut-700">
+        TRY ASKING
+      </div>
+      <div className="grid gap-[9px]">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            onClick={() => onPick(s)}
+            className="flex cursor-pointer items-center gap-3 rounded-[11px] border border-line bg-ink-raised px-4 py-3.5 text-left font-sans hover:border-accent-bd hover:bg-ink-hover"
+          >
+            <span className="text-[14px] text-accent">→</span>
+            <span className="text-[14px] text-mut-200">{s}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
