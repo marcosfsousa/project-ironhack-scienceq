@@ -4,7 +4,7 @@ A RAG-based chatbot that answers questions grounded in YouTube science video tra
 
 Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engineering course.
 
-**Live demo:** [scienceq-web-886463515307.europe-west1.run.app](https://scienceq-web-886463515307.europe-west1.run.app)
+**Live demo:** [scienceq.app](https://scienceq.app)
 
 ---
 

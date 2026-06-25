@@ -2,7 +2,7 @@
 
 The production frontend is a React 18 + Vite + TypeScript SPA deployed as a separate Cloud Run service (`scienceq-web`) behind an nginx reverse proxy.
 
-**Live URL:** `https://scienceq-web-886463515307.europe-west1.run.app`
+**Live URL:** [https://scienceq.app](https://scienceq.app)
 
 ---
 
