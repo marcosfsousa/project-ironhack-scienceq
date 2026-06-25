@@ -18,18 +18,14 @@
 ### Symptom
 The LLM outputs inline citation markers in the format `[Title, mm:ss]`. Below the answer, source pills render correctly as styled badges (sources arrive in the `[SOURCES]` SSE frame). Inside the streamed text bubble, the raw `[Title, mm:ss]` text is displayed instead of styled `[n]` pills — because `message.sources` is empty while the stream is in progress.
 
-### Root cause
-`ChatMessage.tsx` calls `renderCitations(message.text, message.sources, ...)` for both the streaming and done states. `lib/citations.tsx` matches citation markers against `message.sources` to build styled pills. During streaming `message.sources = []` so no matches are found and the markers pass through as plain text.
+### Root cause (historical — fix already shipped)
+`ChatMessage.tsx` called `renderCitations(message.text, message.sources, ...)` for both the streaming and done states. During streaming `message.sources = []` so no matches were found and markers passed through as plain text.
 
-### Fix options
-**A (simpler):** During streaming, render plain text without citation processing. After `status === "done"`, apply `renderCitations` with the populated sources. This means inline pills only appear once the answer is complete — no visual change during streaming, then citations snap in.
-
-**B (richer):** Parse `[Title, mm:ss]` markers from the text during streaming (regex only, no source lookup), render them as greyed-out `[?]` placeholders, then swap to numbered `[n]` pills when sources arrive on `[DONE]`.
-
-Option A is the right call — simpler, no intermediate state to manage, and the answer completes fast enough that users won't notice.
+### Fix applied (Option A)
+`ChatMessage.tsx` now gates `renderCitations` on `status === "done"`. During streaming, `message.text` is rendered as plain text; citation pills snap in once the answer is complete. See the `done` conditional in the `whitespace-pre-wrap` block.
 
 ### Files
-- `frontend/src/components/ChatMessage.tsx` — gate `renderCitations` on `status === "done"`
+- `frontend/src/components/ChatMessage.tsx` — `renderCitations` is called only when `done === true` ✓
 
 ---
 

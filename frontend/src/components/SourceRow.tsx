@@ -55,7 +55,7 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
             <span className="font-mono text-[11px] text-mut-400">{source.timestamp}</span>
           )}
           <span
-            className={`flex shrink-0 items-center justify-center rounded-[${isMobile ? "9px" : "7px"}] border border-accent-bd bg-accent-soft text-[10px] text-accent ${isMobile ? "h-9 w-9" : "h-6 w-6"}`}
+            className={`flex shrink-0 items-center justify-center border border-accent-bd bg-accent-soft text-[10px] text-accent ${isMobile ? "h-9 w-9 rounded-[9px]" : "h-6 w-6 rounded-[7px]"}`}
           >
             {isOpen ? "✕" : "▶"}
           </span>

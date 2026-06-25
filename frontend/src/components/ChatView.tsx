@@ -63,7 +63,8 @@ export function ChatView({
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-ink">
       <div
-        className={`flex h-[52px] shrink-0 items-center gap-2.5 border-b border-line ${isMobile ? "px-[14px]" : "px-[22px]"}`}
+        className={`flex shrink-0 items-center gap-2.5 border-b border-line ${isMobile ? "px-[14px]" : "h-[52px] px-[22px]"}`}
+        style={isMobile ? { paddingTop: "env(safe-area-inset-top)", height: "calc(52px + env(safe-area-inset-top))" } : undefined}
       >
         {isMobile && (
           <button

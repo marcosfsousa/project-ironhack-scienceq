@@ -38,8 +38,15 @@ export function Sidebar({
     : "relative h-full w-[312px] shrink-0";
 
   return (
-    <aside className={`flex flex-col border-r border-line bg-ink-sidebar ${positionClasses}`}>
-      <div className="px-[18px] pb-3.5 pt-5">
+    <aside
+      className={`flex flex-col border-r border-line bg-ink-sidebar ${positionClasses}`}
+      aria-hidden={isMobile && !isOpen ? "true" : undefined}
+      inert={isMobile && !isOpen ? true : undefined}
+    >
+      <div
+        className="px-[18px] pb-3.5 pt-5"
+        style={isMobile ? { paddingTop: "calc(1.25rem + env(safe-area-inset-top))" } : undefined}
+      >
         <div className="flex items-center gap-2.5">
           <BrandMark size={21} className="flex text-accent" />
           <span className="text-[18px] font-bold tracking-[-0.01em]">ScienceQ</span>
