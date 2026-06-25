@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import type { Accent, ChatMessage as Msg } from "@/types";
 import { ChatMessage } from "./ChatMessage";
 import { Hero } from "./Hero";
@@ -30,6 +30,7 @@ export function ChatView({
   onIngest,
 }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Map<Accent, HTMLButtonElement>>(new Map());
 
   // Auto-stick to the bottom while a conversation is active.
   useEffect(() => {
@@ -38,6 +39,23 @@ export function ChatView({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // Roving tabIndex for the accent radio group: arrow keys move focus+selection.
+  // Focus must follow selection so repeated keypresses continue to cycle.
+  const handleAccentKeyDown = useCallback(
+    (e: React.KeyboardEvent, current: Accent) => {
+      const idx = ACCENTS.indexOf(current);
+      let next = -1;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % ACCENTS.length;
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + ACCENTS.length) % ACCENTS.length;
+      if (next === -1) return;
+      e.preventDefault();
+      const nextAccent = ACCENTS[next];
+      onAccentChange(nextAccent);
+      buttonRefs.current.get(nextAccent)?.focus();
+    },
+    [onAccentChange]
+  );
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-ink">
       <div className="flex h-[52px] shrink-0 items-center justify-end gap-2.5 border-b border-line px-[22px]">
@@ -45,10 +63,13 @@ export function ChatView({
           {ACCENTS.map((a) => (
             <button
               key={a}
+              ref={(el) => { if (el) buttonRefs.current.set(a, el); else buttonRefs.current.delete(a); }}
               aria-label={a}
               aria-checked={accent === a}
               role="radio"
+              tabIndex={accent === a ? 0 : -1}
               onClick={() => onAccentChange(a)}
+              onKeyDown={(e) => handleAccentKeyDown(e, a)}
               className={
                 "h-4 w-4 rounded-full border transition " +
                 (accent === a ? "border-white/60" : "border-transparent")

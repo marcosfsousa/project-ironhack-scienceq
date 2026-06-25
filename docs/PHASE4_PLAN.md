@@ -13,13 +13,13 @@
 | Hooks (`useChat`, `useIngest`, `useCatalog`) | ✅ Done (Claude Design) |
 | All components (10) | ✅ Done (Claude Design) |
 | Design tokens, Tailwind config, CSS | ✅ Done (Claude Design) |
-| `POST /api/chat/stream` SSE endpoint | ❌ Not built |
-| `GET /api/catalog` endpoint + `api/catalog.py` | ❌ Not built |
-| CORS middleware | ❌ Not built |
-| `google-cloud-storage` in `requirements.txt` | ❌ Missing |
-| Move `docs/design/` → `frontend/` | ❌ Not done |
-| `Dockerfile.web` + `cloudbuild-web.yaml` | ❌ Not built |
-| Deploy `scienceq-web` Cloud Run service | ❌ Not done |
+| `POST /api/chat/stream` SSE endpoint | ✅ Done (`api/service.py`, `api/routes.py`) |
+| `GET /api/catalog` endpoint + `api/catalog.py` | ✅ Done (`api/catalog.py`, `api/routes.py`) |
+| CORS middleware | ✅ Done (`api/main.py`) |
+| `google-cloud-storage` in `requirements.txt` | ✅ Added |
+| Move `docs/design/` → `frontend/` | ✅ Done |
+| `Dockerfile.web` + `cloudbuild-web.yaml` | ✅ Done |
+| Deploy `scienceq-web` Cloud Run service | ✅ Done |
 
 ---
 
@@ -39,7 +39,7 @@
 
 ## Implementation Steps
 
-### 1. API — SSE streaming endpoint ❌
+### 1. API — SSE streaming endpoint ✅
 **Files:** `api/routes.py`, `api/service.py`, `api/schemas.py`
 
 - Add `stream_run_chat()` to `service.py` yielding SSE-formatted lines from `agent.stream_chat()` + `agent.last_sources`
@@ -53,7 +53,7 @@
 
 > **Field name note:** `lib/sse.ts` sends `{ question, history }`. The new stream endpoint must use `question` (not `message` like `ChatRequest`) or `sse.ts` must be updated.
 
-### 2. API — Catalog endpoint ❌
+### 2. API — Catalog endpoint ✅
 **Files:** `api/routes.py`, new `api/catalog.py`, `requirements.txt`
 
 - Add `google-cloud-storage` to `requirements.txt`
@@ -62,13 +62,13 @@
 - Return merged list: `[{video_id, title, channel, topic, duration, url, source: "corpus"|"live"}]`
 - Grant `Storage Object Viewer` to compute SA `886463515307-compute@developer.gserviceaccount.com` on `scienceq-data` bucket
 
-### 3. API — CORS middleware ❌
+### 3. API — CORS middleware ✅
 **Files:** `api/main.py`
 
 - Allow `https://scienceq-web-*.europe-west1.run.app` + `http://localhost:5173` for dev
 - Lock to exact `scienceq-web` URL once known (deploy web first → get URL → update → redeploy API)
 
-### 4. Frontend — Move scaffold into place ❌
+### 4. Frontend — Move scaffold into place ✅
 **Action:** Copy `docs/design/` contents → `frontend/`
 
 The Claude Design bundle at `docs/design/` is a runnable scaffold. Move it:
@@ -89,15 +89,15 @@ cd frontend && npm install
 VITE_API_TARGET=http://localhost:8080 npm run dev
 ```
 
-### 5. Infrastructure ❌
-**Files:** `Dockerfile.web`, `cloudbuild-web.yaml`, `frontend/nginx.conf`
+### 5. Infrastructure ✅
+**Files:** `Dockerfile.web`, `cloudbuild-web.yaml`, `frontend/nginx.conf.template`
 
 - `Dockerfile.web` — two-stage: `node:20-alpine` build (`vite build`) → `nginx:alpine` serve
-- `frontend/nginx.conf` — `add_header X-Accel-Buffering "off"` required for SSE through nginx; serve `index.html` for all non-API routes (SPA fallback)
+- `frontend/nginx.conf.template` — `add_header X-Accel-Buffering "no"` required for SSE through nginx; serve `index.html` for all non-API routes (SPA fallback)
 - `cloudbuild-web.yaml` — `VITE_API_URL` substitution baked at `vite build` time
 - Add to `.dockerignore`: `frontend/node_modules`, `frontend/.env.local`
 
-### 6. Deploy ❌
+### 6. Deploy ✅
 - Deploy `scienceq-web` first → get auto-generated Cloud Run URL
 - Update CORS in `api/main.py` with exact URL
 - Redeploy API (`cloudbuild.yaml`)

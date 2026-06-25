@@ -1,5 +1,5 @@
 import type { Source } from "@/types";
-import { embedUrl, tsToSec, youTubeStart } from "@/lib/format";
+import { embedUrl, tsToSec, youTubeId, youTubeStart } from "@/lib/format";
 
 interface SourceRowProps {
   source: Source;
@@ -12,11 +12,17 @@ interface SourceRowProps {
 export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
   const pct = Math.round((source.rerank_score ?? source.score) * 100);
   const start = youTubeStart(source.link) || tsToSec(source.timestamp);
+  // Use the YouTube video ID to build a globally unique player element ID;
+  // a plain index collides when multiple messages each render their own source lists.
+  const playerId = `source-player-${youTubeId(source.link) ?? index}`;
 
   return (
     <div className="overflow-hidden rounded-[10px] border border-line bg-ink-card">
       <button
         onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={playerId}
+        aria-label={isOpen ? `Collapse source ${index + 1}` : `Expand source ${index + 1}`}
         className="flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent px-3 py-2.5 text-left font-sans hover:bg-ink-hover"
       >
         <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md border border-accent-bd bg-accent-soft font-mono text-[11px] font-bold text-accent">
@@ -46,7 +52,7 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
       </button>
 
       {isOpen && (
-        <div className="aspect-video border-t border-line bg-black">
+        <div id={playerId} className="aspect-video border-t border-line bg-black">
           <iframe
             src={embedUrl(source.link, { autoplay: true, startSec: start })}
             title={source.title}
