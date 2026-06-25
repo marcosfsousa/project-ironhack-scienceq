@@ -50,6 +50,11 @@ class ChatResponse(BaseModel):
     intent: str  # "rag" | "metadata" | "ingest"
 
 
+class ChatStreamRequest(BaseModel):
+    question: str
+    history: list[Turn] = Field(default_factory=list)
+
+
 class IngestRequest(BaseModel):
     url: str
 

@@ -13,17 +13,20 @@ import logging
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import StreamingResponse
 
 from live_ingest import ingest_url
 
+from .catalog import get_catalog
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    ChatStreamRequest,
     IngestJobCreated,
     IngestRequest,
     IngestStatusResponse,
 )
-from .service import run_chat
+from .service import run_chat, stream_run_chat
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +79,29 @@ def chat(request: ChatRequest) -> ChatResponse:
             status_code=500,
             detail="An unexpected error occurred while answering your question.",
         )
+
+
+@router.post("/api/chat/stream")
+def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
+    """
+    Stream an answer token-by-token via SSE.
+
+    SSE protocol (matches frontend docs/design/src/lib/sse.ts):
+      data: <token>          — one frame per LLM token
+      data: [SOURCES]<json>  — source list after answer completes (RAG only)
+      data: [DONE]           — stream closed
+    """
+    return StreamingResponse(
+        stream_run_chat(request.question, request.history),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/api/catalog")
+def catalog() -> list[dict]:
+    """Return merged corpus + live video catalog for the sidebar."""
+    return get_catalog()
 
 
 @router.post("/api/ingest", status_code=202, response_model=IngestJobCreated)
