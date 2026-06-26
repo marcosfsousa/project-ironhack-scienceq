@@ -41,3 +41,6 @@ steps:
       - --member=allUsers
       - --role=roles/run.invoker
       - --project=scienceq-prod
+
+options:
+  logging: CLOUD_LOGGING_ONLY
