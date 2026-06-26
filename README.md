@@ -11,7 +11,7 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engin
 ## Demo
 
 <p align="center">
-  <img src="docs/scienceq_app_demo.gif" alt="ScienceQ demo" width="780" />
+  <img src="docs/scienceq_app_demo_v2.gif" alt="ScienceQ demo" width="780" />
 </p>
 
 ---
