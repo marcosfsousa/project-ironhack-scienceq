@@ -14,8 +14,11 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.requests import Request
 
 from live_ingest import ingest_url
+
+from .limiter import limiter
 
 from .catalog import get_catalog
 from .schemas import (
@@ -57,15 +60,17 @@ def _run_ingest(job_id: str, url: str) -> None:
 
 
 @router.post("/api/chat", response_model=ChatResponse)
-def chat(request: ChatRequest) -> ChatResponse:
+@limiter.limit("20/hour")
+def chat(request: Request, body: ChatRequest) -> ChatResponse:
     """
     Answer a question against the indexed corpus (blocking).
 
     Defined as a sync handler so FastAPI runs it in a worker thread — the
     underlying agent call is blocking I/O, so this keeps the event loop free.
+    Rate-limited to 20 requests per IP per hour.
     """
     try:
-        return run_chat(request.message, request.history)
+        return run_chat(body.message, body.history)
     except Exception as exc:  # noqa: BLE001 — translate any failure to HTTP
         err = str(exc).lower()
         if "429" in err or "rate_limit" in err or "too many requests" in err:
@@ -82,7 +87,8 @@ def chat(request: ChatRequest) -> ChatResponse:
 
 
 @router.post("/api/chat/stream")
-def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
+@limiter.limit("20/hour")
+def chat_stream(request: Request, body: ChatStreamRequest) -> StreamingResponse:
     """
     Stream an answer token-by-token via SSE.
 
@@ -90,9 +96,10 @@ def chat_stream(request: ChatStreamRequest) -> StreamingResponse:
       data: <token>          — one frame per LLM token
       data: [SOURCES]<json>  — source list after answer completes (RAG only)
       data: [DONE]           — stream closed
+    Rate-limited to 20 requests per IP per hour.
     """
     return StreamingResponse(
-        stream_run_chat(request.question, request.history),
+        stream_run_chat(body.question, body.history),
         media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )
@@ -105,15 +112,17 @@ def catalog() -> list[dict]:
 
 
 @router.post("/api/ingest", status_code=202, response_model=IngestJobCreated)
-def ingest(request: IngestRequest, background_tasks: BackgroundTasks) -> IngestJobCreated:
+@limiter.limit("3/hour")
+def ingest(request: Request, body: IngestRequest, background_tasks: BackgroundTasks) -> IngestJobCreated:
     """
     Kick off async ingestion of a YouTube URL.
 
     Returns immediately with a job_id. Poll GET /api/ingest/{job_id} for status.
+    Rate-limited to 3 requests per IP per hour to prevent index abuse.
     """
     job_id = uuid.uuid4().hex[:8]
     _jobs[job_id] = {"status": "pending"}
-    background_tasks.add_task(_run_ingest, job_id, request.url)
+    background_tasks.add_task(_run_ingest, job_id, body.url)
     return IngestJobCreated(job_id=job_id, status="pending")
 
 
