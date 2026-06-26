@@ -5,8 +5,15 @@ steps:
       - -f
       - Dockerfile.web
       - -t
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:$COMMIT_SHA
+      - -t
       - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:latest
       - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:$COMMIT_SHA
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -19,7 +26,7 @@ steps:
       - run
       - deploy
       - scienceq-web
-      - --image=europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:latest
+      - --image=europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-web:$COMMIT_SHA
       - --region=europe-west1
       - --platform=managed
       - --allow-unauthenticated

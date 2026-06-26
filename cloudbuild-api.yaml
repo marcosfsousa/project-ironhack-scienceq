@@ -3,8 +3,15 @@ steps:
     args:
       - build
       - -t
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:$COMMIT_SHA
+      - -t
       - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
       - .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:$COMMIT_SHA
 
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -17,8 +24,20 @@ steps:
       - run
       - deploy
       - scienceq-api
-      - --image=europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
+      - --image=europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:$COMMIT_SHA
       - --region=europe-west1
       - --platform=managed
       - --allow-unauthenticated
+      - --project=scienceq-prod
+
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - gcloud
+      - run
+      - services
+      - add-iam-policy-binding
+      - scienceq-api
+      - --region=europe-west1
+      - --member=allUsers
+      - --role=roles/run.invoker
       - --project=scienceq-prod

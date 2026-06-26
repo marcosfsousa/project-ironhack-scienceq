@@ -31,7 +31,10 @@ VITE_API_TARGET=http://localhost:8080 npm run dev
 ## Deploy
 
 ```bash
-gcloud builds submit --config cloudbuild-web.yaml --project=scienceq-prod
+gcloud builds submit \
+  --config cloudbuild-web.yaml \
+  --substitutions=COMMIT_SHA=$(git rev-parse HEAD) \
+  --project=scienceq-prod
 ```
 
 The build is two-stage: `node:20-alpine` runs `vite build`, then `nginx:alpine` serves the static bundle. `${API_URL}` is substituted at container startup via `envsubst`. Both stages run as non-root users (`nginx` user in the serving stage).
