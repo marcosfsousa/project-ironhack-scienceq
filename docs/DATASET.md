@@ -164,7 +164,7 @@ Builds `data/metadata.json` — a flat catalog of all indexed videos used by the
 |---|---|---|
 | `RETRIEVER_FETCH_K` | 10 | Over-retrieve from Pinecone before reranking |
 | `RETRIEVER_TOP_N` | 3 | Chunks passed to the LLM after reranking |
-| `SCORE_THRESHOLD` | 0.40 | Calibrated post-Cohere re-indexing: factual queries score 0.49–0.78; adversarial out-of-corpus queries fall below 0.40. Multilingual chunks (EN query → non-EN chunk) consistently score 0.52–0.70, comfortably above the gate. |
+| `SCORE_THRESHOLD` | 0.25 | Calibrated in Phase 5 retrieval sweep against Cohere `embed-multilingual-v3.0`. Previous value (0.40) was set for MiniLM and was too aggressive for Cohere's embedding space. Factual queries score 0.49–0.78; adversarial out-of-corpus queries fall below 0.25. Multilingual chunks (EN query → non-EN chunk) consistently score 0.52–0.70, comfortably above the gate. |
 | Multi-namespace | True | Corpus + live queried together at runtime |
 
 ---
@@ -191,4 +191,4 @@ A separate evaluation dataset of 38 cases is stored in `eval/eval_set.json`:
 | Multi-turn | 5 | Pronoun resolution across conversation turns |
 | Adversarial | 5 | Prompt injection, out-of-scope, hallucination bait |
 
-Adversarial cases are excluded from automated scoring and reviewed manually. The 8 cross-lingual cases validate that English queries retrieve semantically relevant chunks in all four non-English languages above the 0.40 score threshold.
+Adversarial cases are excluded from automated scoring and reviewed manually. The 8 cross-lingual cases validate that English queries retrieve semantically relevant chunks in all four non-English languages above the 0.25 score threshold.
