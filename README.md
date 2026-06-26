@@ -10,7 +10,9 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engin
 
 ## Demo
 
-![ScienceQ Demo](docs/demo.gif)
+<p align="center">
+  <img src="docs/scienceq_app_demo.gif" alt="ScienceQ demo" width="780" />
+</p>
 
 ---
 
