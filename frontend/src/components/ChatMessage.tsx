@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChatMessage as Msg } from "@/types";
-import { renderCitations } from "@/lib/citations";
+import { cleanAnswer } from "@/lib/citations";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { BrandMark } from "./BrandMark";
 import { SourceRow } from "./SourceRow";
@@ -55,11 +55,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         ) : (
           <div className="whitespace-pre-wrap text-[15.5px] leading-[1.78] text-mut-250">
-            {done
-              ? renderCitations(message.text, message.sources, (i) =>
-                  setOpen((p) => new Set(p).add(i))
-                )
-              : message.text}
+            {done ? cleanAnswer(message.text) : message.text}
             {streaming && (
               <span className="ml-px inline-block h-[15px] w-2 translate-y-0.5 animate-blink bg-accent align-[-2px]" />
             )}
