@@ -1,35 +1,6 @@
 import { test } from "@playwright/test";
 import path from "path";
-
-const CATALOG_FIXTURE = [
-  {
-    video_id: "jAhjPd4uNFY",
-    title: "Genetic Engineering Will Change Everything Forever – CRISPR",
-    channel: "Kurzgesagt",
-    topic: "Biology",
-    duration: "16:04",
-    url: "https://www.youtube.com/watch?v=jAhjPd4uNFY",
-    source: "corpus",
-  },
-  {
-    video_id: "MRjxi-qkPkQ",
-    title: "Why Quantum Mechanics is Weird",
-    channel: "Veritasium",
-    topic: "Physics",
-    duration: "20:12",
-    url: "https://www.youtube.com/watch?v=MRjxi-qkPkQ",
-    source: "corpus",
-  },
-  {
-    video_id: "La_Teoria",
-    title: "La Teoría Clásica y la Revolución de la Física Moderna",
-    channel: "QuantumFracture",
-    topic: "Other",
-    duration: "18:30",
-    url: "https://www.youtube.com/watch?v=La_Teoria",
-    source: "live",
-  },
-];
+import { CATALOG_FIXTURE } from "../src/data/fixtures";
 
 const SSE_FIXTURE = [
   "data: CRISPR is a revolutionary gene-editing tool that allows scientists to make precise changes to DNA.\n\n",
