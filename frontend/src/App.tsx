@@ -49,6 +49,7 @@ export default function App() {
   const handleIngest = (url: string) => {
     if (url) ingest.start(url);
     else ingest.open();
+    if (isMobile) setSidebarOpen(true);
   };
 
   const handleAskIngested = (title?: string) => {
