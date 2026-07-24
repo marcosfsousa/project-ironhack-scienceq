@@ -146,7 +146,7 @@ Two tools registered with the agent:
 
 Three prompt components:
 
-- **`SYSTEM_PROMPT`** — instructs the model to answer directly without hedging openers, stay grounded in retrieved context, enforce a 4-paragraph maximum, and protect prompt confidentiality — with one carve-out: a direct question about whether the user is talking to an AI is answered honestly, exempt from grounding (EU AI Act Art. 50 disclosure, prompt-v4)
+- **`SYSTEM_PROMPT`** — instructs the model to answer directly without hedging openers, stay grounded in retrieved context, enforce a 4-paragraph maximum, and protect prompt confidentiality
 - **`NO_CONTEXT_RESPONSE`** — static fallback when no chunks meet the score threshold
 - **`REWRITE_SYSTEM`** — used by the query rewriter (small model) to resolve pronouns and produce self-contained search queries for multi-turn conversations
 
@@ -238,7 +238,7 @@ All 76 tests pass. Run via `python tests/run_all_tests.py`. Tests cover duplicat
 
 ## Evaluation
 
-Evaluated using a 46-case eval set (`eval/eval_set.json`): 20 English factual RAG cases, 8 cross-lingual RAG cases, 8 multi-turn cases, and 10 adversarial cases for manual review. GPT-4.1 is used as the judge across 4 dimensions.
+Evaluated using a 38-case eval set (`eval/eval_set.json`): 20 English factual RAG cases, 8 cross-lingual RAG cases, 5 multi-turn cases, and 5 adversarial cases for manual review. GPT-4.1 is used as the judge across 4 dimensions.
 
 | Experiment | Cases | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|---|
