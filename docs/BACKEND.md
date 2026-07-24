@@ -35,7 +35,16 @@ The corpus pipeline runs as a Cloud Run Job (`scienceq-pipeline`) backed by a GC
 
 **To add new videos to the corpus:**
 
-1. Append YouTube URLs to `gs://scienceq-data/video_urls.txt`
+1. Append YouTube URLs to `gs://scienceq-data/video_urls.txt`. GCS objects can't be appended in place, so pull the file down, add to it, and put it back. The local `video_urls.txt` here is a throwaway working copy — not the repo-tracked `data/video_urls.txt` used for local builds:
+
+```bash
+gcloud storage cp gs://scienceq-data/video_urls.txt video_urls.txt
+
+echo "https://www.youtube.com/watch?v=VIDEO_ID" >> video_urls.txt
+
+gcloud storage cp video_urls.txt gs://scienceq-data/video_urls.txt
+```
+
 2. Trigger the job:
 
 ```bash
