@@ -12,15 +12,33 @@ module-level singletons reused across requests.
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 from typing import Generator
 
 from agent import YouTubeQAAgent  # resolved via sys.path setup in api/main.py
 
-from .schemas import ChatResponse, Turn
+from .schemas import ChatResponse, GenerationMetadata, Turn
 
 log = logging.getLogger(__name__)
+
+# Sentinel distinguishing an exhausted generator from a falsy first token.
+_STREAM_EMPTY = object()
+
+
+def _provenance_dict(prov) -> dict:
+    """
+    Normalise a GenerationProvenance (or None) into the wire/schema shape.
+
+    Defaults conservatively — an absent provenance is reported as non-generated
+    static text rather than silently claiming an AI origin.
+    """
+    return {
+        "ai_generated": bool(getattr(prov, "ai_generated", False)),
+        "model":        getattr(prov, "model", None),
+        "mode":         getattr(prov, "mode", "static"),
+    }
 
 
 def _build_agent(history: list[Turn]) -> YouTubeQAAgent:
@@ -40,7 +58,12 @@ def run_chat(message: str, history: list[Turn]) -> ChatResponse:
     """Answer a single message (blocking) with conversation context."""
     agent = _build_agent(history)
     resp = agent.chat(message)
-    return ChatResponse(answer=resp.answer, sources=resp.sources, intent=resp.intent)
+    return ChatResponse(
+        answer=resp.answer,
+        sources=resp.sources,
+        intent=resp.intent,
+        generation=GenerationMetadata(**_provenance_dict(resp.provenance)),
+    )
 
 
 def _format_metadata_list(raw: str, question: str = "") -> str:
@@ -91,6 +114,7 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
     Yield SSE-formatted strings for POST /api/chat/stream.
 
     Protocol (matches frontend/src/lib/sse.ts):
+      data: [META]<json>     — generation provenance, emitted before any token
       data: <token>          — one per LLM token
       data: [SOURCES]<json>  — single frame after tokens end (RAG only)
       data: [DONE]           — always the final frame, including on error
@@ -105,7 +129,18 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
     """
     try:
         agent = _build_agent(history)
-        for token in agent.stream_chat(question):
+        stream = agent.stream_chat(question)
+
+        # Advance to the first token before emitting anything. stream_chat sets
+        # _last_provenance after intent classification / retrieval but before it
+        # yields, so pulling one item populates provenance without forwarding a
+        # token — letting the provenance frame lead the stream (Art. 50(2)).
+        first = next(stream, _STREAM_EMPTY)
+        meta = _provenance_dict(agent._last_provenance)
+        yield f"data: [META]{json.dumps(meta)}\n\n"
+
+        tokens = () if first is _STREAM_EMPTY else itertools.chain((first,), stream)
+        for token in tokens:
             if not token:
                 continue
             if token.startswith("METADATA_LIST:"):

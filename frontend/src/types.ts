@@ -14,6 +14,19 @@ export type Role = "user" | "assistant";
 
 export type MessageStatus = "streaming" | "done" | "error";
 
+/**
+ * Machine-readable generation provenance for an answer, from the [META] SSE
+ * frame (and the blocking response's `generation` field). `ai_generated` is
+ * true only for LLM-generated prose; static fallbacks report false with a
+ * null model. Visible presentation is owned by the disclosure work (#11) —
+ * this type only carries the data onto the message.
+ */
+export interface GenerationMeta {
+  ai_generated: boolean;
+  model: string | null;
+  mode: string; // "generated" | "no_context" | "metadata" | "ingest"
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
@@ -21,6 +34,7 @@ export interface ChatMessage {
   sources: Source[];
   status: MessageStatus;
   error?: string;
+  generation?: GenerationMeta;
 }
 
 /** GET /api/catalog item. */

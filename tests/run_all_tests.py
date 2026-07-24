@@ -17,6 +17,7 @@ TEST_MODULES = [
     "tests/test_chunker.py",
     "tests/test_live_ingest.py",
     "tests/test_ingest_node.py",
+    "tests/test_generation_provenance.py",
 ]
 
 if __name__ == "__main__":
