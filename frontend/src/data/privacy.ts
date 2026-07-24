@@ -1,9 +1,11 @@
-// Single source of truth for the privacy notice (issue #17).
+// Privacy notice copy for the React SPA (issue #17).
 //
-// The notice describes what happens to a question when it is asked. Concrete
-// vendor names live here ONCE — the notice copy and every surface reference
-// these constants rather than repeating vendor names, so a provider change is
-// a one-line edit here rather than a hunt across components.
+// The notice describes what happens to a question when it is asked. Within the
+// SPA, vendor names live here once — components reference these constants
+// rather than repeating names inline. Note the Streamlit surface keeps its own
+// parallel copy in app/streamlit_app.py (`_PRIVACY_PROCESSORS`); cross-language
+// sharing isn't worth the machinery, so a provider change is a two-place edit
+// (here and there). Nothing enforces the two staying in sync.
 
 export interface Processor {
   /** What this service does in the course of answering a question. */

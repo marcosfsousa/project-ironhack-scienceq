@@ -230,7 +230,7 @@ def rewrite_query(question: str, history: Optional[list] = None) -> str:
         response  = llm.invoke([SMsg(content=REWRITE_SYSTEM), HMsg(content=user_prompt)])
         rewritten = response.content.strip()
         if rewritten and rewritten != question:
-            log.info(f"Query rewritten: {question!r} → {rewritten!r}")
+            log.debug(f"Query rewritten: {question!r} → {rewritten!r}")  # text at DEBUG only (issue #17)
         return rewritten or question
     except Exception as e:
         log.warning(f"Query rewrite failed ({e}) — using original question.")
@@ -293,7 +293,7 @@ def answer(
 
     # ── Step 2b: Rewrite fallback — retry with original if rewrite hurt retrieval ─
     if not chunks and retrieval_query != question:
-        log.info(f"Rewritten query returned 0 chunks — retrying with original: {question!r}")
+        log.info("Rewritten query returned 0 chunks — retrying with original question")
         if multi_namespace:
             chunks = retrieve_multi_namespace(
                 question,
@@ -399,7 +399,7 @@ def stream_answer(
 
     # Rewrite fallback — retry with original if rewrite hurt retrieval
     if not chunks and retrieval_query != question:
-        log.info(f"Rewritten query returned 0 chunks — retrying with original: {question!r}")
+        log.info("Rewritten query returned 0 chunks — retrying with original question")
         if multi_namespace:
             chunks = retrieve_multi_namespace(
                 question, top_k=top_k, score_threshold=score_threshold

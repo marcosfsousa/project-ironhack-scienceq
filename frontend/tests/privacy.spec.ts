@@ -38,11 +38,33 @@ test("privacy notice is reachable, names the real processors, and is in the acce
   // categories of data sent to them, and what is not collected.
   await expect(dialog.getByText(/Groq/)).toBeVisible();
   await expect(dialog.getByText(/Cohere/)).toBeVisible();
+  await expect(dialog.getByText(/Pinecone/)).toBeVisible();
   await expect(dialog.getByText(/Receives your question text/i)).toBeVisible();
   await expect(dialog.getByText(/no server-side history/i)).toBeVisible();
 
   // Reachable at any point without cost: it closes and leaves the session intact.
   await page.getByRole("button", { name: /close/i }).click();
+  await expect(dialog).not.toBeVisible();
+});
+
+test("privacy notice closes via Escape and via backdrop click", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+
+  const open = () => page.getByRole("button", { name: /how your questions are handled/i }).click();
+  const dialog = page.getByRole("dialog", { name: /how your questions are handled/i });
+
+  // Escape closes the native dialog (keyboard users).
+  await open();
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+
+  // Clicking the backdrop (outside the centered panel) closes it too. The click
+  // lands on the ::backdrop, which targets the <dialog> element itself.
+  await open();
+  await expect(dialog).toBeVisible();
+  await page.mouse.click(5, 5);
   await expect(dialog).not.toBeVisible();
 });
 

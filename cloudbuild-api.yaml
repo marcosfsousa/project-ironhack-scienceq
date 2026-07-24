@@ -21,10 +21,15 @@ steps:
   # Observability tracing is OFF in production (issue #17): real user questions
   # must not be sent to the third-party observability platform (LangSmith).
   # These flags are set here so this deploy step is the authoritative record and
-  # every deploy re-asserts them — no code change or console edit can silently
-  # re-enable tracing in prod. --update-env-vars MERGES (it does not replace the
-  # service's other env vars, e.g. GROQ/COHERE/PINECONE keys set out-of-band).
-  # Development and evaluation environments keep tracing on via their own .env.
+  # every deploy RE-ASSERTS THEM — a console edit that flips a flag survives only
+  # until the next deploy. Because both the auto-tracer and the manual trace-write
+  # (via TRACING_ENABLED) are gated on these flags, tracing stays off even if a
+  # LANGSMITH_API_KEY were re-attached. Note the deploy re-asserts the FLAGS, not
+  # keylessness: a re-attached key would persist across deploys, so the key check
+  # in the verification below is the second layer and must be done by hand.
+  # --update-env-vars MERGES (it does not replace the service's other env vars,
+  # e.g. GROQ/COHERE/PINECONE keys set out-of-band). Development and evaluation
+  # environments keep tracing on via their own .env.
   #
   # Post-deploy verification (record the result when this ships):
   #   gcloud run services describe scienceq-api --region=europe-west1 \
