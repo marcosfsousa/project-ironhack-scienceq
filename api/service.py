@@ -60,6 +60,9 @@ def _trim_source_excerpts(sources: list[dict]) -> list[dict]:
     Shorten each source's `text` to a quotation while leaving every other
     field alone. The source object's shape is unchanged — only the text field's
     content gets shorter — so existing API clients keep working (issue #16).
+
+    Both response paths funnel through here — `run_chat` and the streaming
+    `[SOURCES]` frame — so the two cannot drift apart.
     """
     return [{**s, "text": quotation_excerpt(s.get("text"))} for s in sources]
 
@@ -167,10 +170,11 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
                     "link":         c.youtube_link,
                     "score":        c.score,
                     "rerank_score": c.rerank_score,
-                    "text":         quotation_excerpt(c.text),
+                    "text":         c.text,
                 }
                 for c in chunks
             ]
+            sources = _trim_source_excerpts(sources)
             yield f"data: [SOURCES]{json.dumps(sources)}\n\n"
     except Exception as exc:
         log.exception("Unhandled error in stream_run_chat")

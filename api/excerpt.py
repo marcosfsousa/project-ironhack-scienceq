@@ -12,7 +12,13 @@ to the original, evidences the source just as well.
 This module owns that rule as a single pure function so the API response
 boundary can apply it in one place: `api/service.py` calls it on both the
 blocking `POST /api/chat` response and the streaming `[SOURCES]` frame, so
-every client inherits the same behaviour and the two paths cannot diverge.
+every API client inherits the same behaviour and the two paths cannot diverge.
+
+Scope note: the legacy Streamlit UI (`app/streamlit_app.py`) imports the agent
+directly rather than calling this API, so it does not pass through here. That
+costs nothing today — it renders only title, timestamp, and link, never the
+chunk text — but it does mean "the API trims" is not the same claim as
+"everything that can reach a chunk trims".
 
 The cut is sentence-aware rather than a character chop. Auto-generated YouTube
 captions frequently carry no sentence punctuation at all, so there is a
@@ -36,9 +42,9 @@ MAX_EXCERPT_SENTENCES = 2
 # being read as sentence ends.
 _SENTENCE_END = re.compile(r"[.!?…]+(?=\s|$)")
 
-# Dangling connectives left behind by a mid-sentence cut; trimmed so the
+# Trailing characters left dangling by a mid-sentence cut, stripped so the
 # ellipsis reads cleanly rather than following a stray comma or dash.
-_TRAILING_PUNCTUATION = " ,;:—–-"
+_TRIM_TRAILING_CHARS = " ,;:—–-"
 
 
 def quotation_excerpt(text: str | None) -> str:
@@ -67,9 +73,12 @@ def quotation_excerpt(text: str | None) -> str:
     if fitting:
         return stripped[: fitting[-1]].strip()
 
-    # No terminator in range — fall back to the last whole word.
-    window = stripped[:MAX_EXCERPT_CHARS]
+    # No terminator in range — fall back to the last whole word. The ellipsis
+    # is part of the budget, so a single unbroken run of characters longer than
+    # the budget (no space to fall back to) still comes in at the limit rather
+    # than one over it.
+    window = stripped[: MAX_EXCERPT_CHARS - 1]
     last_space = window.rfind(" ")
     if last_space > 0:
         window = window[:last_space]
-    return window.rstrip(_TRAILING_PUNCTUATION) + "…"
+    return window.rstrip(_TRIM_TRAILING_CHARS) + "…"

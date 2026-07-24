@@ -34,9 +34,12 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
           <span className="block truncate text-[13px] font-medium text-mut-200">
             {source.title}
           </span>
-          <span className="mt-0.5 block text-[11.5px] text-mut-600">
-            {/* channel/topic if the backend supplies them in text or elsewhere */}
-            {source.text ? source.text.slice(0, 70) + "…" : ""}
+          <span className="mt-0.5 block truncate text-[11.5px] text-mut-600">
+            {/* The API already trims this to a sentence-bounded quotation
+                (issue #16). Truncate visually via CSS rather than slicing the
+                string again — a second client-side chop would sever words
+                mid-way and undo the server's sentence-aware cut. */}
+            {source.text ?? ""}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2.5">

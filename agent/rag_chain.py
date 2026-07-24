@@ -165,6 +165,10 @@ class RAGResponse:
         ``api/service.py``) so the blocking and streaming paths trim identically
         — a second, earlier truncation here would feed the two paths different
         input and make them disagree. See issue #16.
+
+        Callers that bypass the API therefore receive the full chunk. The two
+        that do — the Streamlit UI and ``agent/tools.py`` — read only the
+        title/timestamp/link/score fields, never `text`.
         """
         return [
             {

@@ -76,7 +76,7 @@ class TestQuotationExcerpt:
 
     def test_unpunctuated_chunk_cuts_on_a_word_boundary(self):
         out = quotation_excerpt(UNPUNCTUATED_CHUNK)
-        assert len(out) <= MAX_EXCERPT_CHARS + 1  # +1 for the ellipsis
+        assert len(out) <= MAX_EXCERPT_CHARS
         assert out.endswith("…")
         # No severed word: everything before the ellipsis is a whole-word prefix.
         body = out[:-1]
@@ -88,6 +88,38 @@ class TestQuotationExcerpt:
         assert quotation_excerpt(once) == once
         once_unpunctuated = quotation_excerpt(UNPUNCTUATED_CHUNK)
         assert quotation_excerpt(once_unpunctuated) == once_unpunctuated
+
+    def test_never_exceeds_the_budget(self):
+        """The ellipsis counts against the budget, not on top of it."""
+        cases = (
+            FULL_CHUNK,
+            UNPUNCTUATED_CHUNK,
+            "x" * 300,                      # one unbroken run — no space to fall back to
+            "word " * 200,
+            "no terminator anywhere in this caption " * 10,
+        )
+        for text in cases:
+            assert len(quotation_excerpt(text)) <= MAX_EXCERPT_CHARS
+
+    def test_unbroken_run_still_yields_an_excerpt(self):
+        out = quotation_excerpt("x" * 300)
+        assert out.endswith("…")
+        assert set(out[:-1]) == {"x"}
+
+    def test_abbreviation_does_not_collapse_the_excerpt(self):
+        """
+        A terminal-looking abbreviation ("Dr.", "U.S.") is a sentence end by
+        the regex, but it must not reduce the quotation to a stub — the cut
+        takes the last boundary that fits, not the first.
+        """
+        text = (
+            "Dr. Jane Goodall spent decades studying chimpanzees in Gombe, and what "
+            "she found overturned the assumption that tool use was uniquely human. "
+            "Her observations changed primatology permanently."
+        )
+        out = quotation_excerpt(text)
+        assert len(out) > 50
+        assert out.startswith("Dr. Jane Goodall spent decades")
 
     def test_never_returns_more_than_it_was_given(self):
         for text in (FULL_CHUNK, UNPUNCTUATED_CHUNK, "short.", ""):
