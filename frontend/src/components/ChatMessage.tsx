@@ -43,15 +43,24 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <div className={`mb-1.5 mt-5 flex animate-fadeUp ${msgGap}`}>
-      <div className={`flex ${avatarSize} shrink-0 items-center justify-center ${avatarRadius} border border-accent-bd bg-accent-soft text-accent`}>
-        <BrandMark size={isMobile ? 13 : 17} className="flex text-accent" />
+      <div className="flex shrink-0 flex-col items-center gap-[5px]">
+        <div className={`flex ${avatarSize} items-center justify-center ${avatarRadius} border border-accent-bd bg-accent-soft text-accent`}>
+          <BrandMark size={isMobile ? 13 : 17} className="flex text-accent" />
+        </div>
+        <span
+          role="note"
+          aria-label="AI-generated answer"
+          className="rounded-[5px] border border-line bg-ink-raised px-[4px] py-px text-[8.5px] font-semibold tracking-[0.08em] text-mut-600"
+        >
+          AI
+        </span>
       </div>
 
       <div className="min-w-0 flex-1 pt-[3px]">
         {streaming && message.text === "" ? (
           <div className="flex items-center gap-2.5 py-0.5 text-[14px] text-mut-600">
             <span className="h-[7px] w-[7px] animate-pulse2 rounded-full bg-accent" />
-            Searching transcripts…
+            Searching transcripts and generating an answer…
           </div>
         ) : (
           <div className="whitespace-pre-wrap text-[15.5px] leading-[1.78] text-mut-250">
