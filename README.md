@@ -155,7 +155,7 @@ SCORE_THRESHOLD=0.25
 
 - Retrieval quality depends on transcript verbosity — visually-heavy videos without verbal explanation retrieve poorly
 - Multi-turn pronoun resolution occasionally drifts on short follow-ups
-- Live URL ingestion requires a video with available captions (auto-generated accepted). Both the Streamlit and Cloud Run deployments route transcript requests through a residential proxy to bypass YouTube's datacenter IP blocks.
+- Live URL ingestion requires a video with available captions (auto-generated accepted). Transcript requests are made directly, using only access methods YouTube permits; the residential proxy that previously worked around datacenter IP restrictions was removed in issue #16.
 
 ## Next steps
 
