@@ -1,5 +1,7 @@
 # ScienceQ
 
+[![CI](https://github.com/marcosfsousa/project-ironhack-scienceq/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/marcosfsousa/project-ironhack-scienceq/actions/workflows/ci.yml)
+
 A RAG-based chatbot that answers questions grounded in YouTube science video transcripts. Ask anything about the pre-built corpus of science videos (English, Spanish, German, French, and Portuguese), or paste any YouTube URL to ingest and query it on the fly.
 
 Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engineering course.
