@@ -5,10 +5,11 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 interface ComposerProps {
   onSend: (text: string) => void;
   onIngest: (url: string) => void;
+  onOpenPrivacy: () => void;
   isMobile: boolean;
 }
 
-export function Composer({ onSend, onIngest, isMobile }: ComposerProps) {
+export function Composer({ onSend, onIngest, onOpenPrivacy, isMobile }: ComposerProps) {
   const [value, setValue] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -91,7 +92,13 @@ export function Composer({ onSend, onIngest, isMobile }: ComposerProps) {
         </div>
         <p className="mx-0.5 mt-2 text-center text-[11px] text-mut-800">
           Answers are grounded in video transcripts and may be incomplete. Check
-          the cited source.
+          the cited source.{" "}
+          <button
+            onClick={onOpenPrivacy}
+            className="cursor-pointer border-0 bg-transparent p-0 text-[11px] text-mut-600 underline underline-offset-2 hover:text-accent"
+          >
+            Privacy &amp; your data
+          </button>
         </p>
       </div>
     </div>

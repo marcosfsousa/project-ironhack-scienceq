@@ -18,6 +18,20 @@ steps:
       - push
       - europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy/scienceq-api:latest
 
+  # Observability tracing is OFF in production (issue #17): real user questions
+  # must not be sent to the third-party observability platform (LangSmith).
+  # These flags are set here so this deploy step is the authoritative record and
+  # every deploy re-asserts them — no code change or console edit can silently
+  # re-enable tracing in prod. --update-env-vars MERGES (it does not replace the
+  # service's other env vars, e.g. GROQ/COHERE/PINECONE keys set out-of-band).
+  # Development and evaluation environments keep tracing on via their own .env.
+  #
+  # Post-deploy verification (record the result when this ships):
+  #   gcloud run services describe scienceq-api --region=europe-west1 \
+  #     --project=scienceq-prod \
+  #     --format='value(spec.template.spec.containers[0].env)'
+  #   → confirm LANGCHAIN_TRACING_V2=false and LANGSMITH_TRACING=false, and that
+  #     no LANGSMITH_API_KEY is bound to the service (env or secret).
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - gcloud
@@ -29,6 +43,7 @@ steps:
       - --platform=managed
       - --allow-unauthenticated
       - --project=scienceq-prod
+      - --update-env-vars=LANGCHAIN_TRACING_V2=false,LANGSMITH_TRACING=false
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
