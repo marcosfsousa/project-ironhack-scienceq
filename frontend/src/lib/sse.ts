@@ -1,15 +1,17 @@
-import type { Source } from "@/types";
+import type { GenerationMeta, Source } from "@/types";
 
 export interface ChatStreamHandlers {
   onToken: (token: string) => void;
   onSources: (sources: Source[]) => void;
   onDone: () => void;
+  onMeta?: (meta: GenerationMeta) => void;
 }
 
 /**
  * Stream an answer from POST /api/chat/stream.
  *
  * Backend SSE protocol:
+ *   data: [META]{ "ai_generated", "model", "mode" }   — leads the stream
  *   data: <token>
  *   data: [SOURCES][{ "title","timestamp","link","score","rerank_score","text" }, ...]
  *   data: [DONE]
@@ -41,6 +43,14 @@ export async function streamChat(
   const dispatchEvent = (data: string) => {
     if (!data) return;
     if (data === "[DONE]") { h.onDone(); return; }
+    if (data.startsWith("[META]")) {
+      try {
+        h.onMeta?.(JSON.parse(data.slice("[META]".length)) as GenerationMeta);
+      } catch (e) {
+        console.warn("Failed to parse [META] frame", e);
+      }
+      return;
+    }
     if (data.startsWith("[SOURCES]")) {
       try {
         h.onSources(JSON.parse(data.slice("[SOURCES]".length)) as Source[]);

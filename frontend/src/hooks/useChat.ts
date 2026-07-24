@@ -42,6 +42,7 @@ export function useChat() {
           {
             onToken: (t) => patch(aId, (m) => ({ ...m, text: m.text + t })),
             onSources: (s) => patch(aId, (m) => ({ ...m, sources: s })),
+            onMeta: (g) => patch(aId, (m) => ({ ...m, generation: g })),
             onDone: () => patch(aId, (m) => ({ ...m, status: "done" })),
           },
           history
