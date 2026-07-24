@@ -14,11 +14,11 @@ from types import SimpleNamespace
 
 import pytest
 
-# Import `api` first: its package __init__ puts agent/ on sys.path and its
-# submodules import the agent by the bare `agent` name (→ agent/agent.py as a
-# top-level module). Pulling GenerationProvenance from that same `agent` module
-# afterwards avoids binding sys.modules['agent'] to the agent/ *package*, which
-# would shadow `from agent import YouTubeQAAgent` inside api.service.
+# `agent` resolves to the agent/ *package* here: tests/conftest.py pins that
+# binding before any test module is imported, and the package's __init__
+# re-exports the public API, so both `from agent import ...` (api.service) and
+# `from agent.agent import ...` (the agent-node tests) work. See conftest.py
+# for why the pin is needed at all.
 from api import service
 from api.schemas import ChatResponse
 from agent import GenerationProvenance, _derive_provenance

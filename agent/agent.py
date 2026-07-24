@@ -391,6 +391,14 @@ class YouTubeQAAgent:
                 self._streamed_chunks = []
         except Exception as e:
             log.error(f"Streaming failed, falling back to blocking chat(): {e}")
+            # Known limitation: the [META] frame has already gone out (the SSE
+            # layer emits it before the first token), and this re-run may reach
+            # a different outcome — e.g. no_context where the frame said
+            # generated. SSE cannot retract a frame, so the emitted provenance
+            # can disagree with the answer the client ends up rendering. This
+            # is inherent to leading with metadata; the alternative (trailing
+            # the frame) costs consumers provenance-from-the-first-byte, which
+            # the Art. 50(2) substrate wants. Left as-is deliberately.
             resp = self.chat(question)
             yield resp.answer
             return
@@ -469,6 +477,9 @@ class GenerationProvenance:
         "no_context" — static "I don't have information…" fallback
         "metadata"   — catalog/listing text from the metadata tool
         "ingest"     — ingest status message
+        "static"     — defensive fallback for an unrecognised intent; always
+                       ``ai_generated=False``, so a new intent that forgets to
+                       register here under-claims rather than over-claims.
     """
 
     ai_generated: bool

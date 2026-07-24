@@ -20,11 +20,16 @@ export type MessageStatus = "streaming" | "done" | "error";
  * true only for LLM-generated prose; static fallbacks report false with a
  * null model. Visible presentation is owned by the disclosure work (#11) —
  * this type only carries the data onto the message.
+ *
+ * `mode` is kept as a widened `string`: the server may add discriminators
+ * (it already emits "static" as a defensive fallback), and an unknown value
+ * must not break parsing of a frame we otherwise understand.
  */
 export interface GenerationMeta {
   ai_generated: boolean;
   model: string | null;
-  mode: string; // "generated" | "no_context" | "metadata" | "ingest"
+  /** "generated" | "no_context" | "metadata" | "ingest" | "static" (fallback). */
+  mode: string;
 }
 
 export interface ChatMessage {

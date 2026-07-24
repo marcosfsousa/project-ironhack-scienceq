@@ -57,12 +57,19 @@ class GenerationMetadata(BaseModel):
     and reported `ai_generated=False` with `model=None`. `model` is read from
     the runtime generation config at response time, not hard-coded. `mode`
     discriminates the producing path: "generated" | "no_context" | "metadata"
-    | "ingest".
+    | "ingest", plus "static" — the conservative fallback used when provenance
+    is missing or the intent is unrecognised (see `service._provenance_dict`
+    and `agent._derive_provenance`). "static" always carries
+    `ai_generated=False`, so an unmapped path can never claim an AI origin.
+
+    Note: this model validates the blocking `POST /api/chat` response only. The
+    streaming `[META]` frame is serialised straight from `_provenance_dict`,
+    so keep the two in step by hand.
     """
 
     ai_generated: bool
     model: Optional[str] = None
-    mode: str
+    mode: Literal["generated", "no_context", "metadata", "ingest", "static"]
 
 
 class ChatResponse(BaseModel):
