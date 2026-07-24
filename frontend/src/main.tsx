@@ -8,6 +8,3 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </StrictMode>
 );
-
-const ciProbe: number = "not a number";
-void ciProbe;
