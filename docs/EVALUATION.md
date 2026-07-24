@@ -1,6 +1,6 @@
 # Evaluation
 
-Evaluated on 33 automated cases (20 English factual + 8 cross-lingual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually.
+Evaluated on 33 automated cases (20 English factual + 8 cross-lingual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Ten adversarial cases (out-of-scope, prompt-exposure, injection, hallucination-bait, and AI-identity) are excluded from automated scoring and reviewed manually.
 
 | Checkpoint | Cases | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|---|
