@@ -171,6 +171,9 @@ venv.bak/
 docs/technical_plan_youtube_qa_bot.md
 docs/youtube_transcript_api_challenges.md
 
+# Internal legal assessment notes (kept out of the public repo; see docs/COMPLIANCE.md)
+docs/ai-act-*.md
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -232,3 +235,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Playwright test artifacts (root)
+test-results/

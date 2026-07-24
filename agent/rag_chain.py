@@ -62,12 +62,22 @@ GROQ_API_KEY      = os.getenv("GROQ_API_KEY", "")
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
 LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "youtube-qa-bot")
 
-# LangSmith tracing is configured via .env (LANGSMITH_TRACING, LANGSMITH_API_KEY,
-# LANGSMITH_ENDPOINT). LangChain reads these automatically — no manual setup needed.
-if LANGSMITH_API_KEY:
+# Tracing is governed entirely by the environment (issue #17). Production sets
+# these flags to "false" so real user questions are never sent to LangSmith;
+# development and evaluation keep tracing on. LangChain's automatic tracer reads
+# LANGCHAIN_TRACING_V2 / LANGSMITH_TRACING itself; we mirror the same flags into
+# TRACING_ENABLED so the one manual trace-write below is gated by the same
+# switch. There is no code default that turns tracing on — the deployment
+# environment is the single place it is enabled or disabled.
+TRACING_ENABLED = (
+    os.getenv("LANGCHAIN_TRACING_V2", "").strip().lower() == "true"
+    or os.getenv("LANGSMITH_TRACING", "").strip().lower() == "true"
+)
+
+if TRACING_ENABLED and LANGSMITH_API_KEY:
     log.info(f"LangSmith tracing enabled → project: {LANGSMITH_PROJECT}")
 else:
-    log.warning("LANGSMITH_API_KEY not set — tracing disabled.")
+    log.info("LangSmith tracing disabled (env flags off or LANGSMITH_API_KEY not set).")
 
 # ── LLM config ─────────────────────────────────────────────────────────────────
 GROQ_MODEL       = "openai/gpt-oss-120b"
@@ -220,7 +230,7 @@ def rewrite_query(question: str, history: Optional[list] = None) -> str:
         response  = llm.invoke([SMsg(content=REWRITE_SYSTEM), HMsg(content=user_prompt)])
         rewritten = response.content.strip()
         if rewritten and rewritten != question:
-            log.info(f"Query rewritten: {question!r} → {rewritten!r}")
+            log.debug(f"Query rewritten: {question!r} → {rewritten!r}")  # text at DEBUG only (issue #17)
         return rewritten or question
     except Exception as e:
         log.warning(f"Query rewrite failed ({e}) — using original question.")
@@ -283,7 +293,7 @@ def answer(
 
     # ── Step 2b: Rewrite fallback — retry with original if rewrite hurt retrieval ─
     if not chunks and retrieval_query != question:
-        log.info(f"Rewritten query returned 0 chunks — retrying with original: {question!r}")
+        log.info("Rewritten query returned 0 chunks — retrying with original question")
         if multi_namespace:
             chunks = retrieve_multi_namespace(
                 question,
@@ -301,20 +311,23 @@ def answer(
     # ── Step 3: Guard — no relevant context found ──────────────────────────────
     if not chunks:
         log.info(f"No chunks above threshold ({score_threshold}) — returning no-context response.")
-        # Manually log to LangSmith so failed retrievals are visible in traces
-        try:
-            from langsmith import Client
-            ls_client = Client()
-            ls_client.create_run(
-                name="no_context_guard",
-                run_type="chain",
-                inputs={"question": question, "namespace": namespace,
-                        "score_threshold": score_threshold},
-                outputs={"answer": NO_CONTEXT_RESPONSE, "grounded": False},
-                tags=["no_context", "grounded:false"],
-            )
-        except Exception:
-            pass  # Never let tracing failure break the main flow
+        # Manually log to LangSmith so failed retrievals are visible in traces.
+        # Gated on TRACING_ENABLED so production (tracing off) never sends the
+        # question text here — the env switch above is the single control.
+        if TRACING_ENABLED:
+            try:
+                from langsmith import Client
+                ls_client = Client()
+                ls_client.create_run(
+                    name="no_context_guard",
+                    run_type="chain",
+                    inputs={"question": question, "namespace": namespace,
+                            "score_threshold": score_threshold},
+                    outputs={"answer": NO_CONTEXT_RESPONSE, "grounded": False},
+                    tags=["no_context", "grounded:false"],
+                )
+            except Exception:
+                pass  # Never let tracing failure break the main flow
         return RAGResponse(
             answer=NO_CONTEXT_RESPONSE,
             chunks=[],
@@ -386,7 +399,7 @@ def stream_answer(
 
     # Rewrite fallback — retry with original if rewrite hurt retrieval
     if not chunks and retrieval_query != question:
-        log.info(f"Rewritten query returned 0 chunks — retrying with original: {question!r}")
+        log.info("Rewritten query returned 0 chunks — retrying with original question")
         if multi_namespace:
             chunks = retrieve_multi_namespace(
                 question, top_k=top_k, score_threshold=score_threshold

@@ -44,10 +44,39 @@ class ChatRequest(BaseModel):
     history: list[Turn] = Field(default_factory=list)
 
 
+class GenerationMetadata(BaseModel):
+    """
+    Machine-readable generation provenance for one answer.
+
+    Additive substrate for EU AI Act Art. 50(2) output marking: every answer
+    states whether its text is AI-generated and, if so, by which model. Purely
+    additive — existing clients that ignore the field keep working unchanged.
+
+    `ai_generated` is True only for LLM-generated prose; the no-context
+    fallback, catalog listings, and ingest status messages are code-assembled
+    and reported `ai_generated=False` with `model=None`. `model` is read from
+    the runtime generation config at response time, not hard-coded. `mode`
+    discriminates the producing path: "generated" | "no_context" | "metadata"
+    | "ingest", plus "static" — the conservative fallback used when provenance
+    is missing or the intent is unrecognised (see `service._provenance_dict`
+    and `agent._derive_provenance`). "static" always carries
+    `ai_generated=False`, so an unmapped path can never claim an AI origin.
+
+    Note: this model validates the blocking `POST /api/chat` response only. The
+    streaming `[META]` frame is serialised straight from `_provenance_dict`,
+    so keep the two in step by hand.
+    """
+
+    ai_generated: bool
+    model: Optional[str] = None
+    mode: Literal["generated", "no_context", "metadata", "ingest", "static"]
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: list[Source] = Field(default_factory=list)
     intent: str  # "rag" | "metadata" | "ingest"
+    generation: GenerationMetadata
 
 
 class ChatStreamRequest(BaseModel):

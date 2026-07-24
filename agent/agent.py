@@ -63,7 +63,7 @@ for p in [str(_PIPELINE_DIR), str(_AGENT_DIR)]:
         sys.path.insert(0, p)
 
 # ── Local imports ──────────────────────────────────────────────────────────────
-from rag_chain import answer, stream_answer, RAGResponse  # noqa: E402
+from rag_chain import answer, stream_answer, RAGResponse, GROQ_MODEL  # noqa: E402
 from memory import ConversationMemory                      # noqa: E402
 from tools import get_tools                                # noqa: E402
 from live_ingest import ingest_url, IngestResult           # noqa: E402
@@ -198,7 +198,7 @@ def metadata_node(state: AgentState) -> AgentState:
             temperature=0.0,
         )
         resolved = resp.choices[0].message.content.strip().lower()
-        log.info(f"Metadata query resolved: '{question}' → '{resolved}'")
+        log.debug(f"Metadata query resolved: '{question}' → '{resolved}'")  # text at DEBUG only (issue #17)
         question = resolved
     except Exception as e:
         log.warning(f"Metadata resolution failed, using original query: {e}")
@@ -314,6 +314,7 @@ class YouTubeQAAgent:
         self._last_response: RAGResponse | None = None
         self._last_ingest:   IngestResult | None = None
         self._streamed_chunks: list = []
+        self._last_provenance: GenerationProvenance | None = None
 
     def chat(self, question: str) -> "_ChatResponse":
         """
@@ -336,6 +337,9 @@ class YouTubeQAAgent:
         self._last_ingest   = final_state.get("_last_ingest")
         answer_text         = final_state["answer"]
 
+        grounded = bool(getattr(self._last_response, "grounded", False))
+        self._last_provenance = _derive_provenance(final_state["intent"], grounded)
+
         # Update memory
         self.memory.save_turn(question, answer_text)
 
@@ -344,6 +348,7 @@ class YouTubeQAAgent:
             rag_response = self._last_response,
             ingest_result= self._last_ingest,
             intent       = final_state["intent"],
+            provenance   = self._last_provenance,
         )
 
     def stream_chat(self, question: str):
@@ -355,11 +360,13 @@ class YouTubeQAAgent:
         Yields: str tokens
         """
         self._streamed_chunks = []
+        self._last_provenance = None
         history = self.memory.to_history()
         intent  = _classify_intent_fast(question)
 
         if intent != "rag":
-            # Non-RAG intents: run blocking and yield full answer
+            # Non-RAG intents: run blocking and yield full answer.
+            # chat() sets self._last_provenance before returning.
             resp = self.chat(question)
             yield resp.answer
             return
@@ -372,6 +379,10 @@ class YouTubeQAAgent:
                 history=         history,
                 multi_namespace= True,
             )
+            # Provenance is known once retrieval has run (chunks in hand) and is
+            # set *before* the first token is yielded, so the SSE layer can emit
+            # the provenance frame ahead of the answer tokens.
+            self._last_provenance = _derive_provenance("rag", bool(chunks))
             for token in token_stream:
                 full_answer += token
                 yield token
@@ -380,6 +391,14 @@ class YouTubeQAAgent:
                 self._streamed_chunks = []
         except Exception as e:
             log.error(f"Streaming failed, falling back to blocking chat(): {e}")
+            # Known limitation: the [META] frame has already gone out (the SSE
+            # layer emits it before the first token), and this re-run may reach
+            # a different outcome — e.g. no_context where the frame said
+            # generated. SSE cannot retract a frame, so the emitted provenance
+            # can disagree with the answer the client ends up rendering. This
+            # is inherent to leading with metadata; the alternative (trailing
+            # the frame) costs consumers provenance-from-the-first-byte, which
+            # the Art. 50(2) substrate wants. Left as-is deliberately.
             resp = self.chat(question)
             yield resp.answer
             return
@@ -439,12 +458,50 @@ def _classify_intent_fast(question: str) -> str:
 
 from dataclasses import dataclass, field  # noqa: E402
 
+
+@dataclass
+class GenerationProvenance:
+    """
+    Machine-readable provenance for one answer (EU AI Act Art. 50(2) substrate).
+
+    ``ai_generated`` is True only when the answer text is LLM-generated prose.
+    The no-context fallback, the catalog/metadata listing, and ingest status
+    messages are assembled by the code path — not the model — so they are
+    flagged ``ai_generated=False`` with ``model=None``.
+
+    ``model`` is the runtime generation model id (source of truth: the RAG
+    chain's ``GROQ_MODEL``), never hard-coded here.
+
+    ``mode`` discriminates the producing path:
+        "generated"  — RAG answer synthesised by the LLM from retrieved chunks
+        "no_context" — static "I don't have information…" fallback
+        "metadata"   — catalog/listing text from the metadata tool
+        "ingest"     — ingest status message
+        "static"     — defensive fallback for an unrecognised intent; always
+                       ``ai_generated=False``, so a new intent that forgets to
+                       register here under-claims rather than over-claims.
+    """
+
+    ai_generated: bool
+    model:        str | None
+    mode:         str
+
+
+def _derive_provenance(intent: str, grounded: bool) -> GenerationProvenance:
+    """Map (intent, grounded) to the answer's generation provenance."""
+    if intent == "rag" and grounded:
+        return GenerationProvenance(ai_generated=True, model=GROQ_MODEL, mode="generated")
+    mode = {"rag": "no_context", "metadata": "metadata", "ingest": "ingest"}.get(intent, "static")
+    return GenerationProvenance(ai_generated=False, model=None, mode=mode)
+
+
 @dataclass
 class _ChatResponse:
     answer:        str
     intent:        str
     rag_response:  Any | None = None
     ingest_result: Any | None = None
+    provenance:    GenerationProvenance | None = None
 
     @property
     def sources(self) -> list[dict]:
