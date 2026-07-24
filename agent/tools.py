@@ -184,7 +184,10 @@ class RAGRetrieverTool(BaseTool):
         Run the RAG chain and return a formatted string result.
         The agent receives this string and incorporates it into its response.
         """
-        log.info(f"RAGRetrieverTool called | question: {question!r}")
+        log.info("RAGRetrieverTool called")
+        # Question text at DEBUG only — kept out of prod (INFO) logs so the
+        # privacy notice's "no server-side history" holds (issue #17).
+        log.debug(f"RAGRetrieverTool question: {question!r}")
 
         result: RAGResponse = answer(
             question,
@@ -270,7 +273,8 @@ class VideoMetadataTool(BaseTool):
             3. Loose fallback: any word (>3 chars) matched against topic field only
                (restricting to topic prevents cross-contamination from title keywords)
         """
-        log.info(f"VideoMetadataTool called | query: {query!r}")
+        log.info("VideoMetadataTool called")
+        log.debug(f"VideoMetadataTool query: {query!r}")  # text at DEBUG only (issue #17)
 
         corpus = _load_metadata()
         live = _load_live_metadata()

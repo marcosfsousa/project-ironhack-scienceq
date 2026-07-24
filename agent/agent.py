@@ -198,7 +198,7 @@ def metadata_node(state: AgentState) -> AgentState:
             temperature=0.0,
         )
         resolved = resp.choices[0].message.content.strip().lower()
-        log.info(f"Metadata query resolved: '{question}' → '{resolved}'")
+        log.debug(f"Metadata query resolved: '{question}' → '{resolved}'")  # text at DEBUG only (issue #17)
         question = resolved
     except Exception as e:
         log.warning(f"Metadata resolution failed, using original query: {e}")
