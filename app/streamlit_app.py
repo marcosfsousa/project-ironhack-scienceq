@@ -45,6 +45,16 @@ for p in [str(_AGENT_DIR), str(_PIPELINE_DIR)]:
 from agent import YouTubeQAAgent, _classify_intent_fast  # noqa: E402
 from tools import _KNOWN_TOPICS  # noqa: E402
 
+# ── Privacy notice (issue #17) ─────────────────────────────────────────────────
+# Mirrors the web app's notice. Concrete vendor names live here once; the copy
+# below references the processor roles. Kept in sync with
+# frontend/src/data/privacy.ts.
+_PRIVACY_PROCESSORS = [
+    ("Answer generation · Groq", "your question and the transcript excerpts retrieved for it"),
+    ("Embeddings & reranking · Cohere", "your question text"),
+    ("Vector search · Pinecone", "the numeric embedding of your question — not the text itself"),
+]
+
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="ScienceQ",
@@ -222,6 +232,32 @@ def _render_video_embed(sources: list[dict]) -> None:
             start_time=start,
         )
 
+# ── Privacy notice ─────────────────────────────────────────────────────────────
+
+def _render_privacy_notice() -> None:
+    """Compact, always-reachable privacy notice mirroring the web app (issue #17)."""
+    with st.expander("🔒 How your questions are handled", expanded=False):
+        st.markdown(
+            "When you ask a question, ScienceQ sends it to a few third-party "
+            "services to find and generate an answer. Here is what goes where."
+        )
+        for role, receives in _PRIVACY_PROCESSORS:
+            st.markdown(f"- **{role}** — receives {receives}.")
+        st.markdown(
+            "For follow-up questions, the recent conversation is sent along too, "
+            "so answers stay in context."
+        )
+        st.markdown(
+            "**What we don't collect:** no account or sign-in, and no server-side "
+            "history — your conversation lives only in this session and is gone when "
+            "you close it."
+        )
+        st.caption(
+            "ScienceQ is hosted in the EU (Google Cloud, europe-west1). Some "
+            "providers above may process your question outside the EU."
+        )
+
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 def _render_sidebar() -> None:
@@ -235,6 +271,8 @@ def _render_sidebar() -> None:
             st.session_state.messages          = []
             st.session_state.last_embed_source = None
             st.rerun()
+
+        _render_privacy_notice()
 
         # ── Corpus browser ─────────────────────────────────────────────────────
         videos = _load_corpus_metadata()

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import type { Accent, ChatMessage as Msg } from "@/types";
 import { ChatMessage } from "./ChatMessage";
 import { Hero } from "./Hero";
 import { Composer } from "./Composer";
+import { PrivacyNotice } from "./PrivacyNotice";
 
 const ACCENTS: Accent[] = ["Indigo", "Blue", "Amber", "Cyan"];
 const SWATCH: Record<Accent, string> = {
@@ -35,6 +36,8 @@ export function ChatView({
 }: ChatViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<Map<Accent, HTMLButtonElement>>(new Map());
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const openPrivacy = useCallback(() => setPrivacyOpen(true), []);
 
   // Auto-stick to the bottom while a conversation is active.
   useEffect(() => {
@@ -105,14 +108,20 @@ export function ChatView({
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className={`mx-auto max-w-[760px] pb-10 pt-[26px] ${isMobile ? "px-4" : "px-6"}`}>
           {messages.length === 0 ? (
-            <Hero suggestions={suggestions} onPick={onSend} />
+            <Hero suggestions={suggestions} onPick={onSend} onOpenPrivacy={openPrivacy} />
           ) : (
             messages.map((m) => <ChatMessage key={m.id} message={m} />)
           )}
         </div>
       </div>
 
-      <Composer onSend={onSend} onIngest={onIngest} isMobile={isMobile} />
+      <Composer
+        onSend={onSend}
+        onIngest={onIngest}
+        onOpenPrivacy={openPrivacy}
+        isMobile={isMobile}
+      />
+      <PrivacyNotice open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
     </main>
   );
 }
