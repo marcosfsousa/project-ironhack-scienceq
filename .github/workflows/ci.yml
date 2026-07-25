@@ -34,7 +34,7 @@ permissions:
 jobs:
   backend:
     name: Backend tests (pytest)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # The suite runs in seconds; the budget is almost entirely dependency
     # install. Anything past this is stuck, not slow.
     timeout-minutes: 15
@@ -67,7 +67,7 @@ jobs:
 
   frontend-build:
     name: Frontend build (tsc + vite)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 10
     defaults:
       run:
@@ -92,7 +92,7 @@ jobs:
 
   ui-tests:
     name: UI tests (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     # Bounded mainly to cap a Vite dev server that starts but never serves —
     # webServer would otherwise wait, and the job would hold a runner for the
     # 6-hour default.
