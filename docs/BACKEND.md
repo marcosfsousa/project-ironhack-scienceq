@@ -80,7 +80,7 @@ gcloud run jobs replace cloudrun-pipeline-job.yaml \
 
 Paste any YouTube URL and ScienceQ ingests it on the fly — transcript extracted, chunked, embedded, and indexed into Pinecone's `live` namespace alongside the corpus.
 
-Because YouTube blocks transcript requests from datacenter IPs, the ingestion pipeline routes through a residential proxy (`IPROYAL_PROXY_URL`). To avoid HTTP timeouts on what is a 60–90 second operation, the API uses an async fire-and-poll pattern:
+Transcript requests are made directly, using only access methods YouTube permits — the residential proxy that previously worked around datacenter IP restrictions was removed in issue #16. Verified from a proxy-free Cloud Run revision on 25 July 2026: a previously unseen video ingested end-to-end (20 chunks, `already_indexed: false`), so YouTube now serves transcript requests from GCP datacenter IPs and the proxy came out with no feature impact. To avoid HTTP timeouts on what is a 60–90 second operation, the API uses an async fire-and-poll pattern:
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -101,7 +101,7 @@ curl https://scienceq-api-886463515307.europe-west1.run.app/api/ingest/a1b2c3d4
 # → {"status":"complete","title":"...","channel":"...","topic":"...","chunk_count":12,...}
 ```
 
-Video metadata (title, channel) is fetched via the YouTube oEmbed API — no auth, no proxy, ~80ms. The residential proxy is used only for transcript extraction via `youtube-transcript-api`.
+Video metadata (title, channel) is fetched via the YouTube oEmbed API — no auth, ~80ms.
 
 ---
 

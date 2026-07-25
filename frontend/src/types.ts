@@ -7,7 +7,7 @@ export interface Source {
   link: string; // YouTube URL, usually already carrying &t=<seconds>
   score: number; // retrieval score 0..1
   rerank_score: number | null;
-  text: string; // the chunk text (used for hover preview / debugging)
+  text: string; // user-visible quotation — the API trims the chunk to sentence scale (#16)
 }
 
 export type Role = "user" | "assistant";

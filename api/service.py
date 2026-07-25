@@ -19,6 +19,7 @@ from typing import Generator
 
 from agent import YouTubeQAAgent  # resolved via sys.path setup in api/main.py
 
+from .excerpt import quotation_excerpt
 from .schemas import ChatResponse, GenerationMetadata, Turn
 
 log = logging.getLogger(__name__)
@@ -54,13 +55,25 @@ def _build_agent(history: list[Turn]) -> YouTubeQAAgent:
     return agent
 
 
+def _trim_source_excerpts(sources: list[dict]) -> list[dict]:
+    """
+    Shorten each source's `text` to a quotation while leaving every other
+    field alone. The source object's shape is unchanged — only the text field's
+    content gets shorter — so existing API clients keep working (issue #16).
+
+    Both response paths funnel through here — `run_chat` and the streaming
+    `[SOURCES]` frame — so the two cannot drift apart.
+    """
+    return [{**s, "text": quotation_excerpt(s.get("text"))} for s in sources]
+
+
 def run_chat(message: str, history: list[Turn]) -> ChatResponse:
     """Answer a single message (blocking) with conversation context."""
     agent = _build_agent(history)
     resp = agent.chat(message)
     return ChatResponse(
         answer=resp.answer,
-        sources=resp.sources,
+        sources=_trim_source_excerpts(resp.sources),
         intent=resp.intent,
         generation=GenerationMetadata(**_provenance_dict(resp.provenance)),
     )
@@ -161,6 +174,7 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
                 }
                 for c in chunks
             ]
+            sources = _trim_source_excerpts(sources)
             yield f"data: [SOURCES]{json.dumps(sources)}\n\n"
     except Exception as exc:
         log.exception("Unhandled error in stream_run_chat")

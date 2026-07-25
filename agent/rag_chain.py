@@ -157,7 +157,19 @@ class RAGResponse:
 
     @property
     def source_chunks_for_display(self) -> list[dict]:
-        """Per-chunk source info for detailed citation display in the UI."""
+        """
+        Per-chunk source info for detailed citation display in the UI.
+
+        `text` carries the chunk verbatim. Shortening it to a quotation is the
+        API response boundary's job (``api/excerpt.py``, applied in
+        ``api/service.py``) so the blocking and streaming paths trim identically
+        — a second, earlier truncation here would feed the two paths different
+        input and make them disagree. See issue #16.
+
+        Callers that bypass the API therefore receive the full chunk. The two
+        that do — the Streamlit UI and ``agent/tools.py`` — read only the
+        title/timestamp/link/score fields, never `text`.
+        """
         return [
             {
                 "title":        chunk.title,
@@ -165,7 +177,7 @@ class RAGResponse:
                 "link":         chunk.youtube_link,
                 "score":        chunk.score,
                 "rerank_score": chunk.rerank_score,   # None when reranker is off
-                "text":         chunk.text[:200] + ("..." if len(chunk.text) > 200 else ""),
+                "text":         chunk.text,
             }
             for chunk in self.chunks
         ]
