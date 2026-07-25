@@ -39,7 +39,7 @@ export function SourceRow({ source, index, isOpen, onToggle }: SourceRowProps) {
                 (issue #16). Truncate visually via CSS rather than slicing the
                 string again — a second client-side chop would sever words
                 mid-way and undo the server's sentence-aware cut. */}
-            {source.text ?? ""}
+            {source.text}
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-2.5">

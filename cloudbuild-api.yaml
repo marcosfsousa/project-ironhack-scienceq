@@ -56,14 +56,28 @@ steps:
       # leaves a live credential bound to the service. Re-asserted on every
       # deploy, so a console edit re-adding it survives only until the next one.
       #
+      # That last guarantee holds only while traffic follows LATEST. On
+      # 25 July 2026 traffic was pinned to a specific revision, so newly
+      # deployed revisions served 0% and this flag's effect never reached
+      # production. If traffic is pinned again, re-asserting here changes the
+      # revision but not what users hit.
+      #
+      # Idempotent: verified 25 July 2026 against a service whose binding was
+      # already removed — exits 0 and creates a clean revision rather than
+      # erroring on the absent key, so this flag is safe to leave in place
+      # permanently.
+      #
       # It must be --remove-secrets, NOT --remove-env-vars. The variable is
       # secret-backed, and --remove-env-vars only removes plain values: against
       # a secret-backed binding it exits 0 having changed nothing, which reads
       # as a guarantee while providing none. --remove-secrets takes the
       # environment variable's name, not the underlying secret's name.
       #
-      # Unbinding here does NOT revoke the credential. Two further manual steps:
-      # destroy the secret in Secret Manager, and cancel it with the provider.
+      # Unbinding here does NOT revoke the credential — it only detaches it
+      # from this service. The secret itself was destroyed in Secret Manager on
+      # 25 July 2026 (verified: `gcloud secrets list --project=scienceq-prod`
+      # returns COHERE / GROQ / LANGSMITH / PINECONE only). Cancelling the plan
+      # with IPRoyal is a billing step outside this project's control.
       #
       # Post-deploy verification (record the result when this ships):
       #   gcloud run services describe scienceq-api --region=europe-west1 \

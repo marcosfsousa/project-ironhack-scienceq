@@ -17,7 +17,7 @@ import json
 from types import SimpleNamespace
 
 from api import service
-from api.excerpt import MAX_EXCERPT_CHARS, quotation_excerpt
+from api.excerpt import MAX_EXCERPT_CHARS, MIN_EXCERPT_CHARS, quotation_excerpt
 
 
 # A realistic full transcript chunk: several sentences, well over quotation scale.
@@ -36,6 +36,19 @@ UNPUNCTUATED_CHUNK = (
     "you can see that each one splits into two identical copies and that process "
     "repeats over and over again until you end up with an entire organism made of "
     "trillions of cells all descended from that single original cell"
+)
+
+# A chunk opening on an abbreviation the terminator regex reads as a sentence
+# end, with the next real terminator falling outside the budget. Chunks are
+# 60-second windows, so at normal speech rates almost every one exceeds the
+# budget and reaches the sentence logic — an opening "E.", "Dr." or personal
+# initial is the common shape in this corpus, not an edge case.
+ABBREVIATION_OPENING_CHUNK = (
+    "E. coli is the workhorse of molecular biology because it grows fast, it is "
+    "cheap to culture, and its genome has been mapped in exhaustive detail by "
+    "generations of researchers working across dozens of laboratories on every "
+    "continent over the course of the last century. That makes it the default "
+    "chassis for almost any first experiment."
 )
 
 
@@ -106,7 +119,7 @@ class TestQuotationExcerpt:
         assert out.endswith("…")
         assert set(out[:-1]) == {"x"}
 
-    def test_abbreviation_does_not_collapse_the_excerpt(self):
+    def test_abbreviation_does_not_truncate_at_the_first_boundary(self):
         """
         A terminal-looking abbreviation ("Dr.", "U.S.") is a sentence end by
         the regex, but it must not reduce the quotation to a stub — the cut
@@ -115,11 +128,35 @@ class TestQuotationExcerpt:
         text = (
             "Dr. Jane Goodall spent decades studying chimpanzees in Gombe, and what "
             "she found overturned the assumption that tool use was uniquely human. "
-            "Her observations changed primatology permanently."
+            "Her observations changed primatology permanently, and they reshaped how "
+            "field researchers have approached every long-term primate study since."
         )
+        # Guard the guard: under the budget the function returns early and the
+        # sentence logic this test exists to cover is never reached.
+        assert len(text) > MAX_EXCERPT_CHARS
         out = quotation_excerpt(text)
-        assert len(out) > 50
         assert out.startswith("Dr. Jane Goodall spent decades")
+        assert out.endswith("uniquely human.")
+
+    def test_abbreviation_opening_falls_back_rather_than_collapsing(self):
+        """
+        Regression (#25 review): when the abbreviation is the *only* boundary
+        inside the budget, taking it shipped a two-character excerpt ("E.").
+        Such a cut is rejected and the word-boundary fallback runs instead.
+        """
+        assert len(ABBREVIATION_OPENING_CHUNK) > MAX_EXCERPT_CHARS
+        out = quotation_excerpt(ABBREVIATION_OPENING_CHUNK)
+        assert len(out) >= MIN_EXCERPT_CHARS
+        assert len(out) <= MAX_EXCERPT_CHARS
+        assert out.endswith("…")
+        assert out.startswith("E. coli is the workhorse")
+
+    def test_no_opening_abbreviation_yields_a_stub(self):
+        """The same trap across the abbreviations this corpus actually carries."""
+        for opening in ("E.", "J.", "Dr.", "Mr.", "St.", "No.", "vs."):
+            text = opening + " " + "some padding words to run past the budget " * 8
+            out = quotation_excerpt(text)
+            assert len(out) >= MIN_EXCERPT_CHARS, (opening, out)
 
     def test_never_returns_more_than_it_was_given(self):
         for text in (FULL_CHUNK, UNPUNCTUATED_CHUNK, "short.", ""):
