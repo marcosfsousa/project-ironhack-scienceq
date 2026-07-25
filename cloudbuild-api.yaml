@@ -50,22 +50,33 @@ steps:
       - --project=scienceq-prod
       - --update-env-vars=LANGCHAIN_TRACING_V2=false,LANGSMITH_TRACING=false
       # The residential proxy was removed in issue #16. IPROYAL_PROXY_URL was
-      # set on the service out-of-band (it was never in this file), and because
-      # --update-env-vars MERGES, it would otherwise survive every future
-      # deploy — deleting the code path alone leaves a live credential bound to
-      # the service. This unsets it on the service and re-asserts that on every
+      # bound to the service out-of-band (it was never in this file) as a
+      # Secret Manager reference, and because the env-var flags MERGE, it would
+      # otherwise survive every future deploy — deleting the code path alone
+      # leaves a live credential bound to the service. Re-asserted on every
       # deploy, so a console edit re-adding it survives only until the next one.
       #
-      # Removing it here does NOT revoke it: the credential must also be
-      # rotated/cancelled with the provider, which is a manual step.
+      # It must be --remove-secrets, NOT --remove-env-vars. The variable is
+      # secret-backed, and --remove-env-vars only removes plain values: against
+      # a secret-backed binding it exits 0 having changed nothing, which reads
+      # as a guarantee while providing none. --remove-secrets takes the
+      # environment variable's name, not the underlying secret's name.
+      #
+      # Unbinding here does NOT revoke the credential. Two further manual steps:
+      # destroy the secret in Secret Manager, and cancel it with the provider.
       #
       # Post-deploy verification (record the result when this ships):
       #   gcloud run services describe scienceq-api --region=europe-west1 \
       #     --project=scienceq-prod \
-      #     --format='value(spec.template.spec.containers[0].env[].name)'
-      #   → confirm IPROYAL_PROXY_URL is absent. Print names, not values: the
-      #     unfiltered env format renders plain env vars' actual secret values.
-      - --remove-env-vars=IPROYAL_PROXY_URL
+      #     --flatten="spec.template.spec.containers[].env[]" \
+      #     --format="table(spec.template.spec.containers.env.name,
+      #                     spec.template.spec.containers.env.valueFrom.secretKeyRef.name)"
+      #   → confirm IPROYAL_PROXY_URL appears in neither column. Use this form,
+      #     not 'value(...env[].name)': a secret-backed variable still shows up
+      #     under env[].name, so that shorter check cannot tell a live binding
+      #     from a removed one. Never print the unfiltered env format — it
+      #     renders plain env vars' actual secret values.
+      - --remove-secrets=IPROYAL_PROXY_URL
 
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
