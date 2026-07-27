@@ -2,10 +2,10 @@
 //
 // The notice describes what happens to a question when it is asked. Within the
 // SPA, vendor names live here once — components reference these constants
-// rather than repeating names inline. Note the Streamlit surface keeps its own
-// parallel copy in app/streamlit_app.py (`_PRIVACY_PROCESSORS`); cross-language
-// sharing isn't worth the machinery, so a provider change is a two-place edit
-// (here and there). Nothing enforces the two staying in sync.
+// rather than repeating names inline. The processor list was duplicated in the
+// Streamlit surface until that was sunset in issue #13; this is now its only
+// copy. Note the tech-credit strings in Sidebar.tsx and ChatView.tsx name
+// vendors separately and are not driven by these constants.
 
 export interface Processor {
   /** What this service does in the course of answering a question. */

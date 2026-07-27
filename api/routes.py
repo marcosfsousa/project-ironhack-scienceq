@@ -74,7 +74,7 @@ def chat(request: Request, body: ChatRequest) -> ChatResponse:
     except Exception as exc:  # noqa: BLE001 — translate any failure to HTTP
         err = str(exc).lower()
         if "429" in err or "rate_limit" in err or "too many requests" in err:
-            # Mirror the Streamlit UI's graceful rate-limit handling.
+            # Surface capacity limits as a retryable 503, not an opaque 500.
             raise HTTPException(
                 status_code=503,
                 detail="The service is currently at capacity. Please try again in a few minutes.",

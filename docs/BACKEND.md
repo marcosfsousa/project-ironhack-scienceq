@@ -25,7 +25,7 @@ curl -X POST https://scienceq-api-886463515307.europe-west1.run.app/api/chat \
   -d '{"message":"How does natural selection work?","history":[]}'
 ```
 
-The original Streamlit UI remains live at [scienceq.streamlit.app](https://scienceq.streamlit.app). The React SPA is the primary interface going forward.
+The React SPA is the only interface — the original Streamlit UI was sunset in issue #13.
 
 ---
 
@@ -117,30 +117,23 @@ docker build -t scienceq-api .
 docker run --env-file .env -p 8080:8080 scienceq-api
 ```
 
-```bash
-# Streamlit app (runs as appuser)
-docker build -f Dockerfile.streamlit -t scienceq-streamlit .
-docker run --env-file .env -p 8501:8501 scienceq-streamlit
-```
-
 See [`docs/FRONTEND.md`](FRONTEND.md) for the React SPA (`Dockerfile.web`) Docker instructions.
 
 To verify non-root users in built images:
 ```bash
-docker inspect scienceq-api --format '{{.Config.User}}'       # → appuser
-docker inspect scienceq-streamlit --format '{{.Config.User}}' # → appuser
-docker inspect scienceq-web --format '{{.Config.User}}'       # → nginx
+docker inspect scienceq-api --format '{{.Config.User}}'  # → appuser
+docker inspect scienceq-web --format '{{.Config.User}}'  # → nginx
 ```
 
 ---
 
 ## Running with Docker Compose
 
-Docker Compose separates the serving layer (Streamlit app) from the batch pipeline into two containers that share a `./data` volume.
+Docker Compose separates the serving layer (FastAPI) from the batch pipeline into two containers. Only the pipeline mounts `./data`; the API image bakes `data/metadata.json` at build time, so rebuild it (`docker compose build api`) after a pipeline run to serve a freshly-built corpus.
 
-**Start the app:**
+**Start the API:**
 ```bash
-docker compose up app
+docker compose up api
 ```
 
 **Run the full pipeline** (extract → clean → chunk → embed → bootstrap → enrich → index):
