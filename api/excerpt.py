@@ -14,11 +14,14 @@ boundary can apply it in one place: `api/service.py` calls it on both the
 blocking `POST /api/chat` response and the streaming `[SOURCES]` frame, so
 every API client inherits the same behaviour and the two paths cannot diverge.
 
-Scope note: the legacy Streamlit UI (`app/streamlit_app.py`) imports the agent
-directly rather than calling this API, so it does not pass through here. That
-costs nothing today — it renders only title, timestamp, and link, never the
-chunk text — but it does mean "the API trims" is not the same claim as
-"everything that can reach a chunk trims".
+Scope note: this used to be narrower than it looks, because the legacy Streamlit
+UI imported the agent directly and bypassed the API. That surface was sunset in
+issue #13, so the API is now the only *user-facing* path by which chunk text is
+distributed. What still bypasses this module is developer tooling that prints to
+a terminal, not to a product surface: the `agent.py` REPL (via `last_sources`,
+which carries `chunk_text`) and the `retriever.py` CLI. `agent/tools.py` holds
+chunks too but reads only title, timestamp, link, and score. Adding another
+user-facing surface that imports the agent directly would reopen the gap.
 
 The cut is sentence-aware rather than a character chop. Auto-generated YouTube
 captions frequently carry no sentence punctuation at all, so there is a

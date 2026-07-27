@@ -11,7 +11,7 @@ Wires together:
 
 Exposes two public functions:
   answer(question, namespace, top_k, ...)  → RAGResponse
-  stream_answer(question, ...)             → tuple[Iterator[str], list[RetrievedChunk]]  (for Streamlit)
+  stream_answer(question, ...)             → tuple[Iterator[str], list[RetrievedChunk]]  (for the SSE path)
 
 Usage (standalone smoke test):
   python rag_chain.py --question "How does a neural network learn?"
@@ -166,9 +166,10 @@ class RAGResponse:
         — a second, earlier truncation here would feed the two paths different
         input and make them disagree. See issue #16.
 
-        Callers that bypass the API therefore receive the full chunk. The two
-        that do — the Streamlit UI and ``agent/tools.py`` — read only the
-        title/timestamp/link/score fields, never `text`.
+        Callers that bypass the API therefore receive the full chunk.
+        ``agent/tools.py`` reads only the title/timestamp/link/score fields,
+        never `text`; the ``agent.py`` and ``retriever.py`` developer CLIs do
+        print `text`, but to a terminal rather than a product surface.
         """
         return [
             {
@@ -384,18 +385,19 @@ def stream_answer(
     multi_namespace: bool = False,
 ) -> tuple[Iterator[str], list[RetrievedChunk]]:
     """
-    Streaming version of answer() for Streamlit's st.write_stream().
+    Streaming version of answer(), consumed by the agent's stream_chat() and
+    forwarded as SSE by api/service.py.
 
     Returns a tuple of:
       - token_iterator: yields string tokens as they stream from the LLM
       - chunks:         the retrieved source chunks (available immediately,
                         before streaming completes)
 
-    Usage in Streamlit:
+    Usage:
         token_stream, chunks = stream_answer(question)
-        with st.chat_message("assistant"):
-            response_text = st.write_stream(token_stream)
-        render_sources(chunks)
+        for token in token_stream:
+            ...          # forward each token to the client
+        # chunks become the [SOURCES] frame once the stream ends
     """
     # Rewrite query, then retrieve (blocking) — chunks available before stream starts
     retrieval_query = rewrite_query(question, history)

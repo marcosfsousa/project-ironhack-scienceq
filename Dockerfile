@@ -1,5 +1,4 @@
 # ScienceQ FastAPI service — deployed to Cloud Run.
-# (The Streamlit image lives in Dockerfile.streamlit.)
 FROM python:3.11-slim
 
 WORKDIR /app

@@ -10,8 +10,8 @@ Tools defined here:
 Design decision:
   RAGRetrieverTool returns a formatted string so the LLM can reason over it.
   VideoMetadataTool returns "METADATA_LIST:<json>" when matches are found —
-  detected by streamlit_app.py and rendered directly, bypassing LLM reformatting.
-  Plain-text fallback is used for no-match responses.
+  intercepted by api/service.py and formatted directly, bypassing LLM
+  reformatting. Plain-text fallback is used for no-match responses.
 
 Usage:
   from tools import get_tools
@@ -263,9 +263,9 @@ class VideoMetadataTool(BaseTool):
         Search metadata.json and return a structured signal for direct rendering.
 
         Return format for matches:
-            "METADATA_LIST:<json>"   ← detected by streamlit_app.py, rendered directly
+            "METADATA_LIST:<json>"   ← intercepted by api/service.py, formatted directly
         Return format for no-match / catalog unavailable:
-            plain text fallback (displayed via st.markdown as-is)
+            plain text fallback (forwarded to the client as-is)
 
         Matching strategy:
             1. 'all' or bare browse intent → full catalog

@@ -88,8 +88,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Fill in your API keys in .env
 
-streamlit run app/streamlit_app.py
+uvicorn api.main:app --reload --port 8080
 ```
+
+That serves the API on `http://localhost:8080`. To run the React SPA against it, see
+[`docs/FRONTEND.md`](docs/FRONTEND.md).
 
 ### Required environment variables
 
@@ -117,7 +120,6 @@ SCORE_THRESHOLD=0.25
 ```
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
 ├── api/                # FastAPI service (Cloud Run) — main, routes, service, schemas, catalog
-├── app/                # Streamlit UI (original frontend)
 ├── data/               # metadata.json, per-video transcript/chunk/embedding files
 ├── docs/               # ARCHITECTURE.md, BACKEND.md, FRONTEND.md, EVALUATION.md, DATASET.md
 ├── eval/               # Eval set, sweep scripts, LangSmith runner, results
@@ -125,7 +127,6 @@ SCORE_THRESHOLD=0.25
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
 ├── tests/              # Unit tests
 ├── Dockerfile                   # FastAPI API image (Cloud Run serving, non-root appuser)
-├── Dockerfile.streamlit         # Streamlit app image (Streamlit Cloud, non-root appuser)
 ├── Dockerfile.pipeline          # Pipeline image (Cloud Run Job)
 ├── Dockerfile.web               # React SPA — nginx + Vite build (Cloud Run serving, non-root nginx)
 ├── cloudbuild-pipeline.yaml     # Cloud Build config for pipeline image
@@ -133,7 +134,7 @@ SCORE_THRESHOLD=0.25
 ├── cloudrun-pipeline-job.yaml   # Cloud Run Job definition
 ├── docker-compose.yml
 ├── .env.example
-├── requirements.txt             # Runtime deps (shared by API + Streamlit Cloud)
+├── requirements.txt             # Runtime deps (API + live ingest)
 └── requirements-dev.txt         # Full dev + pipeline + eval dependencies
 ```
 

@@ -11,24 +11,6 @@ services:
     ports:
       - "8080:8080"
 
-  # ── Streamlit app (legacy UI, kept until the SPA lands) ───────────────────────
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile.streamlit
-    env_file: .env
-    ports:
-      - "8501:8501"
-    volumes:
-      # mount data/ so the corpus browser reflects the latest metadata.json
-      - ./data:/app/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 60s
-      retries: 3
-
   # ── Batch pipeline ────────────────────────────────────────────────────────────
   # Uses 'pipeline' profile so it does NOT start with 'docker compose up'.
   # Run explicitly: docker compose run pipeline [--full | --steps <steps>]
@@ -38,7 +20,9 @@ services:
       dockerfile: Dockerfile.pipeline
     env_file: .env
     volumes:
-      # shared volume: pipeline writes to data/, app reads from data/
+      # the pipeline writes its outputs here. The api service does not mount
+      # data/ — it bakes data/metadata.json at build time (see Dockerfile), so
+      # rebuild the api image to serve a freshly-built corpus.
       - ./data:/app/data
     profiles:
       - pipeline

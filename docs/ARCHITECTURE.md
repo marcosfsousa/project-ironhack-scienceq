@@ -2,7 +2,7 @@
 
 ## Overview
 
-ScienceQ is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion. The primary interface is a React SPA served by a Cloud Run nginx container, backed by a FastAPI service on a separate Cloud Run instance. The original Streamlit frontend remains deployed in parallel.
+ScienceQ is a retrieval-augmented generation (RAG) system that answers questions grounded in YouTube video transcripts. It combines a curated offline corpus with on-the-fly live URL ingestion. The primary interface is a React SPA served by a Cloud Run nginx container, backed by a FastAPI service on a separate Cloud Run instance. It is the only frontend — the original Streamlit UI was sunset in issue #13.
 
 ---
 
@@ -81,16 +81,6 @@ The Cloud Run API service (`scienceq-api`) is the stateless seam between the Rea
 - **`POST /api/ingest` / `GET /api/ingest/:job_id`** — fire-and-poll pattern for live ingestion (see Phase 3)
 - **CORS** locked to the exact `scienceq-web` Cloud Run URL + `http://localhost:5173` for local dev
 
-### Streamlit App (`app/streamlit_app.py`) — legacy parallel deployment
-
-The original web interface, still live at `scienceq.streamlit.app`. Key behaviours:
-
-- **Intent detection** via `_classify_intent_fast()` to route to streaming (RAG) or blocking (metadata/ingest) path
-- **Streaming** renders tokens incrementally using a placeholder with a cursor character (`▌`)
-- **Source pills** render as clickable HTML links with deep-linked YouTube timestamps
-- **Video embed** persists in `st.session_state`, rendered in a 2-column layout (chat 60%, embed 40%) when a RAG source exists
-- **Sidebar** displays the corpus catalog grouped by topic in collapsible `st.expander` sections, each showing title, channel, and duration
-
 ### LangGraph Agent (`agent/agent.py`)
 
 A compiled LangGraph state machine with four nodes:
@@ -106,7 +96,7 @@ Intent routing is zero-cost keyword matching — no LLM call required. The agent
 Built with LangChain LCEL. Two execution paths:
 
 - **Blocking** (`answer()`) — used by the agent graph and eval runner
-- **Streaming** (`stream_answer()`) — yields tokens directly to the Streamlit UI
+- **Streaming** (`stream_answer()`) — yields tokens to the agent's `stream_chat()`, which `api/service.py` forwards as SSE
 
 Both paths share the same prompt template from `prompts.py`. The chain applies a `score_threshold=0.40` gate: queries scoring below this on all retrieved chunks receive a no-context fallback response rather than a hallucinated answer. Groq 429 rate limit errors are handled with exponential backoff (3 attempts, 2s → 4s → 8s).
 
@@ -211,7 +201,7 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **SSE multi-line encoding** — tokens from the agent occasionally span multiple lines (the metadata list is always multi-line). The SSE spec allows multiple `data:` lines within one event; consumers must join them with `\n` before dispatching. `service.py` encodes multi-line tokens as consecutive `data:` lines in one event (`"\n".join(f"data: {l}" for l in token.split("\n"))`). `lib/sse.ts` accumulates lines within an event and dispatches a single `onToken` call on the blank-line boundary, so `whitespace-pre-wrap` in the chat bubble renders newlines correctly.
 
-**METADATA_LIST signal pattern** — `VideoMetadataTool` returns a `METADATA_LIST:<json>` prefix rather than a formatted string, bypassing LLM reformatting which produced inconsistent output. In the Streamlit path the app renders this directly. In the React path `service.py::_format_metadata_list()` intercepts the signal before the SSE stream and converts it to grouped plain text — topic headers with counts, then bullet lines — filtered by any topic keyword in the user's question. The React client never sees the prefix.
+**METADATA_LIST signal pattern** — `VideoMetadataTool` returns a `METADATA_LIST:<json>` prefix rather than a formatted string, bypassing LLM reformatting which produced inconsistent output. `service.py::_format_metadata_list()` intercepts the signal before the SSE stream and converts it to grouped plain text — topic headers with counts, then bullet lines — filtered by any topic keyword in the user's question. The React client never sees the prefix.
 
 **Custom `ConversationMemory`** — avoids `langchain-community` dependency, which had unstable versioning during development.
 
@@ -252,7 +242,7 @@ Evaluated using a 38-case eval set (`eval/eval_set.json`): 20 English factual RA
 | prompt-v3 — grounding tightened | 33 | 4.48 | 4.79 | 3.94 | 3.88 | 4.27 |
 | **gpt-oss-120b — model swap** | **33** | **4.64** | 4.67 | **4.58** | **4.79** | **4.67** |
 
-Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 6 added 8 non-English videos (ES/DE/FR/PT); cross-lingual retrieval validated via `eval/validate_multilingual.py` — 4/4 validation queries PASS with all non-English target chunks scoring above the 0.40 threshold (range: 0.52–0.70). Frontend confirmed: English queries surface non-English source pills in the Streamlit UI alongside English results. prompt-v3 replaced the prohibition-framed grounding rule with a verification frame ("which excerpt supports this?") and an explicit inference ban — grounding +0.32 on multilingual cases, correctness +0.12 overall, no regressions on tone or conciseness. Two cases (ml_007 microplastics, ml_008 neurodivergence) remained at grounding=2 — a corpus data gap, not fixable by prompt alone. gpt-oss-120b swapped the LLM from `llama-3.3-70b-versatile` to `openai/gpt-oss-120b` (via Groq) with no prompt or retrieval changes — the largest single-checkpoint gain in the table: grounding +0.64, conciseness +0.91, correctness +0.16, overall mean +0.40 vs. prompt-v3. Tone dipped -0.12. The two previously stuck multilingual cases (ml_007, ml_008) recovered: grounding 2 → 5 and 2 → 4 respectively.
+Phase 3 and Phase 4 scores are not comparable to prompt-v1/v2 — different embedding space (Cohere 1024d vs MiniLM 384d) and different eval methodology. Phase 6 added 8 non-English videos (ES/DE/FR/PT); cross-lingual retrieval validated via `eval/validate_multilingual.py` — 4/4 validation queries PASS with all non-English target chunks scoring above the 0.40 threshold (range: 0.52–0.70). Frontend confirmed: English queries surface non-English source pills alongside English results (verified at the time in the since-retired Streamlit UI). prompt-v3 replaced the prohibition-framed grounding rule with a verification frame ("which excerpt supports this?") and an explicit inference ban — grounding +0.32 on multilingual cases, correctness +0.12 overall, no regressions on tone or conciseness. Two cases (ml_007 microplastics, ml_008 neurodivergence) remained at grounding=2 — a corpus data gap, not fixable by prompt alone. gpt-oss-120b swapped the LLM from `llama-3.3-70b-versatile` to `openai/gpt-oss-120b` (via Groq) with no prompt or retrieval changes — the largest single-checkpoint gain in the table: grounding +0.64, conciseness +0.91, correctness +0.16, overall mean +0.40 vs. prompt-v3. Tone dipped -0.12. The two previously stuck multilingual cases (ml_007, ml_008) recovered: grounding 2 → 5 and 2 → 4 respectively.
 
 Results are tracked in LangSmith under the `scienceq` project.
 
@@ -270,6 +260,5 @@ Results are tracked in LangSmith under the `scienceq` project.
 | Transcripts | `youtube-transcript-api` v1.2.4 |
 | Frontend | React 18 + Vite + TypeScript + Tailwind CSS |
 | Web server | nginx (reverse proxy + SPA fallback) |
-| Legacy UI | Streamlit 1.55 |
 | Deployment | Google Cloud Run — `scienceq-api` (FastAPI) + `scienceq-web` (nginx/React) |
 | Python | 3.11.9 |

@@ -15,7 +15,7 @@ Architecture:
 
 Key classes:
   YouTubeQAAgent  — owns graph + memory + tools per session.
-                    Use one instance per browser session (store in st.session_state).
+                    One instance per request; api/service.py replays history into it.
 
 CLI:
   python agent.py
@@ -28,7 +28,7 @@ Changes from Day 3:
   - Added 'ingest' intent classification and ingest node
   - multi_namespace=True by default (corpus + live queried together)
   - ingest_url() imported from pipeline/live_ingest.py
-  - Last ingest result stored on agent for Streamlit access
+  - Last ingest result stored on the graph state for the caller to inspect
 """
 
 from __future__ import annotations
@@ -204,8 +204,8 @@ def metadata_node(state: AgentState) -> AgentState:
         log.warning(f"Metadata resolution failed, using original query: {e}")
 
     raw_result = meta_tool.run(question)
-    # Pass through as-is — streamlit_app.py detects "METADATA_LIST:<json>"
-    # and renders directly; plain-text fallbacks are displayed via st.markdown.
+    # Pass through as-is — api/service.py detects "METADATA_LIST:<json>" and
+    # formats it; plain-text fallbacks are forwarded to the client unchanged.
     return {**state, "answer": raw_result, "rag_response": None}
 
 
@@ -256,7 +256,7 @@ def ingest_node(state: AgentState) -> AgentState:
         **state,
         "answer":       answer_text,
         "rag_response": None,
-        "_last_ingest": result,  # available on state for Streamlit to inspect
+        "_last_ingest": result,  # available on state for the caller to inspect
     }
 
 
@@ -299,7 +299,8 @@ def _build_graph() -> Any:
 
 class YouTubeQAAgent:
     """
-    One instance per user session. Store in st.session_state in Streamlit.
+    One instance per user session. `api/service.py` builds a fresh one per
+    request and replays the client-supplied history into its memory.
 
     Usage:
         agent = YouTubeQAAgent()
@@ -353,7 +354,7 @@ class YouTubeQAAgent:
 
     def stream_chat(self, question: str):
         """
-        Generator yielding answer tokens for Streamlit st.write_stream.
+        Generator yielding answer tokens for the SSE path in api/service.py.
         Only streams for RAG intent; other intents yield the full answer at once.
         Falls back to blocking chat() on any streaming error.
 
