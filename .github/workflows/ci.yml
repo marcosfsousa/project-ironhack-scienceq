@@ -58,10 +58,11 @@ jobs:
           pip install -r requirements.txt
           pip install pytest==9.0.2
 
-      # Discovery over tests/, not the curated list in tests/run_all_tests.py,
-      # so a new test file cannot be silently omitted. Run from the repo root:
-      # the suite's imports resolve the agent/ and pipeline/ packages relative
-      # to it, and one session keeps collection-order bugs catchable.
+      # Discovery over tests/, never an enumerated list, so a new test file
+      # cannot be silently omitted — tests/run_all_tests.py discovers the same
+      # way, so a local run and this one collect the same set. Run from the repo
+      # root, since tests/ is a relative path; one session for the whole
+      # directory also keeps collection-order bugs catchable.
       - name: Run pytest
         run: pytest tests/ -v --tb=short
 

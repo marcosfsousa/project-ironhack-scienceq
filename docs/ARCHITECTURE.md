@@ -216,7 +216,7 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 | Module | Covers |
 |---|---|
 | `tests/test_transcript_extractor.py` | URL parsing — watch/short/embed forms, timestamps, playlist params, malformed input |
-| `tests/test_cleaner.py` | Transcript cleaning edge cases |
+| `tests/test_cleaner.py` | Transcript cleaning edge cases and sponsor-segment detection |
 | `tests/test_chunker.py` | Chunk boundary conditions |
 | `tests/test_live_ingest.py` | Duplicate detection, the live-ingest `parse_video_id`, ingest results |
 | `tests/test_ingest_node.py` | The agent's ingest node, including error masking |
