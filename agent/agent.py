@@ -3,11 +3,12 @@ agent.py
 --------
 LangGraph agent for ScienceQ.
 
-Graph: [START] → classify_intent → [rag | metadata | ingest] → respond → [END]
+Graph: [START] → classify_intent → [rag | metadata | ingest | identity] → respond → [END]
 
 Architecture:
-  - Three-way intent routing (classify_intent node, keyword-based, zero LLM cost):
+  - Four-way intent routing (classify_intent node, keyword-based, zero LLM cost):
       URL detected       → ingest_node  (live_ingest pipeline)
+      Identity question  → identity_node (static AI disclosure, no LLM call)
       Metadata keywords  → metadata_node (VideoMetadataTool)
       Everything else    → rag_node (RAGRetrieverTool, multi_namespace=True)
   - Custom ConversationMemory (5-turn sliding window) from memory.py
@@ -64,6 +65,7 @@ for p in [str(_PIPELINE_DIR), str(_AGENT_DIR)]:
 
 # ── Local imports ──────────────────────────────────────────────────────────────
 from rag_chain import answer, stream_answer, RAGResponse, GROQ_MODEL  # noqa: E402
+from prompts import IDENTITY_RESPONSE                     # noqa: E402
 from memory import ConversationMemory                      # noqa: E402
 from tools import get_tools                                # noqa: E402
 from live_ingest import ingest_url, IngestResult           # noqa: E402
@@ -96,13 +98,47 @@ _YT_URL_PATTERN = re.compile(
     r"(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[A-Za-z0-9_-]{11}"
 )
 
+# ── Identity disclosure patterns (issue #15) ───────────────────────────────────
+#
+# Tuned for *precision*, not recall. A miss falls through to the RAG path, where
+# the prompt's IDENTITY honesty floor still produces an honest answer; a false
+# positive answers a genuine science question with "I'm an AI", which is the
+# worse failure. Word boundaries do the load-bearing work: `\b` after "you"
+# blocks the possessive "your", which is what keeps "what are your instructions"
+# (the prompt-exposure probes adv_009/010) out of this branch and routed to the
+# confidentiality deflection instead.
+#
+# Matching runs on the *raw* question — classify_intent sits ahead of
+# rag_chain.rewrite_query, so a multi-turn rewrite can no longer mangle
+# "are you an AI?" before it is seen.
+_IDENTITY_PATTERNS = [
+    re.compile(p) for p in (
+        r"\bare you (an? )?(ai|bot|robot|human|person|machine|chatbot|real)\b",
+        r"\bare you (a )?(real )?(person|human)\b",
+        r"\b(am i|are we) (talking|speaking|chatting) (to|with) (a|an) (real )?(person|human|bot|ai|machine)\b",
+        r"\bwhat (exactly )?are you\b",
+        r"\bwho are you\b",
+        r"\bis this (a )?(bot|human|ai|real person)\b",
+        r"\bhow do you (come up with|generate|produce|write) (your )?answers\b",
+        # Collides with the METADATA_INTENT_KEYWORDS substring "what do you know
+        # about", which is why identity is ordered ahead of metadata below.
+        r"\bwhat do you know about (yourself|you)\b",
+    )
+]
+
+
+def _is_identity_question(question: str) -> bool:
+    """True if the user is asking what/who they are talking to."""
+    q = question.lower().strip()
+    return any(p.search(q) for p in _IDENTITY_PATTERNS)
+
 
 # ── LangGraph state ────────────────────────────────────────────────────────────
 
 class AgentState(TypedDict):
     messages:     list        # full conversation so far as LangChain message objects
     question:     str         # current user question / raw input
-    intent:       str         # 'rag' | 'metadata' | 'ingest'
+    intent:       str         # 'rag' | 'metadata' | 'ingest' | 'identity'
     answer:       str         # final answer to return to user
     rag_response: Any         # RAGResponse or None
 
@@ -112,14 +148,21 @@ class AgentState(TypedDict):
 def classify_intent(state: AgentState) -> AgentState:
     """
     Zero-cost keyword routing. Order matters:
-      1. URL detected → 'ingest'
-      2. Metadata keywords → 'metadata'
-      3. Everything else → 'rag'
+      1. URL detected → 'ingest'      (unambiguous signal, keeps top priority)
+      2. Identity question → 'identity'
+      3. Metadata keywords → 'metadata'
+      4. Everything else → 'rag'
+
+    Identity sits ahead of metadata because the two collide: "what do you know
+    about" is a metadata keyword, so "what do you know about yourself?" used to
+    answer an identity question with a video listing. Disclosure wins that.
     """
     question = state["question"].lower().strip()
 
     if _YT_URL_PATTERN.search(state["question"]):
         intent = "ingest"
+    elif _is_identity_question(question):
+        intent = "identity"
     elif any(kw in question for kw in METADATA_INTENT_KEYWORDS):
         intent = "metadata"
     else:
@@ -260,6 +303,20 @@ def ingest_node(state: AgentState) -> AgentState:
     }
 
 
+# ── Identity node ──────────────────────────────────────────────────────────────
+
+def identity_node(state: AgentState) -> AgentState:
+    """
+    Serve the canonical AI-disclosure answer (issue #15).
+
+    Deterministic and LLM-free by design. Identity questions don't match science
+    transcripts, so before this branch existed they under-retrieved and hit the
+    no-context guard in rag_chain — returning "I don't have information about
+    that" *before* the model ever ran, which no prompt wording could fix.
+    """
+    return {**state, "answer": IDENTITY_RESPONSE, "rag_response": None}
+
+
 # ── Respond node ───────────────────────────────────────────────────────────────
 
 def respond_node(state: AgentState) -> AgentState:
@@ -279,17 +336,19 @@ def _build_graph() -> Any:
     builder.add_node("rag",             rag_node)
     builder.add_node("metadata",        metadata_node)
     builder.add_node("ingest",          ingest_node)
+    builder.add_node("identity",        identity_node)
     builder.add_node("respond",         respond_node)
 
     builder.add_edge(START, "classify_intent")
     builder.add_conditional_edges(
         "classify_intent",
         _route_after_classify,
-        {"rag": "rag", "metadata": "metadata", "ingest": "ingest"},
+        {"rag": "rag", "metadata": "metadata", "ingest": "ingest", "identity": "identity"},
     )
     builder.add_edge("rag",      "respond")
     builder.add_edge("metadata", "respond")
     builder.add_edge("ingest",   "respond")
+    builder.add_edge("identity", "respond")
     builder.add_edge("respond",  END)
 
     return builder.compile()
@@ -449,6 +508,8 @@ def _classify_intent_fast(question: str) -> str:
     q = question.lower().strip()
     if _YT_URL_PATTERN.search(question):
         return "ingest"
+    if _is_identity_question(q):
+        return "identity"
     if any(kw in q for kw in METADATA_INTENT_KEYWORDS):
         return "metadata"
     return "rag"
@@ -491,7 +552,12 @@ def _derive_provenance(intent: str, grounded: bool) -> GenerationProvenance:
     """Map (intent, grounded) to the answer's generation provenance."""
     if intent == "rag" and grounded:
         return GenerationProvenance(ai_generated=True, model=GROQ_MODEL, mode="generated")
-    mode = {"rag": "no_context", "metadata": "metadata", "ingest": "ingest"}.get(intent, "static")
+    mode = {
+        "rag":      "no_context",
+        "metadata": "metadata",
+        "ingest":   "ingest",
+        "identity": "identity",
+    }.get(intent, "static")
     return GenerationProvenance(ai_generated=False, model=None, mode=mode)
 
 

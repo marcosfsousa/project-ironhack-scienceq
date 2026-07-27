@@ -12,7 +12,7 @@ locally and not tracked in this repository.
 
 | Obligation | Status | Tracking |
 |---|---|---|
-| Art. 50(1)/(5) — inform users they are interacting with an AI system, before first interaction, accessibly | In progress | [#11](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/11) |
+| Art. 50(1)/(5) — inform users they are interacting with an AI system, before first interaction, accessibly | Shipped — landing-page disclosure + per-answer AI badge cover first interaction; the chat path now answers identity questions deterministically | [#15](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/15) |
 | Art. 50(2) — machine-readable marking of AI-generated output | Provenance substrate first, full marking to follow | [#18](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/18) |
 | Art. 50(3), 50(4) — emotion recognition / deepfakes / published public-interest text | Not triggered by the current product (see tripwires) | — |
 | High-risk classification (Art. 6 / Annex III) | Not applicable | — |
