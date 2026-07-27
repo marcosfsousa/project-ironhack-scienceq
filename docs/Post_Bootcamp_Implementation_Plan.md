@@ -1,5 +1,11 @@
 # ScienceQ — Post-Bootcamp Implementation Plan
 
+> **Superseded — historical record.** Kept for the decisions it documents, not as
+> instructions to follow. Anything here describing the Streamlit app as live or
+> deployable is out of date: that frontend was sunset in issue #13, and steps
+> referencing `app/streamlit_app.py`, `Dockerfile.streamlit` or port 8501 no
+> longer work.
+
 This plan covers the improvements to ScienceQ after the Ironhack bootcamp presentation. Each phase is designed to be a self-contained unit with its own commit(s), testable outcome, and clear dependency on previous phases.
 
 **Key architectural decision:** Embedding and reranking move from local models to Cohere's API (embed-v3/v4 + Rerank v3). This collapses three improvements — asymmetric embeddings, smaller Docker image, multilingual support — into one dependency change, and removes PyTorch (~2GB) from the runtime stack.

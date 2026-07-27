@@ -166,10 +166,11 @@ class RAGResponse:
         — a second, earlier truncation here would feed the two paths different
         input and make them disagree. See issue #16.
 
-        Callers that bypass the API therefore receive the full chunk.
-        ``agent/tools.py`` reads only the title/timestamp/link/score fields,
-        never `text`; the ``agent.py`` and ``retriever.py`` developer CLIs do
-        print `text`, but to a terminal rather than a product surface.
+        Callers that bypass the API therefore receive the full chunk. All of
+        them are developer tooling — ``agent/tools.py`` and the CLIs in
+        ``agent.py``, ``retriever.py`` and this module. Only ``retriever.py``'s
+        CLI prints `text`, and only to a terminal; the rest render just the
+        title/timestamp/link/score fields.
         """
         return [
             {

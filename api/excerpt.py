@@ -17,11 +17,12 @@ every API client inherits the same behaviour and the two paths cannot diverge.
 Scope note: this used to be narrower than it looks, because the legacy Streamlit
 UI imported the agent directly and bypassed the API. That surface was sunset in
 issue #13, so the API is now the only *user-facing* path by which chunk text is
-distributed. What still bypasses this module is developer tooling that prints to
-a terminal, not to a product surface: the `agent.py` REPL (via `last_sources`,
-which carries `chunk_text`) and the `retriever.py` CLI. `agent/tools.py` holds
-chunks too but reads only title, timestamp, link, and score. Adding another
-user-facing surface that imports the agent directly would reopen the gap.
+distributed. What still bypasses this module is developer tooling: `agent/tools.py`
+and the CLIs in `agent/agent.py`, `agent/rag_chain.py` and `agent/retriever.py`.
+Of those, only `retriever.py`'s CLI actually prints chunk text, and only to a
+terminal; the rest receive the full chunk in the `text` field but render just
+title, timestamp, link and score. Adding another user-facing surface that
+imports the agent directly would reopen the gap.
 
 The cut is sentence-aware rather than a character chop. Auto-generated YouTube
 captions frequently carry no sentence punctuation at all, so there is a
