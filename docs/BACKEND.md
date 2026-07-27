@@ -179,7 +179,10 @@ The chunks will be indexed in the namespace set under `PINECONE_NAMESPACE_CORPUS
 ## Running tests
 
 ```bash
-python tests/run_all_tests.py
+pytest tests/                    # what CI runs
+python tests/run_all_tests.py    # same run, with -v --tb=short preset
 ```
 
-76 unit tests, no live API calls required, full run in ~4s.
+Both discover every `tests/test_*.py`, so the two agree by construction. No live
+API calls required; the full run takes a few seconds. See the testing table in
+[`ARCHITECTURE.md`](ARCHITECTURE.md#testing) for what each file covers.
