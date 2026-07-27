@@ -122,7 +122,9 @@ _IDENTITY_PATTERNS = [
         r"\bhow do you (come up with|generate|produce|write) (your )?answers\b",
         # Collides with the METADATA_INTENT_KEYWORDS substring "what do you know
         # about", which is why identity is ordered ahead of metadata below.
-        r"\bwhat do you know about (yourself|you)\b",
+        # Deliberately "yourself" only — a bare "you" arm would swallow catalog
+        # questions like "what do you know about you guys".
+        r"\bwhat do you know about yourself\b",
     )
 ]
 
@@ -145,7 +147,7 @@ class AgentState(TypedDict):
 
 # ── Intent classification ──────────────────────────────────────────────────────
 
-def classify_intent(state: AgentState) -> AgentState:
+def _classify(question: str) -> str:
     """
     Zero-cost keyword routing. Order matters:
       1. URL detected → 'ingest'      (unambiguous signal, keeps top priority)
@@ -156,18 +158,25 @@ def classify_intent(state: AgentState) -> AgentState:
     Identity sits ahead of metadata because the two collide: "what do you know
     about" is a metadata keyword, so "what do you know about yourself?" used to
     answer an identity question with a video listing. Disclosure wins that.
+
+    Single source of truth for both entry points — the graph node below and
+    _classify_intent_fast, which stream_chat routes on. The two disagreeing
+    would split the streaming and blocking paths.
     """
-    question = state["question"].lower().strip()
+    q = question.lower().strip()
 
-    if _YT_URL_PATTERN.search(state["question"]):
-        intent = "ingest"
-    elif _is_identity_question(question):
-        intent = "identity"
-    elif any(kw in question for kw in METADATA_INTENT_KEYWORDS):
-        intent = "metadata"
-    else:
-        intent = "rag"
+    if _YT_URL_PATTERN.search(question):
+        return "ingest"
+    if _is_identity_question(q):
+        return "identity"
+    if any(kw in q for kw in METADATA_INTENT_KEYWORDS):
+        return "metadata"
+    return "rag"
 
+
+def classify_intent(state: AgentState) -> AgentState:
+    """Graph node wrapper around _classify()."""
+    intent = _classify(state["question"])
     log.info(f"Intent classified: {intent}")
     return {**state, "intent": intent}
 
@@ -504,15 +513,8 @@ class YouTubeQAAgent:
 # ── Helper: fast intent check without full graph invocation ───────────────────
 
 def _classify_intent_fast(question: str) -> str:
-    """Mirrors classify_intent node logic without touching the graph."""
-    q = question.lower().strip()
-    if _YT_URL_PATTERN.search(question):
-        return "ingest"
-    if _is_identity_question(q):
-        return "identity"
-    if any(kw in q for kw in METADATA_INTENT_KEYWORDS):
-        return "metadata"
-    return "rag"
+    """Classify without touching the graph — same rules as the node."""
+    return _classify(question)
 
 
 # ── Response dataclass ─────────────────────────────────────────────────────────

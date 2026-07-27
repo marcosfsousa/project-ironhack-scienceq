@@ -189,4 +189,4 @@ The chunks will be indexed in the namespace set under `PINECONE_NAMESPACE_CORPUS
 python tests/run_all_tests.py
 ```
 
-76 unit tests, no live API calls required, full run in ~4s.
+150 unit tests, no live API calls required, full run in well under a second.

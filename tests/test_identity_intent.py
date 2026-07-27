@@ -59,6 +59,7 @@ NON_IDENTITY_QUESTIONS = [
     "who are the people in this AI video?",
     "what are your favourite videos",
     "what do you know about black holes",
+    "what do you know about you guys",
     "how do neural networks produce predictions",
 ]
 

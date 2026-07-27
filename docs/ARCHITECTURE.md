@@ -232,10 +232,10 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 | `tests/test_ingest_node.py` | 12 |
 | `tests/test_generation_provenance.py` | 9 |
 | `tests/test_source_excerpts.py` | 21 |
-| `tests/test_identity_intent.py` | 42 |
-| **Total** | **148** |
+| `tests/test_identity_intent.py` | 44 |
+| **Total** | **150** |
 
-All 148 tests pass. Run via `python tests/run_all_tests.py` locally, or `pytest tests/` from the repo root — the latter is what CI runs, and it discovers test files rather than reading the curated list in `run_all_tests.py`. Tests cover duplicate detection logic, URL timestamp parsing, cleaning edge cases, chunking boundary conditions, error masking behaviour, generation provenance, source excerpts, and identity-intent routing.
+All 150 tests pass. Run via `python tests/run_all_tests.py` locally, or `pytest tests/` from the repo root — the latter is what CI runs, and it discovers test files rather than reading the curated list in `run_all_tests.py`. Tests cover duplicate detection logic, URL timestamp parsing, cleaning edge cases, chunking boundary conditions, error masking behaviour, generation provenance, source excerpts, and identity-intent routing.
 
 CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend build (tsc + vite)`, and `UI tests (Playwright)`.
 
