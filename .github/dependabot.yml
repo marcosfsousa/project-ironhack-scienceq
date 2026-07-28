@@ -208,3 +208,43 @@ updates:
     # @playwright/test is intentionally in no group. ci.yml caches browser
     # binaries keyed on its exact version, so a Playwright bump is also a cache
     # miss and a browser reinstall — worth seeing on its own.
+
+    # Two majors parked behind a written decision — not, as with pinecone and
+    # groq above, two that cannot resolve at all. Both of these would install;
+    # neither is work a merge button finishes. Each has an issue that traced the
+    # actual surface, and the ignore is what those issues asked for so the PR
+    # stops reopening against a decision already recorded:
+    #
+    #   tailwindcss 3.4.19 → 4.3.3   #76 — a config migration, not a bump. v4
+    #     reads neither tailwind.config.ts nor the @tailwind directives in
+    #     src/index.css, so the proposed diff produces a build that does not
+    #     compile. #58 is currently red for exactly this.
+    #   typescript  5.9.3  → 7.0.2   #77 — a reimplemented compiler, so a green
+    #     `tsc -b` carries less than usual: tsconfig.node.json is typechecked by
+    #     nothing, and no CI job exercises the language service. #62 is green
+    #     and still not merged, which is the point.
+    #
+    # Scoped to majors, like the pip block. Both packages are also in the
+    # frontend-tooling group above at `update-types: [minor, patch]`, so patches
+    # and minors keep arriving grouped and only the major is withheld — v3 and
+    # 5.9.x both stay maintained.
+    #
+    # Same cost as the pip block, restated rather than cross-referenced: an
+    # ignore also suppresses *security* PRs for the versions it covers. A CVE
+    # fixed within tailwind 3.x or typescript 5.x still arrives normally; one
+    # whose only fix ships in 4.x or 7.x arrives as nothing at all. Unlike
+    # pinecone and groq, where the withheld bump was unmergeable anyway, these
+    # two are mergeable — so here the ignore does defer something real. Alerts
+    # still fire and neither has an advisory today; that is what makes the trade
+    # acceptable, and it is what to re-check if one appears.
+    #
+    # Delete the matching entry when #76 or #77 closes. These should be
+    # shorter-lived than the pip entries: #77 scopes its verification at about
+    # an afternoon, and its one blocker — vite 6.4.3, landed in #73 — is done.
+    ignore:
+      - dependency-name: tailwindcss
+        update-types:
+          - version-update:semver-major
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
