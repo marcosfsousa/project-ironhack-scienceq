@@ -18,6 +18,7 @@ import logging
 from typing import Generator
 
 from agent import YouTubeQAAgent  # resolved via sys.path setup in api/main.py
+from rag_chain import chunks_for_display  # same bridge; see api/__init__.py
 
 from .excerpt import quotation_excerpt
 from .schemas import ChatResponse, GenerationMetadata, Turn
@@ -164,18 +165,7 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
             yield f"{sse_data}\n\n"
         chunks = agent._streamed_chunks
         if chunks:
-            sources = [
-                {
-                    "title":        c.title,
-                    "timestamp":    c.timestamp_label,
-                    "link":         c.youtube_link,
-                    "score":        c.score,
-                    "rerank_score": c.rerank_score,
-                    "text":         c.text,
-                }
-                for c in chunks
-            ]
-            sources = _trim_source_excerpts(sources)
+            sources = _trim_source_excerpts(chunks_for_display(chunks))
             yield f"data: [SOURCES]{json.dumps(sources)}\n\n"
     except Exception as exc:
         log.exception("Unhandled error in stream_run_chat")

@@ -64,7 +64,7 @@ for p in [str(_PIPELINE_DIR), str(_AGENT_DIR)]:
         sys.path.insert(0, p)
 
 # ── Local imports ──────────────────────────────────────────────────────────────
-from rag_chain import answer, stream_answer, RAGResponse, GROQ_MODEL  # noqa: E402
+from rag_chain import answer, stream_answer, chunks_for_display, RAGResponse, GROQ_MODEL  # noqa: E402
 from prompts import IDENTITY_RESPONSE                     # noqa: E402
 from memory import ConversationMemory                      # noqa: E402
 from tools import get_tools                                # noqa: E402
@@ -498,7 +498,11 @@ class YouTubeQAAgent:
     def last_sources(self) -> list[dict]:
         """
         Return source chunks from the last RAG answer.
-        Each dict has: title, video_id, start, end, chunk_text.
+
+        Each dict has: title, timestamp, link, score, rerank_score, text —
+        ``rag_chain.chunks_for_display`` defines that shape and both paths below
+        go through it, so a caller never has to ask which one ran. It used to
+        return a second, streaming-only shape; see issue #30.
 
         Checks streaming path (_streamed_chunks) first, then blocking
         path (_last_response). Returns empty list if last intent was
@@ -506,18 +510,7 @@ class YouTubeQAAgent:
         """
 
         if self._streamed_chunks:
-            # format chunks the same way RAGResponse does
-            return [
-                {
-                    "title":      c.title,
-                    "video_id":   c.video_id,
-                    "channel":    c.channel,
-                    "start":      c.start,
-                    "end":        c.end,
-                    "chunk_text": c.text,
-                }
-                for c in self._streamed_chunks
-            ]
+            return chunks_for_display(self._streamed_chunks)
         if self._last_response is None:
             return []
         return self._last_response.source_chunks_for_display
@@ -621,8 +614,10 @@ def _cli() -> None:
             else:
                 print("Bot: Sources from last answer:")
                 for s in sources:
-                    ts = f"{int(s.get('start', 0))}s–{int(s.get('end', 0))}s"
-                    print(f"  [{s.get('title', '?')}]  {ts}  — {s.get('chunk_text', '')[:80]}...")
+                    print(
+                        f"  [{s.get('title', '?')}]  {s.get('timestamp', '?')}"
+                        f"  — {s.get('text', '')[:80]}..."
+                    )
             print()
             continue
 

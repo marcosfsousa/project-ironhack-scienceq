@@ -223,6 +223,7 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 | `tests/test_generation_provenance.py` | Generation-provenance metadata on both response paths (issue #18) |
 | `tests/test_source_excerpts.py` | Quotation-scale source excerpts on both response paths (issue #16) |
 | `tests/test_identity_intent.py` | Identity-question matching, router ordering against metadata, the identity node and its provenance (issue #15) |
+| `tests/test_last_sources.py` | One source-display shape from `agent.last_sources` on both paths, and the REPL `sources` output (issue #30) |
 
 Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for the same run with `-v --tb=short` preset. Both discover test files rather than reading a list, so a new file is picked up without being registered anywhere — and a local run and a CI run cannot disagree. Per-file test counts are deliberately not recorded here: nothing enforces them, and they drifted unnoticed once already ([#28](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/28)).
 
