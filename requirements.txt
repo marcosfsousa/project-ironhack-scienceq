@@ -1,7 +1,7 @@
 # Direct dependencies, pinned to the known-good build verified in Docker on
 # 2026-06-08 (linux/py3.11 — the Cloud Run runtime). Bump versions deliberately.
 # The four at the bottom were added later and carry their own date; see there.
-langchain==1.3.4
+langchain==1.3.9
 langchain-groq==1.1.2
 langchain-pinecone==0.2.13
 langgraph==1.2.4
