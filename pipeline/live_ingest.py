@@ -396,7 +396,7 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
     """
     Full ingestion pipeline for a single YouTube URL.
 
-    This is the function called by agent.py and streamlit_app.py.
+    This is the function called by agent.py.
     Never raises — all errors are captured in IngestResult.error.
 
     Args:

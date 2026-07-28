@@ -17,6 +17,12 @@ locally and not tracked in this repository.
 | Art. 50(3), 50(4) — emotion recognition / deepfakes / published public-interest text | Not triggered by the current product (see tripwires) | — |
 | High-risk classification (Art. 6 / Annex III) | Not applicable | — |
 
+The React SPA is the only user-facing surface. The legacy Streamlit frontend, which
+carried the Art. 50(1) disclosure only on its landing screen and lost it once a
+conversation started, was retired in
+[#13](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/13) rather than
+patched. Any new surface has to carry the disclosure in its own right.
+
 ## Key dates
 
 - **2 August 2026** — Article 50 applies. The Art. 50(1) disclosure duty has **no

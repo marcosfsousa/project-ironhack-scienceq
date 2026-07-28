@@ -84,8 +84,9 @@ def _format_metadata_list(raw: str, question: str = "") -> str:
     Convert the METADATA_LIST:<json> signal from VideoMetadataTool into
     human-readable plain text for the React frontend.
 
-    The signal is a Streamlit-specific internal format. The SSE path must
-    normalise it before forwarding so the React client never sees the prefix.
+    The signal is an agent-internal format, never part of the wire protocol.
+    The SSE path must normalise it before forwarding so the client never sees
+    the prefix.
 
     If the question mentions a topic that matches a known topic in the corpus,
     the list is filtered to that topic only.
@@ -137,8 +138,8 @@ def stream_run_chat(question: str, history: list[Turn]) -> Generator[str, None, 
     bubble exits the streaming state with a user-readable message.
 
     METADATA_LIST:<json> tokens (emitted by the metadata intent) are converted
-    to plain text before forwarding — the React frontend has no handler for
-    that Streamlit-specific signal prefix.
+    to plain text before forwarding — the signal is agent-internal and the
+    frontend has no handler for that prefix.
     """
     try:
         agent = _build_agent(history)
