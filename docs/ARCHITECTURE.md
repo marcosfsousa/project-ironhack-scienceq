@@ -33,13 +33,13 @@ nginx reverse proxy  (Dockerfile.web / scienceq-web Cloud Run)
                                                           │
                                                     LangGraph Agent  (agent/agent.py)
                                                           │
-                                          ┌───────────────┼───────────────┐
-                                          ▼               ▼               ▼
-                                    RAG intent    Metadata intent   Ingest intent
-                                          │               │
-                                          ▼               ▼
-                                 RAGRetrieverTool  VideoMetadataTool
-                                 (rag_chain.py)    (metadata.json + Pinecone live)
+                                  ┌───────────────┼───────────────┬───────────────┐
+                                  ▼               ▼               ▼               ▼
+                            RAG intent    Metadata intent   Ingest intent  Identity intent
+                                  │               │                               │
+                                  ▼               ▼                               ▼
+                         RAGRetrieverTool  VideoMetadataTool              IDENTITY_RESPONSE
+                         (rag_chain.py)    (metadata.json + Pinecone live) (static, no LLM)
                                           │
                                           ▼
                                  Pinecone similarity search
@@ -83,13 +83,13 @@ The Cloud Run API service (`scienceq-api`) is the stateless seam between the Rea
 
 ### LangGraph Agent (`agent/agent.py`)
 
-A compiled LangGraph state machine with four nodes:
+A compiled LangGraph state machine with five nodes:
 
 ```
-START → classify_intent → [rag | metadata | ingest] → respond → END
+START → classify_intent → [rag | metadata | ingest | identity] → respond → END
 ```
 
-Intent routing is zero-cost keyword matching — no LLM call required. The agent maintains a 5-turn sliding window conversation memory via a custom `ConversationMemory` class (no LangChain community dependency).
+Intent routing is zero-cost keyword matching — no LLM call required. Order is URL → identity → metadata → rag: a pasted URL is unambiguous and keeps top priority, and identity precedes metadata because the two collide (`"what do you know about"` is a metadata keyword, so "what do you know about yourself?" would otherwise be answered with a video listing). The `identity` intent serves a static AI disclosure without calling the LLM — see [COMPLIANCE.md](COMPLIANCE.md) for the Art. 50(1) obligation it discharges. The agent maintains a 5-turn sliding window conversation memory via a custom `ConversationMemory` class (no LangChain community dependency).
 
 ### RAG Chain (`agent/rag_chain.py`)
 
@@ -222,6 +222,7 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 | `tests/test_ingest_node.py` | The agent's ingest node, including error masking |
 | `tests/test_generation_provenance.py` | Generation-provenance metadata on both response paths (issue #18) |
 | `tests/test_source_excerpts.py` | Quotation-scale source excerpts on both response paths (issue #16) |
+| `tests/test_identity_intent.py` | Identity-question matching, router ordering against metadata, the identity node and its provenance (issue #15) |
 
 Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for the same run with `-v --tb=short` preset. Both discover test files rather than reading a list, so a new file is picked up without being registered anywhere — and a local run and a CI run cannot disagree. Per-file test counts are deliberately not recorded here: nothing enforces them, and they drifted unnoticed once already ([#28](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/28)).
 

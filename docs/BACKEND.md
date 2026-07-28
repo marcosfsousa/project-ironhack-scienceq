@@ -184,5 +184,5 @@ python tests/run_all_tests.py    # same run, with -v --tb=short preset
 ```
 
 Both discover every `tests/test_*.py`, so the two agree by construction. No live
-API calls required; the full run takes a few seconds. See the testing table in
-[`ARCHITECTURE.md`](ARCHITECTURE.md#testing) for what each file covers.
+API calls required; the full run takes well under a second. See the testing table
+in [`ARCHITECTURE.md`](ARCHITECTURE.md#testing) for what each file covers.
