@@ -7,7 +7,7 @@ langchain-groq==1.1.2
 langchain-pinecone==0.2.13
 langgraph==1.2.4
 langsmith==0.8.18
-pinecone==7.3.0
+pinecone==9.1.0
 cohere==7.0.3
 youtube-transcript-api==1.2.4
 python-dotenv==1.2.2
