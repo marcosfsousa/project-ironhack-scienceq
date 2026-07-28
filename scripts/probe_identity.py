@@ -56,22 +56,35 @@ CASES = [
 
 
 def main() -> int:
-    for case_id, question in CASES:
-        # Fresh agent per question: conversation memory must not let an earlier
-        # identity answer influence the next classification.
-        agent = YouTubeQAAgent()
-        resp = agent.chat(question)
-        prov = resp.provenance
+    # Per-case isolation: this is a one-shot manual gate, and the RAG-dependent
+    # cases are ordered last, so an unrelated failure (a stale key, a provider
+    # blip) used to take out the entire miss tail that the probe exists to
+    # observe. Report what ran, flag what didn't, exit non-zero if anything did.
+    failures = 0
 
+    for case_id, question in CASES:
         print("=" * 78)
         print(f"{case_id}  {question}")
-        print(f"  intent : {resp.intent}")
-        print(f"  mode   : {getattr(prov, 'mode', None)}   "
-              f"ai_generated={getattr(prov, 'ai_generated', None)}   "
-              f"model={getattr(prov, 'model', None)}")
-        print(f"  answer : {resp.answer}")
+        try:
+            # Fresh agent per question: conversation memory must not let an
+            # earlier identity answer influence the next classification.
+            agent = YouTubeQAAgent()
+            resp = agent.chat(question)
+            prov = resp.provenance
+
+            print(f"  intent : {resp.intent}")
+            print(f"  mode   : {getattr(prov, 'mode', None)}   "
+                  f"ai_generated={getattr(prov, 'ai_generated', None)}   "
+                  f"model={getattr(prov, 'model', None)}")
+            print(f"  answer : {resp.answer}")
+        except Exception as exc:  # noqa: BLE001 — a probe reports, it does not raise
+            failures += 1
+            print(f"  ERROR  : {type(exc).__name__}: {exc}")
+
     print("=" * 78)
-    return 0
+    if failures:
+        print(f"{failures}/{len(CASES)} case(s) errored — the run is INCOMPLETE.")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

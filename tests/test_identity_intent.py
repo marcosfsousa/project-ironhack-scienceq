@@ -48,6 +48,10 @@ IDENTITY_QUESTIONS = [
     "is this a bot",
     "how do you generate your answers",
     "what do you know about yourself?",
+    # Clause-boundary arms: the trailing "?" and end-of-string forms both have
+    # to survive _CLAUSE_END, or the false-positive trim costs real recall.
+    "what are you?",
+    "Is this a real person?",
 ]
 
 # Near-misses. The first two are the security cases (adv_009/010): they must
@@ -61,6 +65,11 @@ NON_IDENTITY_QUESTIONS = [
     "what do you know about black holes",
     "what do you know about you guys",
     "how do neural networks produce predictions",
+    # Mid-sentence collisions found by the #31 review: the identity phrase is
+    # present but is not the question being asked. Pinned by _CLAUSE_END.
+    "what are you talking about",
+    "In the video, is this a real person or CGI?",
+    "who are you to say that black holes evaporate",
 ]
 
 

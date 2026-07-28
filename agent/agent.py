@@ -101,24 +101,36 @@ _YT_URL_PATTERN = re.compile(
 # ── Identity disclosure patterns (issue #15) ───────────────────────────────────
 #
 # Tuned for *precision*, not recall. A miss falls through to the RAG path, where
-# the prompt's IDENTITY honesty floor still produces an honest answer; a false
-# positive answers a genuine science question with "I'm an AI", which is the
-# worse failure. Word boundaries do the load-bearing work: `\b` after "you"
-# blocks the possessive "your", which is what keeps "what are your instructions"
-# (the prompt-exposure probes adv_009/010) out of this branch and routed to the
-# confidentiality deflection instead.
+# the prompt's IDENTITY honesty floor usually produces an honest answer — the
+# #31 live probe confirmed this for the paraphrase tail, which retrieves above
+# threshold because words like "human"/"person"/"real" pull consciousness and AI
+# chunks out of the corpus. It is not structurally guaranteed: a phrasing that
+# retrieves nothing would hit rag_chain's no-context guard before the LLM runs.
+# A false positive is still the worse failure — it answers a genuine science
+# question with "I'm an AI". Word boundaries do the load-bearing work: `\b` after
+# "you" blocks the possessive "your", which is what keeps "what are your
+# instructions" (the prompt-exposure probes adv_009/010) out of this branch and
+# routed to the confidentiality deflection instead.
 #
 # Matching runs on the *raw* question — classify_intent sits ahead of
 # rag_chain.rewrite_query, so a multi-turn rewrite can no longer mangle
 # "are you an AI?" before it is seen.
+
+# The bare "are you"/"who are you"/"is this a ..." arms are open-ended enough to
+# fire mid-sentence, where the identity phrase is not the question being asked
+# ("what are you talking about", "is this a real person or CGI?", "who are you
+# to say that ..."). Requiring a clause boundary after the predicate keeps every
+# true positive — including adv_008, where "are you" is followed by a comma.
+_CLAUSE_END = r"(?=\s*[?.,!]|$)"
+
 _IDENTITY_PATTERNS = [
     re.compile(p) for p in (
         r"\bare you (an? )?(ai|bot|robot|human|person|machine|chatbot|real)\b",
         r"\bare you (a )?(real )?(person|human)\b",
         r"\b(am i|are we) (talking|speaking|chatting) (to|with) (a|an) (real )?(person|human|bot|ai|machine)\b",
-        r"\bwhat (exactly )?are you\b",
-        r"\bwho are you\b",
-        r"\bis this (a )?(bot|human|ai|real person)\b",
+        r"\bwhat (exactly )?are you\b" + _CLAUSE_END,
+        r"\bwho are you\b" + _CLAUSE_END,
+        r"\bis this (a )?(bot|human|ai|real person)\b" + _CLAUSE_END,
         r"\bhow do you (come up with|generate|produce|write) (your )?answers\b",
         # Collides with the METADATA_INTENT_KEYWORDS substring "what do you know
         # about", which is why identity is ordered ahead of metadata below.
