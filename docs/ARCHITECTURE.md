@@ -33,13 +33,13 @@ nginx reverse proxy  (Dockerfile.web / scienceq-web Cloud Run)
                                                           │
                                                     LangGraph Agent  (agent/agent.py)
                                                           │
-                                          ┌───────────────┼───────────────┐
-                                          ▼               ▼               ▼
-                                    RAG intent    Metadata intent   Ingest intent
-                                          │               │
-                                          ▼               ▼
-                                 RAGRetrieverTool  VideoMetadataTool
-                                 (rag_chain.py)    (metadata.json + Pinecone live)
+                                  ┌───────────────┼───────────────┬───────────────┐
+                                  ▼               ▼               ▼               ▼
+                            RAG intent    Metadata intent   Ingest intent  Identity intent
+                                  │               │                               │
+                                  ▼               ▼                               ▼
+                         RAGRetrieverTool  VideoMetadataTool              IDENTITY_RESPONSE
+                         (rag_chain.py)    (metadata.json + Pinecone live) (static, no LLM)
                                           │
                                           ▼
                                  Pinecone similarity search
@@ -83,13 +83,13 @@ The Cloud Run API service (`scienceq-api`) is the stateless seam between the Rea
 
 ### LangGraph Agent (`agent/agent.py`)
 
-A compiled LangGraph state machine with four nodes:
+A compiled LangGraph state machine with five nodes:
 
 ```
-START → classify_intent → [rag | metadata | ingest] → respond → END
+START → classify_intent → [rag | metadata | ingest | identity] → respond → END
 ```
 
-Intent routing is zero-cost keyword matching — no LLM call required. The agent maintains a 5-turn sliding window conversation memory via a custom `ConversationMemory` class (no LangChain community dependency).
+Intent routing is zero-cost keyword matching — no LLM call required. Order is URL → identity → metadata → rag: a pasted URL is unambiguous and keeps top priority, and identity precedes metadata because the two collide (`"what do you know about"` is a metadata keyword, so "what do you know about yourself?" would otherwise be answered with a video listing). The `identity` intent serves a static AI disclosure without calling the LLM — see [COMPLIANCE.md](COMPLIANCE.md) for the Art. 50(1) obligation it discharges. The agent maintains a 5-turn sliding window conversation memory via a custom `ConversationMemory` class (no LangChain community dependency).
 
 ### RAG Chain (`agent/rag_chain.py`)
 
@@ -220,9 +220,12 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 | `tests/test_chunker.py` | 16 |
 | `tests/test_live_ingest.py` | 14 |
 | `tests/test_ingest_node.py` | 12 |
-| **Total** | **76** |
+| `tests/test_generation_provenance.py` | 9 |
+| `tests/test_source_excerpts.py` | 21 |
+| `tests/test_identity_intent.py` | 54 |
+| **Total** | **160** |
 
-All 76 tests pass. Run via `python tests/run_all_tests.py` locally, or `pytest tests/` from the repo root — the latter is what CI runs, and it discovers test files rather than reading the curated list in `run_all_tests.py`. Tests cover duplicate detection logic, URL timestamp parsing, cleaning edge cases, chunking boundary conditions, and error masking behaviour.
+All 160 tests pass. Run via `python tests/run_all_tests.py` locally, or `pytest tests/` from the repo root — the latter is what CI runs, and it discovers test files rather than reading the curated list in `run_all_tests.py`. Tests cover duplicate detection logic, URL timestamp parsing, cleaning edge cases, chunking boundary conditions, error masking behaviour, generation provenance, source excerpts, and identity-intent routing.
 
 CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend build (tsc + vite)`, and `UI tests (Playwright)`.
 

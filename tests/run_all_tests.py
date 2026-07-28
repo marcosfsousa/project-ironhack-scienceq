@@ -18,6 +18,8 @@ TEST_MODULES = [
     "tests/test_live_ingest.py",
     "tests/test_ingest_node.py",
     "tests/test_generation_provenance.py",
+    "tests/test_source_excerpts.py",
+    "tests/test_identity_intent.py",
 ]
 
 if __name__ == "__main__":
