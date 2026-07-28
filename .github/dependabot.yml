@@ -118,6 +118,15 @@ updates:
       # openai each arrived as their own PR — eight of the ten slots, none of
       # them individually interesting.
       #
+      # Those eight are what the first sweep happened to move, not the whole
+      # tail. Derived from both requirements files against the two groups
+      # above, this catch-all actually collects eleven: the eight named, plus
+      # typing-extensions, youtube-transcript-api and python-dotenv. The limit
+      # comment above lists a third variant again. None of the three is wrong
+      # for what it describes — sweep, membership, and crowding are different
+      # questions — so reconcile them by re-deriving from the manifests rather
+      # than by editing one list to match another.
+      #
       # Must stay last among the pip groups. A dependency joins the first group
       # whose patterns match, in the order groups are written here, so a `*`
       # pattern above fastapi-stack or langchain would swallow both and undo
@@ -220,6 +229,22 @@ updates:
     schedule:
       interval: weekly
       day: monday
+
+    # Matched to pip's, and recorded here because the reasoning above it was
+    # only ever written down for pip while this entry sat on the default 5.
+    # The failure mode is the same one and it is silent: a group PR that has
+    # no slot left does not open, and nothing reports that it did not.
+    #
+    # Not tuned lower to reflect the smaller surface, deliberately. This is a
+    # ceiling, not a budget — it costs nothing until it binds, and the only
+    # thing a lower number buys is a higher chance of the silent failure. The
+    # actual volume control is the grouping below, not this line.
+    #
+    # Scope, now that it has been checked rather than assumed: *security* PRs
+    # neither count toward this limit nor are capped by it. So this governs the
+    # Monday sweep only, and an advisory wave — the seven of #44–#50 — arrives
+    # whatever this says.
+    open-pull-requests-limit: 10
     commit-message:
       prefix: chore
       include: scope
@@ -251,9 +276,10 @@ updates:
           - patch
       # The same long-tail catch as the pip block, and last for the same
       # ordering reason — but read this one as forward-looking rather than as
-      # a fix. It is a no-op today: all eleven entries in frontend/package.json
-      # already sit in the react or frontend-tooling group except
-      # @playwright/test, which is excluded below on purpose. It exists so that
+      # a fix. It is a no-op today: frontend/package.json declares twelve
+      # entries (2 dependencies + 10 devDependencies), of which eleven are
+      # already grouped — four in react, seven in frontend-tooling — and the
+      # twelfth is @playwright/test, excluded below on purpose. It exists so
       # the *next* dependency added to this frontend does not arrive ungrouped
       # by default, which is how the pip long tail accumulated.
       frontend-minor-patch:
