@@ -1,6 +1,6 @@
 # Direct dependencies, pinned to the known-good build verified in Docker on
 # 2026-06-08 (linux/py3.11 — the Cloud Run runtime). Bump versions deliberately.
-# The two blocks at the bottom were added later and carry their own dates and
+# The three blocks at the bottom were added later and carry their own dates and
 # rationale; see there.
 langchain==1.3.4
 langchain-groq==1.1.2
@@ -55,8 +55,9 @@ slowapi==0.1.9
 # httpx, tenacity, numpy, ...) and there are no hashes, so builds are more
 # reproducible than before, not reproducible. The one transitive held despite
 # nothing importing it is limits, pinned at the bottom of this file under a
-# criterion #41 settled; the block there states why it is the exception and
-# why anyio, sitting in the same position under starlette, is not. Successor releases are watched
+# two-clause criterion #41 settled; the block there states what makes it the
+# exception and works through h11 under uvicorn, which meets the first clause
+# and is still not pinned. Successor releases are watched
 # now: .github/dependabot.yml (#40) opens a weekly PR when a newer release of
 # a pin below exists, grouping fastapi+starlette and the langchain train so a
 # coupled bump arrives as one reviewable diff. The floating transitive tree is
@@ -120,22 +121,37 @@ requests==2.34.2
 # exception without a written boundary is just that mistake with better
 # manners.
 #
-# The rule: pin an unimported transitive when the pinned parent is a thin
-# wrapper over it and the child is where the behaviour lives. slowapi is that
-# wrapper. It supplies the decorator, the key function and the 429 handler
-# (api/limiter.py, api/main.py:29-31); limits supplies the window algorithm and
-# the storage that every @limiter.limit(...) in api/routes.py:63,90,115 is
-# evaluated by. Read out of the running image, the limiter behind those three
-# decorators is limits' FixedWindowRateLimiter over limits' MemoryStorage —
-# api/limiter.py passes neither, and slowapi resolves both out of limits by
-# name: STRATEGIES["fixed-window"] and storage_from_string.
+# The rule, in two clauses that have to be taken in order: pin an unimported
+# transitive when (1) the pinned parent declares it with no upper bound, and
+# (2) the parent is a thin wrapper over it — the child being where the
+# behaviour lives. slowapi meets both. It declares `limits>=2.3` with no
+# ceiling, and it supplies the decorator, the key function and the 429 handler
+# (api/limiter.py, api/main.py:29-31) while limits supplies the window
+# algorithm and the storage that every @limiter.limit(...) in
+# api/routes.py:63,90,115 is evaluated by. Read out of the running image, the
+# limiter behind those three decorators is limits' FixedWindowRateLimiter over
+# limits' MemoryStorage — api/limiter.py passes neither, and slowapi resolves
+# both out of limits by name: STRATEGIES["fixed-window"] and
+# storage_from_string.
 #
-# The rule stops there, and anyio is the case that shows where. anyio is also
-# unimported, also reached through a pinned parent, also unbounded — but
-# starlette runs on anyio, it does not re-export it, and no starlette behaviour
-# this service depends on is anyio's behaviour under another name. slowapi's
-# public surface is limits' behaviour under another name. That is the line. If
-# it ever has to move, move it here in writing rather than package by package.
+# Clause (1) is what most candidates fail, and failing it ends the question
+# before judgment enters: starlette declares `anyio<5,>=3.6.2` and pydantic
+# declares `pydantic-core==2.46.4`, so neither child can cross a major on a
+# rebuild. A parent that later lifted its own cap would surface as a bump to
+# that parent, in a diff. Only an unbounded declaration puts the child beyond
+# review, which is the exposure this pin answers.
+#
+# Clause (2) is the judgment, and h11 under uvicorn is the case that shows
+# where it stops. h11 clears clause (1) — `h11>=0.8`, no ceiling — is imported
+# by nothing here, and is where HTTP/1.1 protocol behaviour actually lives, so
+# it reaches the same question limits does. It is still not pinned, because
+# uvicorn is not a thin wrapper over it: uvicorn is a server with config,
+# lifespan, worker and signal handling, and h11 is one pluggable protocol
+# implementation inside it. slowapi has no such surface of its own — strip
+# limits out and nothing is left but the decorator. That is the line: is the
+# parent's public behaviour the child's behaviour renamed, or does the parent
+# merely run on the child. If it ever has to move, move it here in writing
+# rather than package by package.
 #
 # The unbounded floor is not hypothetical: `limits>=2.3` has already been
 # walked to 5.8.0, three majors, which is the starlette case above further down
