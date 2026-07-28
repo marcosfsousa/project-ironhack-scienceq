@@ -30,7 +30,7 @@ openai==2.26.0
 
 # ── Tests only ───────────────────────────────────────────────────────────────
 # CI pins this same version explicitly (.github/workflows/ci.yml).
-pytest==9.0.2
+pytest==9.0.3
 
 # Note: .dockerignore excludes eval/ and tests/, so the pipeline image installs
 # openai and pytest for code it never copies in. Pre-existing — the freeze this
