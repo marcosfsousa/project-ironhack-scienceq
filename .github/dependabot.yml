@@ -105,6 +105,43 @@ updates:
           - langgraph
           - langsmith
 
+    # Two majors that cannot be taken at all, not two we would rather defer.
+    # The langchain integration packages cap them, and in both cases the
+    # capping version is the newest one published — there is no combination of
+    # releases that resolves, so the PR is unmergeable the moment it opens:
+    #
+    #   langchain-pinecone 0.2.13  →  pinecone[asyncio]>=6.0.0,<8.0.0
+    #   langchain-groq     1.1.3   →  groq>=0.30.0,<1.0.0
+    #
+    # Both were opened on the first sweep (#63 pinecone 9.1.0, #65 groq 1.6.0)
+    # and both failed CI at the pip resolve step with ResolutionImpossible.
+    # Without this block they reopen every Monday and burn two of the ten PR
+    # slots the limit above exists to protect.
+    #
+    # Scoped to majors on purpose, not a blanket dependency-name ignore.
+    # Dependabot reads 0.37.1 → 1.6.0 as a major and 0.37.1 → 0.38.0 as a
+    # minor, so groq keeps flowing inside the 0.x range langchain-groq allows,
+    # and pinecone keeps flowing inside 7.x. Only the jump over the cap stops.
+    #
+    # The cost, so it is not discovered during an incident: an ignore also
+    # suppresses *security* PRs for the versions it covers. A CVE fixed within
+    # 7.x or 0.x still arrives normally; one whose only fix ships in pinecone 8+
+    # or groq 1.x arrives as nothing at all. That is not a new exposure — such a
+    # bump is already unmergeable here — but it would be silent rather than a
+    # red PR. Alerts are unaffected and still fire; only the automatic PR is
+    # withheld.
+    #
+    # Delete the matching entry as soon as langchain-pinecone or langchain-groq
+    # raises its ceiling. Nothing here re-checks that: this is a snapshot of an
+    # upstream constraint on 2026-07-28, and it stays in force until edited.
+    ignore:
+      - dependency-name: pinecone
+        update-types:
+          - version-update:semver-major
+      - dependency-name: groq
+        update-types:
+          - version-update:semver-major
+
   # ── GitHub Actions used by ci.yml ─────────────────────────────────────────
   # These are pinned to floating majors (actions/checkout@v4), so only a major
   # release produces a PR — a handful a year. One grouped PR, since they are
