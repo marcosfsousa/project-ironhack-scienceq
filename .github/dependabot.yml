@@ -7,13 +7,16 @@
 # Before this file, nothing did: every version in the deploy manifest stayed
 # frozen until a human edited the line.
 #
-# IMPORTANT — this file is only half the coverage. It configures *version*
-# updates: a scheduled sweep that opens a PR when a newer release exists,
-# whatever the reason for it. *Security* updates — the immediate PR triggered
-# by a Dependabot alert on a known CVE — are a repository setting, not a config
-# file, and must be enabled under Settings → Code security → Dependabot
-# security updates. Without that toggle a CVE published on a Tuesday waits for
-# the Monday sweep below. Turning it on is the other half of closing #40.
+# This file is only half the coverage, and the half it is not lives outside
+# the repo. It configures *version* updates: the scheduled sweep below, which
+# opens a PR when a newer release exists, whatever the reason for it.
+# *Security* updates — the immediate PR triggered by a Dependabot alert on a
+# published CVE — are a repository setting under Settings → Code security, not
+# a config file, so nothing here can assert or restore them. Both alerts and
+# security updates were switched on for this repo on 2026-07-28, alongside this
+# commit; before that they were off, which meant a CVE published on a Tuesday
+# waited for the Monday sweep. If that toggle is ever flipped back, this file
+# silently degrades to exactly that six-day worst case rather than failing.
 #
 # Base images are deliberately not watched. Dockerfile and Dockerfile.pipeline
 # ride python:3.11-slim and Dockerfile.web rides node:20-alpine; both majors
