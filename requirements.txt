@@ -22,6 +22,58 @@
 # test-checked, not image-checked. langsmith is the one to watch on the next
 # deploy: 0.8.18 → 0.10.10 is a 0.x minor, which carries no compatibility
 # promise, and agent/rag_chain.py:354 imports it inside shipped code.
+#
+# google-cloud-storage moved separately on 2026-07-28 (#64), 2.18.2 → 3.13.0,
+# and alone rather than in the batch above — Dependabot opens majors ungrouped
+# on purpose (.github/dependabot.yml), because a major is not a
+# review-by-reading change. This one is the exception that proves the rule, and
+# the reason is the size of the call site rather than the size of the version
+# jump: the whole of this repo's GCS usage is three lines at api/catalog.py:50
+# — `storage.Client()`, `.bucket(...).blob(...)`, `.download_as_text()` — read
+# once per GET /api/catalog to pull gs://scienceq-data/metadata.json. Nothing
+# else under api/, agent/ or pipeline/ imports google.cloud, uploads, or names
+# a bucket.
+#
+# The four breaking changes 3.0 declares, and why each misses that surface:
+#   - google.resumable_media.common.{InvalidResponse,DataCorruption} moved to
+#     google.cloud.storage.exceptions. Nothing here imports resumable_media, so
+#     there is no import to update; and get_catalog wraps the read in a bare
+#     `except Exception` that degrades to the live-only list, so either class is
+#     caught. That fallback is what makes this change inert rather than merely
+#     unreferenced.
+#   - Blob.upload_from_file now requires bytes mode and raises TypeError
+#     otherwise. Download-only path.
+#   - Retries are now on by default for object upload, metadata update and
+#     delete, reversing the old off-unless-generation-specified rule. All three
+#     are mutations; this path performs none.
+#   - Upload/download checksums default to "auto" (crc32c, falling back to md5
+#     when the fast C extension is absent) where 2.x used md5 for most
+#     downloads and None for most uploads. This is the only one that touches
+#     the read, and it adds validation rather than removing it. It also pulls
+#     google-crc32c into both images as a transitive.
+# The 3.0 Python floor is >=3.7 and both images are 3.11, so that one is
+# recorded, not a constraint. 3.0 also absorbed google-resumable-media, which
+# it still declares for backwards compatibility and may drop later; since
+# nothing here imports it, that removal lands inert too.
+#
+# Verification, and its limits — the same shape as the paragraph above but
+# weaker in one place and newly stronger in another. Weaker: CI installs this
+# file for real on linux/py3.11, so the resolve is checked, but it builds no
+# image (#39, #52), so 3.13.0 is resolver-checked and not image-checked.
+# Stronger: until this bump the catalog GCS path had no test at all — the
+# import at api/catalog.py:48 is lazy and no test reached it, so a green suite
+# on a google-cloud-storage bump was measuring nothing. tests/test_catalog.py
+# now asserts, against the installed package, the four attributes those three
+# lines resolve against, so a future major that removes or renames one turns a
+# green Dependabot PR red instead of surfacing on the next request. What it
+# deliberately does not do is touch the network: CI runs
+# keyless by design, so the live read is still only exercised by a deploy. The
+# check for that is GET /api/catalog returning entries with source "corpus" —
+# read off the serving revision, which is not necessarily the latest one.
+#
+# requirements-dev.txt inherits this file via `-r`, so the pipeline image takes
+# 3.13.0 and google-crc32c for code pipeline/ never imports. Pre-existing shape,
+# already stated there, and #52's to narrow — not a reason to split the pin.
 langchain==1.3.14
 langchain-groq==1.1.3
 langchain-pinecone==0.2.13
