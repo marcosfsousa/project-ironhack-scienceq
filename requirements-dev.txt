@@ -45,11 +45,24 @@
 
 # ── Eval only ────────────────────────────────────────────────────────────────
 # LLM-as-judge scoring in run_evals and the two sweep scripts.
-openai==2.26.0
+#
+# Bumped 2.26.0 → 2.49.0 on 2026-07-28 with the rest of the weekly batch (#40),
+# and unlike every pin in requirements.txt this one is not covered by CI: the
+# backend job installs requirements.txt alone, never this file, so a green run
+# on an openai bump says nothing about it. Twenty-three minors is also too wide
+# a span to have read release notes across. Accepted because the blast radius
+# is eval/ — imported at run_evals.py:59 and both sweeps, none of which ships
+# in either image or runs in CI. A break here costs a local eval run, not a
+# deploy; the next `python -m eval.run_evals` is the real test.
+openai==2.49.0
 
 # ── Tests only ───────────────────────────────────────────────────────────────
-# CI pins this same version explicitly (.github/workflows/ci.yml).
-pytest==9.0.2
+# CI pins this same version explicitly (.github/workflows/ci.yml) — that pin is
+# the one that decides what the suite runs against, since CI never installs this
+# file. Bump the two together or CI silently keeps testing the old version:
+# Dependabot only ever edits this line, so its green check on a pytest bump is
+# measuring the version it just replaced.
+pytest==9.1.1
 
 # Note: .dockerignore excludes eval/ and tests/, so the pipeline image installs
 # openai and pytest for code it never copies in. Pre-existing — the freeze this
