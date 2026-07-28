@@ -64,14 +64,30 @@ the first implementation and it let exactly that through.
 Two other ways this test could quietly stop working
 ---------------------------------------------------
 
-**The first-party set is derived from the filesystem, never hand-listed.**
-``api/__init__.py`` and ``agent/agent.py`` bridge ``sys.path``, so siblings are
-imported flat — ``import live_ingest``, ``from rag_chain import ...``, ``import
-sponsorblock``. Fourteen such names exist today. A hand-maintained exclusion
-list would go stale on the first new module and start reporting it as an
-undeclared dependency. The cost of deriving it instead: a first-party module
-whose basename collided with a real distribution would mask that dependency.
-Nothing collides today.
+**The first-party set is derived from the filesystem, never hand-listed, and
+scoped to what is actually importable flat.** ``api/__init__.py`` and
+``agent/agent.py`` insert ``agent/`` and ``pipeline/`` into ``sys.path``, which
+is what makes their top-level modules resolvable as bare names — ``import
+live_ingest``, ``from rag_chain import ...``, ``import sponsorblock``. A script
+run directly also gets its own directory on ``sys.path``, which is how
+``eval/sweep_retrieval.py`` reaches ``from run_evals import ...``. So the set is
+the root names, plus the top-level modules of the bridged directories, plus the
+top-level modules of the roots being checked — and nothing else.
+
+Scoping it that way is the point, not an optimization. Pooling every ``.py``
+basename from every root at any depth was the first implementation, and it
+meant an unshipped filename could silence a shipped import: a stray
+``tests/httpx.py`` or ``api/helpers/httpx.py`` made an undeclared ``import
+httpx`` in ``api/`` disappear. Neither is importable as ``httpx`` from anywhere
+in this repo, so neither should have counted. What remains is same-directory
+shadowing (``api/httpx.py`` masking ``httpx`` for a directly-run script in
+``api/``), which is real Python behaviour rather than an artifact of this test.
+
+If the bridge is ever widened — say ``api/`` is added to it — a bare ``from
+schemas import ...`` would resolve at runtime but is not in this set, so it
+surfaces here as an undeclared dependency. That is a confusing message rather
+than a silent hole, which is the right direction to fail in; widen
+``_BRIDGED_DIRS`` to match.
 
 **Names are normalized per PEP 503 on both sides.**
 ``packages_distributions()`` returns the name as recorded, which is not always
@@ -104,6 +120,16 @@ UNSHIPPED_ROOTS = ("eval", "tests", "scripts")
 
 ALL_ROOTS = SHIPPED_ROOTS + UNSHIPPED_ROOTS
 
+# Directories inserted into sys.path by api/__init__.py and agent/agent.py,
+# which is what makes their top-level modules importable as bare names from
+# anywhere in the app. TestEveryRootIsCovered keeps ALL_ROOTS honest; this one
+# is kept honest by failing loudly — see the module docstring.
+_BRIDGED_DIRS = ("agent", "pipeline")
+
+# Directories that hold no first-party Python source. Anything else containing
+# a .py file must be covered by ALL_ROOTS.
+_NON_SOURCE_DIRS = {".git", ".claude", "__pycache__", "frontend", "node_modules"}
+
 
 # ── Collecting imports ─────────────────────────────────────────────────────────
 
@@ -119,19 +145,21 @@ def _python_files(root: str) -> list[Path]:
     ]
 
 
-def _first_party_names() -> set[str]:
+def _first_party_names(roots: tuple[str, ...]) -> set[str]:
     """
-    Every name that resolves to source in this repo rather than a dependency.
+    Names that resolve to source in this repo rather than a dependency, for an
+    import appearing under ``roots``.
 
-    Derived from the tree, not listed: the source roots themselves, every
-    package directory under them, and every module basename — the last being
-    what the sys.path bridge makes importable flat.
+    Derived from the tree, not listed, and deliberately narrow: the root names
+    (importable as packages from the repo root), the top-level modules of the
+    bridged directories, and the top-level modules of ``roots`` themselves. Only
+    ``glob``, never ``rglob`` — a module nested one level down is not importable
+    as a bare name, so counting it would let it mask a real dependency. See the
+    module docstring.
     """
     names = set(ALL_ROOTS)
-    for root in ALL_ROOTS:
-        for path in _python_files(root):
-            names.add(path.stem)
-            names.update(part for part in path.relative_to(_REPO_ROOT).parts[:-1])
+    for root in set(roots) | set(_BRIDGED_DIRS):
+        names.update(p.stem for p in (_REPO_ROOT / root).glob("*.py"))
     return names
 
 
@@ -175,7 +203,7 @@ def _third_party_paths(roots: tuple[str, ...]) -> set[str]:
     module docstring for why this is both safe and stricter than pooling
     candidates per top-level name.
     """
-    excluded = set(sys.stdlib_module_names) | _first_party_names()
+    excluded = set(sys.stdlib_module_names) | _first_party_names(roots)
     paths = {
         path for path in _imported_paths(roots)
         if path.split(".")[0] not in excluded
@@ -205,17 +233,29 @@ def _declared_distributions(requirements: Path) -> set[str]:
     """
     declared: set[str] = set()
     for raw in requirements.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#")[0].strip()
+        # A `#` opens a comment only at the start of a line or after
+        # whitespace, per pip. Splitting on every `#` would read the fragment
+        # of a URL requirement as a comment and declare a distribution named
+        # `git` for `git+https://...#egg=foo`.
+        line = re.split(r"(?:^|\s)#", raw, maxsplit=1)[0].strip()
         if not line:
             continue
-        if line.startswith("-r"):
-            declared |= _declared_distributions(requirements.parent / line[2:].strip())
+        # Both spellings of the include flag, with or without `=`.
+        include = re.match(r"^(?:-r|--requirement)[=\s]\s*(.+)$", line)
+        if include:
+            declared |= _declared_distributions(
+                requirements.parent / include.group(1).strip()
+            )
             continue
         # Name is everything up to the first extras bracket or version
-        # specifier — `uvicorn[standard]==0.51.0` declares `uvicorn`.
-        match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", line)
-        if match:
-            declared.add(_normalize(match.group(1)))
+        # specifier — `uvicorn[standard]==0.51.0` declares `uvicorn`. A URL or
+        # path requirement has no name in this position and is skipped rather
+        # than guessed at; none exist today, and one appearing silently
+        # undeclared is safer than one declaring `https`.
+        if re.match(r"^[A-Za-z0-9]", line) and "://" not in line:
+            match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", line)
+            if match:
+                declared.add(_normalize(match.group(1)))
     return declared
 
 
@@ -333,9 +373,23 @@ class TestGuardIsNotVacuous:
         # The sys.path bridge makes these importable as bare top-level names. If
         # the derivation breaks they surface as undeclared dependencies, and the
         # guard fails on its own repo rather than on a real gap.
-        first_party = _first_party_names()
+        shipped = _first_party_names(SHIPPED_ROOTS)
         for name in ("live_ingest", "rag_chain", "retriever", "sponsorblock"):
-            assert name in first_party
+            assert name in shipped
+        # eval/ is not bridged; its flat imports work because a directly-run
+        # script puts its own directory on sys.path.
+        assert "run_evals" in _first_party_names(UNSHIPPED_ROOTS)
+
+    def test_unimportable_names_are_not_treated_as_first_party(self):
+        # The masking hole: neither is reachable as a bare name from api/, so
+        # neither may silence an undeclared dependency there. Nested modules are
+        # excluded by globbing one level, cross-root ones by scoping to the
+        # group under test.
+        shipped = _first_party_names(SHIPPED_ROOTS)
+        assert "conftest" not in shipped     # tests/, a different group
+        assert "run_evals" not in shipped    # eval/, a different group
+        assert "schemas" in shipped          # api/schemas.py, same group
+        assert "limiter" in shipped
 
     def test_function_level_imports_are_collected(self):
         # pipeline/chunker.py:180 imports sponsorblock inside a branch, and
@@ -376,7 +430,62 @@ class TestGuardIsNotVacuous:
         base = _declared_distributions(_REPO_ROOT / "requirements.txt")
         assert "uvicorn" in base            # declared as uvicorn[standard]==...
         assert "typing-extensions" in base  # hyphenated here, underscored on import
-        assert not any(d.startswith("#") for d in base)
+        # requirements.txt is mostly prose; none of it may become a declaration.
+        assert "the" not in base and "note" not in base
+
+    @pytest.mark.parametrize("line, expected", [
+        ("fastapi==0.140.10", {"fastapi"}),
+        ("uvicorn[standard]==0.51.0", {"uvicorn"}),
+        ("# a whole-line comment", set()),
+        ("requests==2.34.2  # trailing comment", {"requests"}),
+        ("git+https://example.invalid/x.git#egg=foo", set()),
+        ("https://example.invalid/x-1.0-py3-none-any.whl", set()),
+    ])
+    def test_requirement_line_forms(self, line, expected, tmp_path):
+        path = tmp_path / "r.txt"
+        path.write_text(line + "\n", encoding="utf-8")
+        assert _declared_distributions(path) == expected
+
+    def test_both_include_spellings_are_followed(self, tmp_path):
+        (tmp_path / "base.txt").write_text("fastapi==1.0\n", encoding="utf-8")
+        for spelling in ("-r base.txt", "--requirement base.txt",
+                         "--requirement=base.txt"):
+            path = tmp_path / "top.txt"
+            path.write_text(f"{spelling}\npydantic==2.0\n", encoding="utf-8")
+            assert _declared_distributions(path) == {"fastapi", "pydantic"}
+
+
+class TestEveryRootIsCovered:
+    """
+    No Python source in the repo escapes the guard.
+
+    Without this, ALL_ROOTS is the same hand-maintained list this file argues
+    against for first-party names, and the docstring's claim to check *every*
+    package imported by name holds only by coincidence of nobody having added a
+    directory. That is not hypothetical here: `app/` held the Streamlit
+    frontend until f494e16 sunset it, so this tree demonstrably gains and loses
+    top-level Python directories. A new `worker.py` at the root, or a new
+    `app/` package, would import whatever it liked with nothing declared.
+
+    Directories with no first-party Python are excluded by name; everything
+    else containing a .py must be covered.
+    """
+
+    def test_no_python_source_lives_outside_the_roots(self):
+        uncovered = sorted(
+            str(path.relative_to(_REPO_ROOT)).replace("\\", "/")
+            for path in _REPO_ROOT.rglob("*.py")
+            if not _NON_SOURCE_DIRS & set(path.relative_to(_REPO_ROOT).parts)
+            and path.relative_to(_REPO_ROOT).parts[0] not in ALL_ROOTS
+        )
+        assert not uncovered, (
+            "Python source outside the directories this guard checks:\n"
+            + "\n".join(f"  {p}" for p in uncovered)
+            + "\n\nNothing declares the imports in these files. Add the "
+            "directory to SHIPPED_ROOTS if a Dockerfile COPYs it into an "
+            "image, or to UNSHIPPED_ROOTS if it ships nowhere; if it holds no "
+            "first-party source at all, add it to _NON_SOURCE_DIRS."
+        )
 
 
 class TestRootListMatchesDockerfile:
@@ -393,18 +502,37 @@ class TestRootListMatchesDockerfile:
     Directory granularity only: a narrowed COPY naming individual .py files
     would not satisfy this as written, which is the point — it should be read
     and updated deliberately, not auto-followed.
+
+    A source counts as a directory because it *is* one on disk, not because it
+    was written with a trailing slash. `COPY scripts /app/scripts` is valid
+    Docker and ships the directory just as `COPY scripts/ scripts/` does, and
+    the slash heuristic this replaced was blind to it — which would have let
+    scripts/ into the serving image while it was still checked against
+    requirements-dev.txt, reintroducing #42 exactly. Shell and JSON/exec forms
+    are both accepted for the same reason.
     """
 
     def test_shipped_roots_are_the_directories_dockerfile_copies(self):
         dockerfile = (_REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
         copied = set()
         for line in dockerfile.splitlines():
-            match = re.match(r"^\s*COPY\s+(.+)$", line)
+            match = re.match(r"^\s*COPY\s+(.+)$", line, flags=re.IGNORECASE)
             if not match:
                 continue
+            # JSON/exec form: COPY ["src/", "dst/"]. Strip the punctuation and
+            # both forms tokenize the same way.
+            tokens = match.group(1).strip().strip("[]").replace(",", " ").split()
+            tokens = [t.strip('"').strip("'") for t in tokens]
+            # --chown / --from and friends are flags, not paths.
+            tokens = [t for t in tokens if not t.startswith("--")]
+            if len(tokens) < 2:
+                continue
             # Last token is the destination; everything before it is a source.
-            *sources, _dest = match.group(1).split()
-            copied.update(s.rstrip("/") for s in sources if s.endswith("/"))
+            *sources, _dest = tokens
+            copied.update(
+                s.rstrip("/") for s in sources
+                if (_REPO_ROOT / s.rstrip("/")).is_dir()
+            )
         assert copied == set(SHIPPED_ROOTS), (
             f"Dockerfile copies {sorted(copied)} but SHIPPED_ROOTS is "
             f"{sorted(SHIPPED_ROOTS)}. The serving image's contents changed: "
