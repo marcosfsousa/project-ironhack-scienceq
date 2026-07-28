@@ -142,12 +142,13 @@ def chunks_for_display(chunks: list[RetrievedChunk]) -> list[dict]:
     — a second, earlier truncation here would feed the two paths different
     input and make them disagree. See issue #16.
 
-    Callers that bypass the API therefore receive the full chunk. All of
-    them are developer tooling — ``agent/tools.py`` and the CLIs in
-    ``agent.py``, ``retriever.py`` and this module — and only ever print to a
-    terminal: ``agent.py``'s REPL shows the first 80 characters of `text`,
-    ``retriever.py``'s CLI shows it in full, and the rest render just the
-    title/timestamp/link/score fields.
+    Callers that bypass the API therefore receive the full chunk. All three are
+    developer tooling: ``agent/tools.py`` (which returns a string to the
+    LangChain agent) and this module's CLI render only the
+    title/timestamp/link/score fields, and ``agent.py``'s REPL is the sole
+    consumer that renders `text` — the first 80 characters, to a terminal.
+    ``retriever.py``'s CLI is not on this path at all; it prints
+    ``RetrievedChunk`` objects directly and truncates `text` itself.
     """
     return [
         {

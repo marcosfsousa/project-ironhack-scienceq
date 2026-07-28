@@ -26,8 +26,8 @@ class Source(BaseModel):
     """
     One source citation.
 
-    Mirrors the dict shape returned by the blocking path
-    (RAGResponse.source_chunks_for_display in agent/rag_chain.py).
+    Mirrors the dict shape both response paths return
+    (chunks_for_display in agent/rag_chain.py, the one place it is defined).
     `rerank_score` is None when the Cohere reranker is disabled.
     """
 

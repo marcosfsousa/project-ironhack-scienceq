@@ -20,13 +20,16 @@ Chunks are real `RetrievedChunk` instances: a fake with hand-written attributes
 would keep passing if the chunk renamed `timestamp_label` or `text`.
 """
 
-# `RAGResponse` and `chunks_for_display` are taken from `agent.agent` rather than
-# from `agent.rag_chain`: the agent imports rag_chain by its *bare* name, so the
-# package path would load a second copy of the module and the tests would compare
-# against a different function object than the one `last_sources` calls. See
-# conftest.py for the bare-vs-package split this comes from.
-from agent.agent import YouTubeQAAgent, RAGResponse, chunks_for_display, _cli
-from agent.retriever import RetrievedChunk
+# rag_chain is imported by its *bare* name, the way agent/agent.py imports it,
+# and `RetrievedChunk` is taken from there — rag_chain imports it bare too
+# (agent/rag_chain.py) — rather than from `agent.retriever`. The package path
+# would load a second copy of each module, leaving the tests comparing against a
+# different function object than `last_sources` calls and building chunks of a
+# different class than the production path's. rag_chain is already in
+# sys.modules by now: conftest.py imports the `agent` package first, and that
+# pulls it in. See conftest.py for the bare-vs-package split this comes from.
+from rag_chain import RAGResponse, RetrievedChunk, chunks_for_display
+from agent.agent import YouTubeQAAgent, _cli
 
 
 DISPLAY_KEYS = {"title", "timestamp", "link", "score", "rerank_score", "text"}
@@ -133,8 +136,11 @@ class _FakeAgent:
 
 
 def _run_cli(monkeypatch, inputs, sources):
+    # Falls back to "quit" once `inputs` runs out: _cli catches EOFError and
+    # KeyboardInterrupt but not StopIteration, so an input list without a
+    # terminator would otherwise escape as an error rather than end the loop.
     replies = iter(inputs)
-    monkeypatch.setattr("builtins.input", lambda *_: next(replies))
+    monkeypatch.setattr("builtins.input", lambda *_: next(replies, "quit"))
     monkeypatch.setattr("agent.agent.YouTubeQAAgent", lambda: _FakeAgent(sources))
     _cli()
 

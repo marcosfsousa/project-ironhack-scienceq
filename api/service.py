@@ -17,8 +17,10 @@ import json
 import logging
 from typing import Generator
 
-from agent import YouTubeQAAgent  # resolved via sys.path setup in api/main.py
-from rag_chain import chunks_for_display  # same bridge; see api/__init__.py
+# Both resolve via the sys.path bridge set up in api/__init__.py, which runs
+# before any api submodule is imported.
+from agent import YouTubeQAAgent
+from rag_chain import chunks_for_display
 
 from .excerpt import quotation_excerpt
 from .schemas import ChatResponse, GenerationMetadata, Turn
