@@ -213,19 +213,18 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 A unit test suite covers all pure pipeline and agent logic with no live API calls:
 
-| Module | Tests |
+| Module | Covers |
 |---|---|
-| `tests/test_transcript_extractor.py` | 12 |
-| `tests/test_cleaner.py` | 22 |
-| `tests/test_chunker.py` | 16 |
-| `tests/test_live_ingest.py` | 14 |
-| `tests/test_ingest_node.py` | 12 |
-| `tests/test_generation_provenance.py` | 9 |
-| `tests/test_source_excerpts.py` | 21 |
-| `tests/test_identity_intent.py` | 54 |
-| **Total** | **160** |
+| `tests/test_transcript_extractor.py` | URL parsing — watch/short/embed forms, timestamps, playlist params, malformed input |
+| `tests/test_cleaner.py` | Transcript cleaning edge cases and sponsor-segment detection |
+| `tests/test_chunker.py` | Chunk boundary conditions |
+| `tests/test_live_ingest.py` | Duplicate detection, the live-ingest `parse_video_id`, ingest results |
+| `tests/test_ingest_node.py` | The agent's ingest node, including error masking |
+| `tests/test_generation_provenance.py` | Generation-provenance metadata on both response paths (issue #18) |
+| `tests/test_source_excerpts.py` | Quotation-scale source excerpts on both response paths (issue #16) |
+| `tests/test_identity_intent.py` | Identity-question matching, router ordering against metadata, the identity node and its provenance (issue #15) |
 
-All 160 tests pass. Run via `python tests/run_all_tests.py` locally, or `pytest tests/` from the repo root — the latter is what CI runs, and it discovers test files rather than reading the curated list in `run_all_tests.py`. Tests cover duplicate detection logic, URL timestamp parsing, cleaning edge cases, chunking boundary conditions, error masking behaviour, generation provenance, source excerpts, and identity-intent routing.
+Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for the same run with `-v --tb=short` preset. Both discover test files rather than reading a list, so a new file is picked up without being registered anywhere — and a local run and a CI run cannot disagree. Per-file test counts are deliberately not recorded here: nothing enforces them, and they drifted unnoticed once already ([#28](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/28)).
 
 CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend build (tsc + vite)`, and `UI tests (Playwright)`.
 
