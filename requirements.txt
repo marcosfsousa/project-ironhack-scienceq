@@ -51,9 +51,12 @@ slowapi==0.1.9
 # loud and shows up in a diff, which is the trade working, not breaking.
 #
 # Scope, so the next reader is not misled: this pins what api/ and agent/
-# import by name. The transitive tree still floats entirely (anyio, httpx,
-# limits, tenacity, numpy, ...) and there are no hashes, so builds are more
-# reproducible than before, not reproducible. Successor releases are watched
+# import by name. The transitive tree still floats almost entirely (anyio,
+# httpx, tenacity, numpy, ...) and there are no hashes, so builds are more
+# reproducible than before, not reproducible. The one transitive held despite
+# nothing importing it is limits, pinned at the bottom of this file under a
+# criterion #41 settled; the block there states why it is the exception and
+# why anyio, sitting in the same position under starlette, is not. Successor releases are watched
 # now: .github/dependabot.yml (#40) opens a weekly PR when a newer release of
 # a pin below exists, grouping fastapi+starlette and the langchain train so a
 # coupled bump arrives as one reviewable diff. The floating transitive tree is
@@ -106,3 +109,64 @@ typing-extensions==4.16.0
 # (urllib3 2.7.0, certifi 2026.7.22), so they are recorded here, not a
 # constraint to work around.
 requests==2.34.2
+
+# ── Imported by nothing, and it is where rate limiting actually happens (#41) ─
+# Nothing under api/, agent/ or pipeline/ imports limits, so the criterion the
+# two blocks above rest on — a package shipped source imports by name is a
+# direct dependency — does not reach it. It is pinned anyway, on a second and
+# narrower criterion this block exists to state. The statement matters more
+# than the pin: pinning packages nothing imports is what #29 had to undo when
+# this file's dev counterpart carried streamlit's whole transitive tree, so an
+# exception without a written boundary is just that mistake with better
+# manners.
+#
+# The rule: pin an unimported transitive when the pinned parent is a thin
+# wrapper over it and the child is where the behaviour lives. slowapi is that
+# wrapper. It supplies the decorator, the key function and the 429 handler
+# (api/limiter.py, api/main.py:29-31); limits supplies the window algorithm and
+# the storage that every @limiter.limit(...) in api/routes.py:63,90,115 is
+# evaluated by. Read out of the running image, the limiter behind those three
+# decorators is limits' FixedWindowRateLimiter over limits' MemoryStorage —
+# api/limiter.py passes neither, and slowapi resolves both out of limits by
+# name: STRATEGIES["fixed-window"] and storage_from_string.
+#
+# The rule stops there, and anyio is the case that shows where. anyio is also
+# unimported, also reached through a pinned parent, also unbounded — but
+# starlette runs on anyio, it does not re-export it, and no starlette behaviour
+# this service depends on is anyio's behaviour under another name. slowapi's
+# public surface is limits' behaviour under another name. That is the line. If
+# it ever has to move, move it here in writing rather than package by package.
+#
+# The unbounded floor is not hypothetical: `limits>=2.3` has already been
+# walked to 5.8.0, three majors, which is the starlette case above further down
+# the same road. What those majors changed is the argument. 5.0.0 removed the
+# fixed-window-elastic-expiry strategy outright, and slowapi selects a strategy
+# by string key with `if strategy not in STRATEGIES: raise` — the set limits
+# 5.8.0 offers is fixed-window, moving-window and sliding-window-counter, so a
+# major that drops or renames the key this service defaults to takes rate
+# limiting down at startup, from a rebuild with no manifest diff. 4.0.0 changed
+# the reset value from get_window_stats from a truncated second to a float,
+# which slowapi still annotates Tuple[int, int] and adds 1 to for its reset
+# header; that one is inert here only because headers_enabled is False.
+#
+# Neither was noticed when it happened, because nothing here looks. No test
+# under tests/ references the limiter, 429 or RateLimitExceeded, and CI builds
+# no image (#39, #52), so this line is the whole of the defence. A check that
+# the limiter still limits belongs with the image gate those two issues
+# propose, not here — as written it would need a TestClient and so an httpx
+# pin, which is a dependency decision of its own.
+#
+# Version derived from a --no-cache build of Dockerfile on 2026-07-28
+# (linux/amd64, py3.11 — the Cloud Run runtime), read with importlib.metadata
+# inside the image. Never re-derive on a developer machine. Dockerfile.pipeline
+# resolves the same 5.8.0 through the `-r` inheritance, so this freezes a
+# version both images already agree on rather than converging a split the way
+# requests above did.
+#
+# The trade is starlette's in the same shape: a future slowapi that raises its
+# limits floor past this pin fails the build instead of resolving quietly, and
+# that failure lands in a diff. slowapi 0.1.10 — open as PR #55 in the
+# fastapi-stack group — still declares `limits>=2.3`, so this pin survives that
+# bump unchanged. limits is in that group too (.github/dependabot.yml), since a
+# limits bump is not reviewable without the slowapi it runs under.
+limits==5.8.0

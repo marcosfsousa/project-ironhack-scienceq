@@ -36,6 +36,13 @@
 # it requests was placed correctly and still diverged, so the criterion is what
 # ships, not what imports.
 #
+# That rule decides which file a pin goes in. Whether an unimported package is
+# pinned at all is a separate question, settled in #41 and written into the
+# limits block at the bottom of requirements.txt: a transitive is pinned only
+# when its pinned parent is a thin wrapper over it. That is the narrow
+# exception, not a licence to re-pin a transitive tree — which is what #29
+# removed from this file.
+#
 # The cost, stated so it is not rediscovered as a surprise: pipeline/ ships in
 # both images, so a future pipeline-only dependency lands in the serving image
 # too, however heavy. The relief for that is narrowing Dockerfile's COPY to the
