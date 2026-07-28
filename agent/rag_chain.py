@@ -122,6 +122,47 @@ def _invoke_with_retry(chain, prompt_input: dict) -> str:
                 raise
 
 
+# ── Source display shape ───────────────────────────────────────────────────────
+
+def chunks_for_display(chunks: list[RetrievedChunk]) -> list[dict]:
+    """
+    Per-chunk source info for detailed citation display in the UI.
+
+    The single definition of that shape. Every consumer routes through here —
+    ``RAGResponse.source_chunks_for_display`` (blocking path), the ``[SOURCES]``
+    frame in ``api/service.py`` (streaming path) and
+    ``YouTubeQAAgent.last_sources`` (both) — so no path can drift onto a
+    different set of keys. See issue #30: ``last_sources`` used to return a
+    second, streaming-only shape, and the agent REPL printed `0s–0s` and empty
+    excerpts because it read keys that shape had and this one doesn't.
+
+    `text` carries the chunk verbatim. Shortening it to a quotation is the
+    API response boundary's job (``api/excerpt.py``, applied in
+    ``api/service.py``) so the blocking and streaming paths trim identically
+    — a second, earlier truncation here would feed the two paths different
+    input and make them disagree. See issue #16.
+
+    Callers that bypass the API therefore receive the full chunk. All three are
+    developer tooling: ``agent/tools.py`` (which returns a string to the
+    LangChain agent) and this module's CLI render only the
+    title/timestamp/link/score fields, and ``agent.py``'s REPL is the sole
+    consumer that renders `text` — the first 80 characters, to a terminal.
+    ``retriever.py``'s CLI is not on this path at all; it prints
+    ``RetrievedChunk`` objects directly and truncates `text` itself.
+    """
+    return [
+        {
+            "title":        chunk.title,
+            "timestamp":    chunk.timestamp_label,
+            "link":         chunk.youtube_link,
+            "score":        chunk.score,
+            "rerank_score": chunk.rerank_score,   # None when reranker is off
+            "text":         chunk.text,
+        }
+        for chunk in chunks
+    ]
+
+
 # ── Response dataclass ─────────────────────────────────────────────────────────
 
 @dataclass
@@ -159,30 +200,10 @@ class RAGResponse:
     def source_chunks_for_display(self) -> list[dict]:
         """
         Per-chunk source info for detailed citation display in the UI.
-
-        `text` carries the chunk verbatim. Shortening it to a quotation is the
-        API response boundary's job (``api/excerpt.py``, applied in
-        ``api/service.py``) so the blocking and streaming paths trim identically
-        — a second, earlier truncation here would feed the two paths different
-        input and make them disagree. See issue #16.
-
-        Callers that bypass the API therefore receive the full chunk. All of
-        them are developer tooling — ``agent/tools.py`` and the CLIs in
-        ``agent.py``, ``retriever.py`` and this module. Only ``retriever.py``'s
-        CLI prints `text`, and only to a terminal; the rest render just the
-        title/timestamp/link/score fields.
+        The shape is defined by ``chunks_for_display`` — see its docstring for
+        why `text` is not trimmed here.
         """
-        return [
-            {
-                "title":        chunk.title,
-                "timestamp":    chunk.timestamp_label,
-                "link":         chunk.youtube_link,
-                "score":        chunk.score,
-                "rerank_score": chunk.rerank_score,   # None when reranker is off
-                "text":         chunk.text,
-            }
-            for chunk in self.chunks
-        ]
+        return chunks_for_display(self.chunks)
 
 
 # ── Singleton LLM ──────────────────────────────────────────────────────────────
