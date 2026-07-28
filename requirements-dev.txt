@@ -1,4 +1,4 @@
-# Dev, pipeline, and eval dependencies — direct only, pinned. Transitives are
+# Dev, eval, and test dependencies — direct only, pinned. Transitives are
 # whatever the resolver picks; do not pin them here by hand.
 #
 # This file is not dev-only despite the name: Dockerfile.pipeline installs it as
@@ -16,13 +16,32 @@
 # The `-r` below is why Dockerfile.pipeline must COPY both files — pip resolves
 # a nested requirements path relative to the referencing file's directory.
 #
-# Adding a dependency: if the API needs it at runtime, it belongs in
-# requirements.txt. Only put it here when nothing under api/ or agent/ imports it.
+# Adding a dependency: placement follows what ships in an image, not which
+# directory holds the importer. Dockerfile COPYs api/, agent/ AND pipeline/ into
+# the serving image, so a package imported by name under any of those three
+# belongs in requirements.txt. A pin here alone never reaches the API image —
+# that is exactly how requests came to float there at a version the pipeline
+# image did not ship (#42). Only put it here when the importer ships in no
+# image at all: eval/, tests/ and scripts/.
+#
+# Do not use .dockerignore as the test for that. It drops eval/ and tests/ from
+# the build context, but scripts/ is not listed there at all — it ships nowhere
+# only because neither Dockerfile's COPY allowlist names it. Both Dockerfiles
+# enumerate what they copy, so the allowlist is what decides and .dockerignore
+# narrows the context underneath it. The question to ask is whether a COPY names
+# the directory, not whether .dockerignore excludes it.
+#
+# The earlier rule read "only put it here when nothing under api/ or agent/
+# imports it", which was written before anyone weighed the pipeline/ COPY. Under
+# it requests was placed correctly and still diverged, so the criterion is what
+# ships, not what imports.
+#
+# The cost, stated so it is not rediscovered as a surprise: pipeline/ ships in
+# both images, so a future pipeline-only dependency lands in the serving image
+# too, however heavy. The relief for that is narrowing Dockerfile's COPY to the
+# modules live_ingest actually reaches — a separate change — not re-splitting
+# these two files, which is what produced the divergence in the first place.
 -r requirements.txt
-
-# ── Pipeline only (corpus build: extract → clean → chunk → embed → index) ─────
-# YouTube Data API calls in enrich_metadata, SponsorBlock segment lookups.
-requests==2.32.5
 
 # ── Eval only ────────────────────────────────────────────────────────────────
 # LLM-as-judge scoring in run_evals and the two sweep scripts.
