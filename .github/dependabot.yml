@@ -87,6 +87,13 @@ updates:
       # reviewable without the fastapi it has to land beside, and slowapi sits
       # on the same seam — it wraps starlette's request/response types, so a
       # starlette major without a matching slowapi is the same failure.
+      #
+      # limits joins the group for the mirror-image reason (#41): slowapi wraps
+      # starlette on one side and limits on the other, resolving limits'
+      # strategy and storage by string name, and declares `limits>=2.3`
+      # unbounded. A limits PR alone is not reviewable without the slowapi it
+      # runs under, and grouping also keeps it off the ungrouped long tail the
+      # open-pull-requests-limit note below is about.
       fastapi-stack:
         patterns:
           - fastapi
@@ -94,6 +101,7 @@ updates:
           - uvicorn*
           - pydantic*
           - slowapi
+          - limits
       # Same argument one layer up: langchain-core 1.5.1 sits exactly on the
       # floor langchain-openai declares, and the integration packages
       # (langchain-groq, langchain-pinecone) track the core release train.
