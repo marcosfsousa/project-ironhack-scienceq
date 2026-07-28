@@ -131,13 +131,34 @@ updates:
     # minor, so groq keeps flowing inside the 0.x range langchain-groq allows,
     # and pinecone keeps flowing inside 7.x. Only the jump over the cap stops.
     #
-    # The cost, so it is not discovered during an incident: an ignore also
-    # suppresses *security* PRs for the versions it covers. A CVE fixed within
-    # 7.x or 0.x still arrives normally; one whose only fix ships in pinecone 8+
-    # or groq 1.x arrives as nothing at all. That is not a new exposure — such a
-    # bump is already unmergeable here — but it would be silent rather than a
-    # red PR. Alerts are unaffected and still fire; only the automatic PR is
-    # withheld.
+    # The cost, corrected. An earlier version of this comment said an ignore
+    # also suppresses *security* PRs for the versions it covers, and that a CVE
+    # fixed only in pinecone 8+ or groq 1.x would therefore arrive as silence.
+    # That is wrong for the form used here, and wrong in the direction that
+    # matters — it understated the coverage this repo actually has.
+    #
+    # An ignore condition scoped by `update-types` reaches version updates only:
+    #
+    #   "update-types only affects version updates, not security updates."
+    #   — GitHub, Dependabot options reference
+    #
+    # The value itself says so: `version-update:semver-major` is namespaced to
+    # version updates. The sibling `versions:` key is the one that does reach
+    # security updates, and neither block in this file uses it. So a CVE whose
+    # only fix ships above the cap still arrives as a security PR — it just
+    # arrives red, failing the same pip resolve #63 and #65 failed, because the
+    # ceiling is upstream and an advisory does not move it. Loud and blocked,
+    # not silent. Deleting the entry would not help; raising the cap upstream
+    # is the only thing that does.
+    #
+    # One case this does not cover, noted so the rule is not over-read:
+    # dependabot-core#4027 reports vulnerable packages going un-updated when
+    # *every* semver type is ignored, which is plausible since nothing is left
+    # to bump to. Ignoring majors alone is not that case.
+    #
+    # Security PRs are also exempt from open-pull-requests-limit — they neither
+    # count toward it nor are capped by it — so the slot argument above is
+    # about the scheduled sweep only.
     #
     # Delete the matching entry as soon as langchain-pinecone or langchain-groq
     # raises its ceiling. Nothing here re-checks that: this is a snapshot of an
@@ -208,3 +229,55 @@ updates:
     # @playwright/test is intentionally in no group. ci.yml caches browser
     # binaries keyed on its exact version, so a Playwright bump is also a cache
     # miss and a browser reinstall — worth seeing on its own.
+
+    # Two parked decisions. Read this block as a different kind of thing from
+    # the pip ignore above, because the lifecycle is the opposite one: those
+    # two wait on an upstream ceiling nobody here controls and stay until
+    # langchain-pinecone or langchain-groq moves. These two wait on a decision
+    # this repo owns, are tracked in issues, and should be short-lived. If
+    # either is still here months from now, that is the signal to go read the
+    # issue, not to leave it alone.
+    #
+    #   tailwindcss 3.4.19 → 4.x   #58, tracked in #76
+    #   typescript  5.9.3  → 7.x   #62, tracked in #77
+    #
+    # Neither PR is wrong; both are incomplete in the same way. Each edits only
+    # package.json and package-lock.json, because that is all Dependabot edits.
+    # For tailwind that is not enough to build: v4 does not read
+    # tailwind.config.ts and does not recognise the `@tailwind` directives in
+    # src/index.css, so postcss.config.js and both of those files have to change
+    # in the same commit. For typescript the bump may well be complete as
+    # proposed — 7.0 is a reimplemented compiler rather than a feature release,
+    # so it wants a deliberate verification pass (language service, the
+    # tsconfig.node.json files nothing typechecks, vite toolchain peers) rather
+    # than a green `tsc -b` read as sufficient.
+    #
+    # Scoped to majors, same as the pip block and for the same reason: minor
+    # and patch releases of both keep flowing, and keep arriving inside the
+    # frontend-tooling group above, which already excludes majors by
+    # update-types. Only the jump over the major stops.
+    #
+    # Security coverage is unaffected, per the correction recorded on the pip
+    # block above: an `update-types` ignore reaches version updates only. A CVE
+    # fixed only in tailwind 4+ or typescript 7+ still opens a security PR.
+    #
+    # Worth following that through here, because it lands differently than it
+    # does for pip. There the security PR arrives red — the upstream ceiling
+    # blocks it and no advisory moves it. Here it arrives *mergeable-looking*
+    # and is not: a tailwind 4 security PR still ships only package.json and the
+    # lockfile, so it still fails to build for the reasons in #76, and a
+    # typescript 7 one still skips the verification #77 scopes. The advisory
+    # changes the urgency of those issues, not their content.
+    #
+    # So the trigger to act is the same either way, and it is not this file:
+    # an advisory against tailwind 3.x or typescript 5.x means go do #76 or #77
+    # properly, not merge whatever the bot opened.
+    #
+    # Delete each entry when its issue closes, whichever way it closes.
+    ignore:
+      - dependency-name: tailwindcss
+        update-types:
+          - version-update:semver-major
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
