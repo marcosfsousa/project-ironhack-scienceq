@@ -208,3 +208,48 @@ updates:
     # @playwright/test is intentionally in no group. ci.yml caches browser
     # binaries keyed on its exact version, so a Playwright bump is also a cache
     # miss and a browser reinstall — worth seeing on its own.
+
+    # Two parked decisions. Read this block as a different kind of thing from
+    # the pip ignore above, because the lifecycle is the opposite one: those
+    # two wait on an upstream ceiling nobody here controls and stay until
+    # langchain-pinecone or langchain-groq moves. These two wait on a decision
+    # this repo owns, are tracked in issues, and should be short-lived. If
+    # either is still here months from now, that is the signal to go read the
+    # issue, not to leave it alone.
+    #
+    #   tailwindcss 3.4.19 → 4.x   #58, tracked in #76
+    #   typescript  5.9.3  → 7.x   #62, tracked in #77
+    #
+    # Neither PR is wrong; both are incomplete in the same way. Each edits only
+    # package.json and package-lock.json, because that is all Dependabot edits.
+    # For tailwind that is not enough to build: v4 does not read
+    # tailwind.config.ts and does not recognise the `@tailwind` directives in
+    # src/index.css, so postcss.config.js and both of those files have to change
+    # in the same commit. For typescript the bump may well be complete as
+    # proposed — 7.0 is a reimplemented compiler rather than a feature release,
+    # so it wants a deliberate verification pass (language service, the
+    # tsconfig.node.json files nothing typechecks, vite toolchain peers) rather
+    # than a green `tsc -b` read as sufficient.
+    #
+    # Scoped to majors, same as the pip block and for the same reason: minor
+    # and patch releases of both keep flowing, and keep arriving inside the
+    # frontend-tooling group above, which already excludes majors by
+    # update-types. Only the jump over the major stops.
+    #
+    # Same cost as the pip block, restated so it is not inherited by assumption:
+    # an ignore also withholds *security* PRs for the versions it covers. A CVE
+    # fixed within tailwind 3.x or typescript 5.x still arrives normally; one
+    # whose only fix ships in 4+ or 7+ arrives as nothing at all. Unlike the pip
+    # case that is a real change — those bumps are unmergeable anyway, these are
+    # merely undecided — so an advisory landing against either is the trigger to
+    # delete the entry and take the migration, not to wait for the issue.
+    # Alerts are unaffected and still fire; only the automatic PR is withheld.
+    #
+    # Delete each entry when its issue closes, whichever way it closes.
+    ignore:
+      - dependency-name: tailwindcss
+        update-types:
+          - version-update:semver-major
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
