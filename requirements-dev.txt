@@ -17,19 +17,31 @@
 # a nested requirements path relative to the referencing file's directory.
 #
 # Adding a dependency: placement follows what ships in an image, not which
-# directory holds the importer. Dockerfile COPYs api/, agent/ AND pipeline/ into
-# the serving image, so a package imported by name under any of those three
-# belongs in requirements.txt. A pin here alone never reaches the API image —
+# directory holds the importer. A pin here alone never reaches the API image —
 # that is exactly how requests came to float there at a version the pipeline
-# image did not ship (#42). Only put it here when the importer ships in no
-# image at all: eval/, tests/ and scripts/.
+# image did not ship (#42).
+#
+# Since #52 that question is finer than a directory. Dockerfile COPYs api/ and
+# agent/ wholesale, but only four pipeline/ modules — live_ingest, and the
+# cleaner, chunker and embedder it imports. So:
+#
+#   imported by api/, agent/, or one of those four   -> requirements.txt
+#   imported only by the other six pipeline modules  -> here
+#   imported only by eval/, tests/, scripts/         -> here
+#
+# The middle line is new and is the point of #52: a dependency that only the
+# batch pipeline needs no longer has to land in the serving image. Nothing
+# relies on you remembering which four — tests/test_declared_imports.py holds
+# the split (SHIPPED_MODULES / UNSHIPPED_MODULES), checks it against
+# Dockerfile's COPY on every run, and fails if a new pipeline/ module lands in
+# neither list.
 #
 # Do not use .dockerignore as the test for that. It drops eval/ and tests/ from
 # the build context, but scripts/ is not listed there at all — it ships nowhere
 # only because neither Dockerfile's COPY allowlist names it. Both Dockerfiles
 # enumerate what they copy, so the allowlist is what decides and .dockerignore
 # narrows the context underneath it. The question to ask is whether a COPY names
-# the directory, not whether .dockerignore excludes it.
+# the path, not whether .dockerignore excludes it.
 #
 # The earlier rule read "only put it here when nothing under api/ or agent/
 # imports it", which was written before anyone weighed the pipeline/ COPY. Under
@@ -43,11 +55,17 @@
 # it. That is the narrow exception, not a licence to re-pin a transitive tree —
 # which is what #29 removed from this file.
 #
-# The cost, stated so it is not rediscovered as a surprise: pipeline/ ships in
-# both images, so a future pipeline-only dependency lands in the serving image
-# too, however heavy. The relief for that is narrowing Dockerfile's COPY to the
-# modules live_ingest actually reaches — a separate change — not re-splitting
-# these two files, which is what produced the divergence in the first place.
+# The cost this file used to carry here — pipeline/ shipping in both images, so
+# a future pipeline-only dependency landed in the serving image too, however
+# heavy — is the one #52 removed, by narrowing the COPY rather than re-splitting
+# these two files. Re-splitting is what produced the divergence in the first
+# place, and the `-r` above is still what prevents it.
+#
+# What remains is smaller and worth stating so it is not mistaken for the old
+# cost: requests is still pinned in requirements.txt even though no shipped
+# module imports it any more, because it arrives in the API image transitively
+# and carries an advisory floor. That is an exception with a written criterion,
+# recorded in its block there — not a leftover to tidy back into this file.
 -r requirements.txt
 
 # ── Eval only ────────────────────────────────────────────────────────────────

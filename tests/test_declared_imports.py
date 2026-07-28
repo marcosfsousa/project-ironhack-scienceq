@@ -12,10 +12,25 @@ drops it or bumps it across a major. This test is the guard.
 
 The rule it encodes is the one #51 settled and wrote into
 ``requirements-dev.txt``: placement follows **what ships in an image**, not
-which directory holds the importer. ``Dockerfile`` COPYs ``api/``, ``agent/``
-*and* ``pipeline/`` into the serving image, so all three are checked against
-``requirements.txt``. ``eval/``, ``tests/`` and ``scripts/`` ship in no image
-and are the only things ``requirements-dev.txt`` should hold.
+which directory holds the importer.
+
+Since #52 that rule is finer than a directory. ``Dockerfile`` COPYs ``api/``
+and ``agent/`` wholesale, but only the four ``pipeline/`` modules the API path
+actually reaches — ``live_ingest`` and the ``cleaner``, ``chunker`` and
+``embedder`` it imports. Those are checked against ``requirements.txt``. The
+six batch-only modules ship in ``Dockerfile.pipeline`` alone and are checked,
+with ``eval/``, ``tests/`` and ``scripts/``, against ``requirements-dev.txt``.
+That file inherits ``requirements.txt`` via ``-r``, so it is the looser of the
+two sets and the split can only ever be conservative.
+
+Two other classes exist because splitting a directory across two manifests
+introduces failure modes a single list did not have.
+``TestShippedSourceMatchesDockerfile`` keeps both halves equal to the COPY
+allowlist and insists every ``pipeline/`` module lands in exactly one of them,
+so a new module cannot escape both. ``TestShippedSourceIsSelfContained``
+asserts that shipped source only bare-imports modules that also ship — the
+enumerated-COPY drift #52 flagged, caught here from the AST rather than only by
+the image build in ``.github/workflows/ci.yml``.
 
 The check is one-directional — imports ⊆ declared, never the reverse. A
 declared package nothing imports is not a finding here: ``uvicorn`` is the
@@ -106,19 +121,52 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Directories that ship in the serving image, per Dockerfile's COPY allowlist.
-# TestRootListMatchesDockerfile asserts this stays true, so #52 — which narrows
-# that COPY to the modules the API path actually reaches — fails loudly here
-# instead of leaving the guard checking source the image no longer carries.
-SHIPPED_ROOTS = ("api", "agent", "pipeline")
+# Source that ships in the serving image, per Dockerfile's COPY allowlist.
+#
+# api/ and agent/ ship wholesale. pipeline/ no longer does: #52 narrowed that
+# COPY to the closure of what the API path imports, so four of its ten modules
+# ship here and the other six ship only in the batch image. That is why this is
+# written as paths rather than directory names — the allowlist is now finer
+# than a directory, and a guard that could only speak in directories would have
+# to either over-claim (checking source the image does not carry) or give up.
+#
+# TestShippedSourceMatchesDockerfile asserts both halves against Dockerfile, so
+# a COPY edit not reflected here fails loudly rather than silently drifting.
+SHIPPED_DIRS = ("api", "agent")
+SHIPPED_MODULES = (
+    "pipeline/chunker.py",
+    "pipeline/cleaner.py",
+    "pipeline/embedder.py",
+    "pipeline/live_ingest.py",
+)
+SHIPPED = SHIPPED_DIRS + SHIPPED_MODULES
 
 # Ships in no image. Note the mechanism, since it is easy to get wrong:
 # .dockerignore drops eval/ and tests/ from the build context, but scripts/ is
 # not listed there at all and ships nowhere purely because no COPY names it.
 # Both Dockerfiles use enumerated allowlists, so the allowlist is what decides.
-UNSHIPPED_ROOTS = ("eval", "tests", "scripts")
+UNSHIPPED_DIRS = ("eval", "tests", "scripts")
 
-ALL_ROOTS = SHIPPED_ROOTS + UNSHIPPED_ROOTS
+# The pipeline/ modules Dockerfile leaves out. "Unshipped" is relative to the
+# *serving* image only — Dockerfile.pipeline still COPYs pipeline/ wholesale,
+# so these do ship in the batch image, which installs requirements-dev.txt.
+# Checking them against that file is therefore the correct side of the split
+# and cannot let an undeclared package through: requirements-dev.txt inherits
+# requirements.txt via `-r`, so it is the looser of the two sets.
+UNSHIPPED_MODULES = (
+    "pipeline/bootstrap_metadata.py",
+    "pipeline/enrich_metadata.py",
+    "pipeline/indexer.py",
+    "pipeline/run.py",
+    "pipeline/sponsorblock.py",
+    "pipeline/transcript_extractor.py",
+)
+UNSHIPPED = UNSHIPPED_DIRS + UNSHIPPED_MODULES
+
+# Top-level directories holding first-party Python, independent of the ship
+# split above. TestEveryRootIsCovered uses it to prove no source escapes the
+# guard; _first_party_names uses it to decide what is not a dependency.
+ALL_ROOTS = SHIPPED_DIRS + ("pipeline",) + UNSHIPPED_DIRS
 
 # Directories inserted into sys.path by api/__init__.py and agent/agent.py,
 # which is what makes their top-level modules importable as bare names from
@@ -138,34 +186,55 @@ def _normalize(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def _python_files(root: str) -> list[Path]:
+def _python_files(spec: str) -> list[Path]:
+    """
+    The .py files a spec covers: one module if it names a file, the whole tree
+    if it names a directory.
+    """
+    target = _REPO_ROOT / spec
+    if target.is_file():
+        return [target]
     return [
-        p for p in (_REPO_ROOT / root).rglob("*.py")
+        p for p in target.rglob("*.py")
         if "__pycache__" not in p.parts
     ]
 
 
-def _first_party_names(roots: tuple[str, ...]) -> set[str]:
+def _spec_roots(specs: tuple[str, ...]) -> set[str]:
+    """Top-level directory of each spec — ``pipeline/chunker.py`` → ``pipeline``."""
+    return {spec.split("/")[0] for spec in specs}
+
+
+def _first_party_names(specs: tuple[str, ...]) -> set[str]:
     """
     Names that resolve to source in this repo rather than a dependency, for an
-    import appearing under ``roots``.
+    import appearing under ``specs``.
 
     Derived from the tree, not listed, and deliberately narrow: the root names
     (importable as packages from the repo root), the top-level modules of the
-    bridged directories, and the top-level modules of ``roots`` themselves. Only
-    ``glob``, never ``rglob`` — a module nested one level down is not importable
-    as a bare name, so counting it would let it mask a real dependency. See the
-    module docstring.
+    bridged directories, and the top-level modules of the roots ``specs`` live
+    under. Only ``glob``, never ``rglob`` — a module nested one level down is
+    not importable as a bare name, so counting it would let it mask a real
+    dependency. See the module docstring.
+
+    Derived from the *directory on disk*, not from the shipped subset, and that
+    distinction survives #52 on purpose. ``pipeline/chunker.py`` ships and
+    imports ``sponsorblock``, which does not; resolving first-party names
+    against the shipped subset would make ``sponsorblock`` read as an
+    undeclared third-party package, and the failure would be unfixable — no
+    requirements file can declare a first-party module. Whether shipped source
+    may import an unshipped module is a real question, but it is a different
+    one, and TestShippedSourceIsSelfContained is where it is asked.
     """
     names = set(ALL_ROOTS)
-    for root in set(roots) | set(_BRIDGED_DIRS):
+    for root in _spec_roots(specs) | set(_BRIDGED_DIRS):
         names.update(p.stem for p in (_REPO_ROOT / root).glob("*.py"))
     return names
 
 
-def _imported_paths(roots: tuple[str, ...]) -> set[str]:
+def _imported_paths(specs: tuple[str, ...]) -> set[str]:
     """
-    Dotted module paths imported anywhere under ``roots``.
+    Dotted module paths imported anywhere under ``specs``.
 
     Walks the whole AST rather than module-level nodes only: agent/agent.py and
     pipeline/chunker.py:180 both import inside functions, and a function-level
@@ -177,8 +246,8 @@ def _imported_paths(roots: tuple[str, ...]) -> set[str]:
     ``google-cloud-storage`` resolvable without consulting the environment.
     """
     paths: set[str] = set()
-    for root in roots:
-        for path in _python_files(root):
+    for spec in specs:
+        for path in _python_files(spec):
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
@@ -194,7 +263,7 @@ def _imported_paths(roots: tuple[str, ...]) -> set[str]:
     return paths
 
 
-def _third_party_paths(roots: tuple[str, ...]) -> set[str]:
+def _third_party_paths(specs: tuple[str, ...]) -> set[str]:
     """
     Maximal third-party dotted paths — stdlib and first-party removed.
 
@@ -203,9 +272,9 @@ def _third_party_paths(roots: tuple[str, ...]) -> set[str]:
     module docstring for why this is both safe and stricter than pooling
     candidates per top-level name.
     """
-    excluded = set(sys.stdlib_module_names) | _first_party_names(roots)
+    excluded = set(sys.stdlib_module_names) | _first_party_names(specs)
     paths = {
-        path for path in _imported_paths(roots)
+        path for path in _imported_paths(specs)
         if path.split(".")[0] not in excluded
     }
     return {
@@ -280,10 +349,10 @@ def _candidate_distributions(path: str) -> set[str]:
     return candidates
 
 
-def _undeclared(roots: tuple[str, ...], requirements: Path) -> set[str]:
+def _undeclared(specs: tuple[str, ...], requirements: Path) -> set[str]:
     declared = _declared_distributions(requirements)
     return {
-        path for path in _third_party_paths(roots)
+        path for path in _third_party_paths(specs)
         if not (_candidate_distributions(path) & declared)
     }
 
@@ -310,10 +379,13 @@ def _report(undeclared: set[str]) -> str:
 # ── The guard ──────────────────────────────────────────────────────────────────
 
 class TestShippedImportsAreDeclared:
-    """api/, agent/ and pipeline/ ship in the serving image (Dockerfile)."""
+    """
+    Source the serving image carries: api/, agent/, and the four pipeline/
+    modules the API path reaches (Dockerfile).
+    """
 
     def test_every_import_is_declared_in_requirements(self):
-        undeclared = _undeclared(SHIPPED_ROOTS, _REPO_ROOT / "requirements.txt")
+        undeclared = _undeclared(SHIPPED, _REPO_ROOT / "requirements.txt")
         assert not undeclared, (
             "Imported by shipped source but not declared in requirements.txt:\n"
             + _report(undeclared)
@@ -322,18 +394,23 @@ class TestShippedImportsAreDeclared:
             "time: two builds of the same commit can ship different versions of "
             "code the app imports, with no diff to review. That is #37 and #42.\n"
             "Placement follows what ships in an image, not which directory "
-            "imports it: Dockerfile COPYs api/, agent/ AND pipeline/, so a "
-            "package imported by name under any of the three belongs in "
-            "requirements.txt. A pin in requirements-dev.txt alone never reaches "
-            "the API image."
+            "imports it. Since #52 that is finer than a directory: Dockerfile "
+            "COPYs api/ and agent/ wholesale but only four named pipeline/ "
+            "modules, so a package imported by one of those four belongs in "
+            "requirements.txt, while one imported only by the other six belongs "
+            "in requirements-dev.txt. A pin there alone never reaches the API "
+            "image."
         )
 
 
 class TestUnshippedImportsAreDeclared:
-    """eval/, tests/ and scripts/ ship in no image."""
+    """
+    Source the serving image does not carry: eval/, tests/, scripts/, and the
+    six batch-only pipeline/ modules.
+    """
 
     def test_every_import_is_declared_in_requirements_dev(self):
-        undeclared = _undeclared(UNSHIPPED_ROOTS, _REPO_ROOT / "requirements-dev.txt")
+        undeclared = _undeclared(UNSHIPPED, _REPO_ROOT / "requirements-dev.txt")
         assert not undeclared, (
             "Imported by unshipped source but not declared in "
             "requirements-dev.txt:\n"
@@ -358,34 +435,47 @@ class TestGuardIsNotVacuous:
     @pytest.mark.parametrize("root", [r for r in ALL_ROOTS if r != "scripts"])
     def test_every_root_holds_source(self, root):
         # scripts/ holds no third-party imports today and may hold no .py at
-        # all; its presence in UNSHIPPED_ROOTS states the placement rule rather
+        # all; its presence in UNSHIPPED_DIRS states the placement rule rather
         # than a claim about its contents.
         assert _python_files(root), f"{root}/ holds no .py files"
 
     def test_shipped_imports_are_actually_collected(self):
         # Sanity floor, not an inventory: fastapi and langchain-core are the two
         # ends of the serving image's stack, and #37 pinned the second.
-        collected = _top_levels(_third_party_paths(SHIPPED_ROOTS))
+        collected = _top_levels(_third_party_paths(SHIPPED))
         assert "fastapi" in collected
         assert "langchain_core" in collected
+
+    def test_file_specs_collect_only_their_own_module(self):
+        # The narrowed half of SHIPPED is file-granular, so a spec naming one
+        # module must not drag in its neighbours. cohere is imported by
+        # pipeline/embedder.py (shipped) and yt_dlp only by
+        # pipeline/transcript_extractor.py (not shipped) — if a file spec
+        # silently widened to its directory, the second would appear here.
+        collected = _top_levels(_third_party_paths(("pipeline/embedder.py",)))
+        assert collected == {"cohere", "dotenv"}, collected
 
     def test_first_party_flat_imports_are_excluded(self):
         # The sys.path bridge makes these importable as bare top-level names. If
         # the derivation breaks they surface as undeclared dependencies, and the
         # guard fails on its own repo rather than on a real gap.
-        shipped = _first_party_names(SHIPPED_ROOTS)
+        shipped = _first_party_names(SHIPPED)
         for name in ("live_ingest", "rag_chain", "retriever", "sponsorblock"):
             assert name in shipped
+        # sponsorblock is in that list on purpose: it no longer ships, but it is
+        # still first-party source, so it must not read as an undeclared
+        # package. See _first_party_names.
+        assert "sponsorblock" not in {Path(m).stem for m in SHIPPED_MODULES}
         # eval/ is not bridged; its flat imports work because a directly-run
         # script puts its own directory on sys.path.
-        assert "run_evals" in _first_party_names(UNSHIPPED_ROOTS)
+        assert "run_evals" in _first_party_names(UNSHIPPED)
 
     def test_unimportable_names_are_not_treated_as_first_party(self):
         # The masking hole: neither is reachable as a bare name from api/, so
         # neither may silence an undeclared dependency there. Nested modules are
         # excluded by globbing one level, cross-root ones by scoping to the
         # group under test.
-        shipped = _first_party_names(SHIPPED_ROOTS)
+        shipped = _first_party_names(SHIPPED)
         assert "conftest" not in shipped     # tests/, a different group
         assert "run_evals" not in shipped    # eval/, a different group
         assert "schemas" in shipped          # api/schemas.py, same group
@@ -396,7 +486,7 @@ class TestGuardIsNotVacuous:
         # api/catalog.py:48 imports google.cloud inside a function — the whole
         # reason this walks the full AST. Module-level-only collection would
         # miss google entirely.
-        assert "google" in _top_levels(_third_party_paths(SHIPPED_ROOTS))
+        assert "google" in _top_levels(_third_party_paths(SHIPPED))
 
     def test_namespace_package_resolves_through_the_dotted_path(self):
         # The case the installed-environment mapping cannot answer: `google`
@@ -415,7 +505,7 @@ class TestGuardIsNotVacuous:
     def test_only_maximal_paths_are_checked(self):
         # `from google.cloud import storage` records google.cloud too; checking
         # that prefix on its own would fail against google-cloud-storage.
-        paths = _third_party_paths(SHIPPED_ROOTS)
+        paths = _third_party_paths(SHIPPED)
         assert "google.cloud.storage" in paths
         assert "google.cloud" not in paths
 
@@ -482,26 +572,49 @@ class TestEveryRootIsCovered:
             "Python source outside the directories this guard checks:\n"
             + "\n".join(f"  {p}" for p in uncovered)
             + "\n\nNothing declares the imports in these files. Add the "
-            "directory to SHIPPED_ROOTS if a Dockerfile COPYs it into an "
-            "image, or to UNSHIPPED_ROOTS if it ships nowhere; if it holds no "
+            "directory to SHIPPED_DIRS if a Dockerfile COPYs it into an "
+            "image, or to UNSHIPPED_DIRS if it ships nowhere; if it holds no "
             "first-party source at all, add it to _NON_SOURCE_DIRS."
         )
 
 
-class TestRootListMatchesDockerfile:
+def _dockerfile_logical_lines(text: str) -> list[str]:
     """
-    SHIPPED_ROOTS is a copy of Dockerfile's COPY allowlist, so it can drift.
+    Dockerfile instructions, with backslash continuations joined.
 
-    #52 proposes narrowing that COPY to the four modules the API path actually
-    reaches, which would drop sponsorblock.py and enrich_metadata.py — the only
-    importers of `requests`. Under the rule this test encodes, `requests` would
-    then belong back in requirements-dev.txt. This assertion is what makes that
-    change fail here rather than leave the guard checking source the image no
-    longer carries.
+    Needed since #52: the narrowed COPY spans several lines, and a line-based
+    parser would read the trailing ``\\`` of ``COPY pipeline/cleaner.py \\`` as
+    part of a path and miss every module after the first. Docker also drops a
+    comment line appearing *inside* a continuation, so this does too — otherwise
+    a commented-out path in the block would be collected as a real source.
+    """
+    lines: list[str] = []
+    buffer = ""
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if buffer and stripped.startswith("#"):
+            continue
+        if stripped.endswith("\\"):
+            buffer += stripped[:-1] + " "
+            continue
+        lines.append(buffer + stripped)
+        buffer = ""
+    if buffer:
+        lines.append(buffer)
+    return lines
 
-    Directory granularity only: a narrowed COPY naming individual .py files
-    would not satisfy this as written, which is the point — it should be read
-    and updated deliberately, not auto-followed.
+
+class TestShippedSourceMatchesDockerfile:
+    """
+    SHIPPED_DIRS and SHIPPED_MODULES copy Dockerfile's COPY allowlist, so they
+    can drift.
+
+    Before #52 this only had to compare directories. That COPY now names four
+    pipeline/ modules individually, so the comparison happens at both
+    granularities — a directory source must appear in SHIPPED_DIRS, a .py
+    source in SHIPPED_MODULES. A directory-only check would still pass while
+    the guard reasoned about six modules the serving image no longer carries,
+    which is precisely the drift this class exists to prevent.
 
     A source counts as a directory because it *is* one on disk, not because it
     was written with a trailing slash. `COPY scripts /app/scripts` is valid
@@ -510,12 +623,18 @@ class TestRootListMatchesDockerfile:
     scripts/ into the serving image while it was still checked against
     requirements-dev.txt, reintroducing #42 exactly. Shell and JSON/exec forms
     are both accepted for the same reason.
+
+    Non-.py sources are ignored rather than asserted on: data/metadata.json
+    ships too, but it declares no imports, so it is outside what this guard
+    reasons about.
     """
 
-    def test_shipped_roots_are_the_directories_dockerfile_copies(self):
+    def _copied(self) -> tuple[set[str], set[str]]:
+        """(directories, files) named as COPY sources in Dockerfile."""
         dockerfile = (_REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
-        copied = set()
-        for line in dockerfile.splitlines():
+        dirs: set[str] = set()
+        files: set[str] = set()
+        for line in _dockerfile_logical_lines(dockerfile):
             match = re.match(r"^\s*COPY\s+(.+)$", line, flags=re.IGNORECASE)
             if not match:
                 continue
@@ -529,14 +648,126 @@ class TestRootListMatchesDockerfile:
                 continue
             # Last token is the destination; everything before it is a source.
             *sources, _dest = tokens
-            copied.update(
-                s.rstrip("/") for s in sources
-                if (_REPO_ROOT / s.rstrip("/")).is_dir()
-            )
-        assert copied == set(SHIPPED_ROOTS), (
-            f"Dockerfile copies {sorted(copied)} but SHIPPED_ROOTS is "
-            f"{sorted(SHIPPED_ROOTS)}. The serving image's contents changed: "
-            "update SHIPPED_ROOTS, and re-check whether any pin in "
+            for source in sources:
+                source = source.rstrip("/")
+                target = _REPO_ROOT / source
+                if target.is_dir():
+                    dirs.add(source)
+                elif target.is_file():
+                    files.add(source)
+        return dirs, files
+
+    def test_copied_directories_are_the_shipped_dirs(self):
+        dirs, _ = self._copied()
+        assert dirs == set(SHIPPED_DIRS), (
+            f"Dockerfile COPYs the directories {sorted(dirs)} but SHIPPED_DIRS "
+            f"is {sorted(SHIPPED_DIRS)}. The serving image's contents changed: "
+            "update SHIPPED_DIRS, and re-check whether any pin in "
             "requirements.txt is now needed only by source that no longer ships "
             "(or vice versa)."
+        )
+
+    def test_copied_modules_are_the_shipped_modules(self):
+        _, files = self._copied()
+        copied_py = {f for f in files if f.endswith(".py")}
+        assert copied_py == set(SHIPPED_MODULES), (
+            f"Dockerfile COPYs the modules {sorted(copied_py)} but "
+            f"SHIPPED_MODULES is {sorted(SHIPPED_MODULES)}. An enumerated COPY "
+            "is an implicit module list (#52): if it grew, the new module's "
+            "imports are checked against requirements.txt only once it is "
+            "listed here; if it shrank, this guard is still vouching for source "
+            "the image dropped. Update SHIPPED_MODULES and UNSHIPPED_MODULES "
+            "together — every pipeline/ module belongs to exactly one."
+        )
+
+    def test_every_pipeline_module_is_classified(self):
+        # The drift this catches is the quiet one: a new pipeline/ module is
+        # picked up by neither list, so nothing checks its imports against
+        # either requirements file. Splitting a directory across two manifests
+        # only works if the split is total.
+        on_disk = {
+            f"pipeline/{path.name}"
+            for path in (_REPO_ROOT / "pipeline").glob("*.py")
+        }
+        classified = set(SHIPPED_MODULES) | set(UNSHIPPED_MODULES)
+        assert on_disk == classified, (
+            f"pipeline/ holds {sorted(on_disk)} but SHIPPED_MODULES + "
+            f"UNSHIPPED_MODULES cover {sorted(classified)}. Add each new module "
+            "to SHIPPED_MODULES if Dockerfile COPYs it, otherwise to "
+            "UNSHIPPED_MODULES."
+        )
+        assert not set(SHIPPED_MODULES) & set(UNSHIPPED_MODULES), (
+            "A module cannot be both shipped and unshipped."
+        )
+
+
+class TestShippedSourceIsSelfContained:
+    """
+    Shipped source may only bare-import pipeline/ modules that also ship.
+
+    This is the repo-side half of the gate #52 asked for, and it exists because
+    an enumerated COPY is an implicit module list that drifts. The api-image job
+    in .github/workflows/ci.yml catches the same class of break by building the
+    image and running ``import api.main``, but that needs Docker and a full
+    dependency install; this catches it from the AST in the pytest job, in
+    milliseconds. Between them, adding ``import transcript_extractor`` to
+    live_ingest fails on the PR instead of at deploy — which matters because
+    merging to main deploys to Cloud Run.
+
+    Note what this does *not* claim. It reasons about first-party modules, not
+    packages: TestShippedImportsAreDeclared already covers distributions, and
+    _first_party_names deliberately keeps unshipped modules out of that check so
+    they never read as undeclared dependencies. This is the other axis.
+
+    The exception set is the point of the class rather than a wart. #52 chose to
+    drop sponsorblock.py and document the seam rather than inject the
+    dependency, so exactly one shipped module names an unshipped one and it is
+    recorded here with its reachability argument. Equality, not a subset, so
+    both directions are deliberate: a new unshipped import fails, and so does
+    removing this one without deleting the entry.
+    """
+
+    # pipeline/chunker.py:180 imports sponsorblock inside the skip_sponsors
+    # branch of chunk_transcript, whose only caller is run() — the batch
+    # entrypoint, which does not exist in the serving image. The import is
+    # unreachable there, and the ImportError it would raise if that changed is
+    # the deliberate trade #52 recorded: a loud failure if the API path ever
+    # grows a caller, rather than the silent version drift #42 had to fix.
+    DOCUMENTED_SEAMS = {("pipeline/chunker.py", "sponsorblock")}
+
+    def test_shipped_source_only_imports_shipped_modules(self):
+        unshipped_stems = {Path(module).stem for module in UNSHIPPED_MODULES}
+        found: set[tuple[str, str]] = set()
+        for spec in SHIPPED:
+            for path in _python_files(spec):
+                rel = str(path.relative_to(_REPO_ROOT)).replace("\\", "/")
+                tree = ast.parse(
+                    path.read_text(encoding="utf-8"), filename=str(path)
+                )
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Import):
+                        names = [alias.name.split(".")[0] for alias in node.names]
+                    elif (
+                        isinstance(node, ast.ImportFrom)
+                        and node.level == 0
+                        and node.module
+                    ):
+                        names = [node.module.split(".")[0]]
+                    else:
+                        continue
+                    found.update(
+                        (rel, name) for name in names if name in unshipped_stems
+                    )
+        assert found == self.DOCUMENTED_SEAMS, (
+            "Shipped source imports pipeline/ modules the serving image does "
+            f"not carry.\n  found:    {sorted(found)}\n"
+            f"  expected: {sorted(self.DOCUMENTED_SEAMS)}\n\n"
+            "An import that appears here but is not documented breaks the image "
+            "at import time, and CI would only catch it in the api-image job "
+            "(or, before that job existed, at deploy). Either add the module to "
+            "Dockerfile's COPY and SHIPPED_MODULES, or restructure so shipped "
+            "code does not name it.\n"
+            "An entry that is documented but no longer found means the seam was "
+            "closed — delete it from DOCUMENTED_SEAMS rather than leaving a "
+            "comment describing code that no longer exists."
         )

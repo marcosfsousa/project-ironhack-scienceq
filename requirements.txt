@@ -58,8 +58,11 @@
 #
 # Verification, and its limits — the same shape as the paragraph above but
 # weaker in one place and newly stronger in another. Weaker: CI installs this
-# file for real on linux/py3.11, so the resolve is checked, but it builds no
-# image (#39, #52), so 3.13.0 is resolver-checked and not image-checked.
+# file for real on linux/py3.11, so the resolve is checked, and since #52 the
+# api-image job also builds Dockerfile and imports the app, so 3.13.0 is now
+# image-checked at import. What no CI job does is exercise the GCS client
+# against a real bucket, so this pin is checked as far as installing and
+# importing, not as far as calling.
 # Stronger: until this bump the catalog GCS path had no test at all — the
 # import at api/catalog.py:48 is lazy and no test reached it, so a green suite
 # on a google-cloud-storage bump was measuring nothing. tests/test_catalog.py
@@ -143,24 +146,42 @@ pydantic==2.13.4
 starlette==1.3.1
 typing-extensions==4.16.0
 
-# ── Imported by shipped pipeline/ source, not by api/ or agent/ (#42) ────────
-# Dockerfile COPYs pipeline/ wholesale into the serving image, so
-# pipeline/sponsorblock.py:17 and pipeline/enrich_metadata.py:27 ship there and
-# import requests by name — the same criterion the four above were pinned on.
-# It was pinned only in requirements-dev.txt, which the API image never
-# installs, so it floated here (2.34.2) while the pipeline image shipped
+# ── No longer imported by shipped source, and pinned anyway (#42, #52) ───────
+# Written when Dockerfile COPYed pipeline/ wholesale, which put
+# pipeline/sponsorblock.py:17 and pipeline/enrich_metadata.py:27 in the serving
+# image importing requests by name — the same criterion the four above were
+# pinned on. It was pinned only in requirements-dev.txt, which the API image
+# never installs, so it floated here (2.34.2) while the pipeline image shipped
 # 2.32.5: two production images, two versions of the same package.
 #
-# Nothing executed that import. live_ingest — the only pipeline module the API
-# path reaches — imports cleaner, chunker and embedder, none of which touch
-# requests; sponsorblock is imported lazily at chunker.py:180 inside the
-# skip_sponsors branch of chunk_transcript, whose only caller is the batch
-# entrypoint run(). The exposure was a future change to the ingest path
-# reaching it and finding an undeclared version, not a live fault.
+# #52 narrowed that COPY to the four modules the API path actually reaches, and
+# neither importer is among them. The criterion above therefore no longer
+# reaches requests, and on the placement rule alone this pin would move to
+# requirements-dev.txt. It stays here deliberately, on the same footing as the
+# limits block below: an unimported package pinned under a narrow written
+# criterion rather than by the general rule. Do not "correct" it back by
+# reading the placement rule literally — that rule is about which file an
+# imported package goes in, and this is the other case.
 #
-# Declared here rather than left in requirements-dev.txt because that file
-# inherits this one via `-r`: the pipeline image resolves the same pin without
-# restating it, so the two images converge on one version by construction.
+# The criterion, in one clause: requests still ARRIVES in the serving image, as
+# a transitive of cohere, langsmith, pinecone and google-cloud-storage. Only
+# the first-party import went away, not the package. Moving the pin to
+# requirements-dev.txt would leave it installed in the API image at whatever
+# the resolver picks, while the pipeline image held 2.34.2 through the `-r` —
+# #42's divergence rebuilt, differing only in that no first-party line imports
+# it any more.
+#
+# The advisory floor is the second reason, and it is why "nothing imports it,
+# so let it float" is the wrong read: CVE-2026-25645 affects < 2.33.0 and an
+# unpinned resolve is free to land there. A package present in a production
+# image is in that image's scan surface whether or not first-party code names
+# it — the scanner reads the installed set, not the import graph.
+#
+# Declared here rather than in requirements-dev.txt because that file inherits
+# this one via `-r`: the pipeline image — where sponsorblock and
+# enrich_metadata do still ship, since Dockerfile.pipeline COPYs pipeline/
+# wholesale — resolves the same pin without restating it, so the two images
+# converge on one version by construction.
 #
 # Converged up on 2.34.2 rather than down on the 2.32.5 requirements-dev.txt
 # carried, because CVE-2026-25645 (GHSA-gc5v-m9x4-r6x2, medium, CVSS 4.4)
@@ -238,10 +259,13 @@ requests==2.34.2
 # header; that one is inert here only because headers_enabled is False.
 #
 # Neither was noticed when it happened, because nothing here looks. No test
-# under tests/ references the limiter, 429 or RateLimitExceeded, and CI builds
-# no image (#39, #52), so this line is the whole of the defence. A check that
-# the limiter still limits belongs with the image gate those two issues
-# propose, not here — as written it would need a TestClient and so an httpx
+# under tests/ references the limiter, 429 or RateLimitExceeded. CI now builds
+# the image and imports the app (the api-image job, added ahead of #52), which
+# closes part of that gap: a limits major that breaks slowapi at import fails
+# on the PR. It does not close the rest — the failure mode described above is a
+# strategy key resolved at request time, and an import that succeeds says
+# nothing about it, so this pin is still the whole of the defence there. A
+# check that the limiter still limits would need a TestClient and so an httpx
 # pin, which is a dependency decision of its own.
 #
 # Version derived from a --no-cache build of Dockerfile on 2026-07-28
