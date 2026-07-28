@@ -227,7 +227,9 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 
 Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for the same run with `-v --tb=short` preset. Both discover test files rather than reading a list, so a new file is picked up without being registered anywhere — and a local run and a CI run cannot disagree. Per-file test counts are deliberately not recorded here: nothing enforces them, and they drifted unnoticed once already ([#28](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/28)).
 
-CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend build (tsc + vite)`, and `UI tests (Playwright)`.
+CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend typecheck + build`, and `UI tests (Playwright)`.
+
+The frontend check runs two `tsc` passes, because one does not cover the tree. `tsc -b` builds `frontend/tsconfig.json`, whose `include` is `src` alone; `frontend/tsconfig.node.json` declares a separate set (the vite/playwright/tailwind configs and `tests/`) and needs its own invocation. Neither config is `composite` and neither declares `references`, so build mode has no project graph to walk and will not reach the second one on its own. Both passes live in `npm run typecheck` ([#81](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/81)).
 
 ---
 
