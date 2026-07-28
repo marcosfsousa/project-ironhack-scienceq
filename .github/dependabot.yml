@@ -18,13 +18,23 @@
 # waited for the Monday sweep. If that toggle is ever flipped back, this file
 # silently degrades to exactly that six-day worst case rather than failing.
 #
-# Base images are deliberately not watched. Dockerfile and Dockerfile.pipeline
-# ride python:3.11-slim and Dockerfile.web rides node:20-alpine; both majors
-# are chosen to match a runtime (Cloud Run's Python, and the Node that
-# ci.yml's setup-node pins) rather than to track latest. A bot proposing 3.12
-# or node 22 is proposing a runtime migration, not applying a patch, so that
-# stays a human decision. The floating `-slim`/`-alpine` tags do pick up
-# upstream patch rebuilds on every image build regardless.
+# Base images are deliberately not watched. The inventory is four FROM lines
+# across three files, not three — Dockerfile.web is multi-stage:
+#
+#   Dockerfile           python:3.11-slim
+#   Dockerfile.pipeline  python:3.11-slim
+#   Dockerfile.web       node:20-alpine   (build stage)
+#   Dockerfile.web       nginx:alpine     (runtime stage — what actually serves)
+#
+# The pythons and the node carry a deliberate major, chosen to match a runtime
+# rather than to track latest: Cloud Run's Python, and the Node that ci.yml's
+# setup-node pins. A bot proposing 3.12 or node 22 is proposing a runtime
+# migration, not applying a patch, so that stays a human decision. nginx is
+# the odd one out and is listed here so an audit from this paragraph does not
+# come up one short: it has no pinned major, so nginx:alpine already floats
+# across majors on every rebuild of the web image. Excluding it changes
+# nothing; pinning it is a separate decision from this one. All four tags pick
+# up upstream patch rebuilds whenever the image is rebuilt.
 
 version: 2
 
@@ -39,10 +49,33 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    # requirements.txt is a pin list, not a range list. `increase` moves the
-    # `==` to the new version; the default `auto` could widen a pin into a
-    # range, which would undo #37.
+    # A no-op today, kept as a written-down assertion rather than a fix.
+    #
+    # It does NOT protect the `==` pins from being widened into ranges, which
+    # an earlier version of this comment claimed. dependabot-core treats an
+    # equality operator as deliberate under every strategy — widen_requirement_
+    # range in python/.../requirements_updater.rb branches on equality first
+    # and just substitutes the new version ("assume it's being used
+    # deliberately"). Nothing turns `==1.2.3` into a range. On top of that,
+    # `auto` resolves to BumpVersions here anyway: it picks WidenRanges only
+    # for a library, and library? returns false without a pyproject.toml,
+    # which this repo does not have.
+    #
+    # What it does buy: `auto` would flip to WidenRanges the day a
+    # pyproject.toml appears, and BumpVersions is also the only strategy that
+    # bumps the lower bound of a `>=` requirement. Neither applies to a file
+    # that is all `==` with no pyproject beside it — but both are exactly the
+    # kind of change someone makes without re-reading this file.
     versioning-strategy: increase
+
+    # Above the default of 5. The groups below exist to make coupled bumps
+    # arrive as one reviewable PR, and that only works if a slot is free when
+    # the sweep runs. The ungrouped long tail is what crowds them out — yt-dlp
+    # is date-versioned and ships often, and pinecone, cohere, groq,
+    # google-cloud-storage, typing-extensions, requests, openai and pytest are
+    # each on their own. Headroom is cheaper than a group PR that silently
+    # never opens.
+    open-pull-requests-limit: 10
     commit-message:
       prefix: chore
       include: scope
