@@ -22,7 +22,7 @@
 
 # ── Pipeline only (corpus build: extract → clean → chunk → embed → index) ─────
 # YouTube Data API calls in enrich_metadata, SponsorBlock segment lookups.
-requests==2.32.5
+requests==2.33.0
 
 # ── Eval only ────────────────────────────────────────────────────────────────
 # LLM-as-judge scoring in run_evals and the two sweep scripts.
