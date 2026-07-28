@@ -1,7 +1,7 @@
-# Pull-request gate for the three test seams the project already has:
-# the backend pytest suite, the frontend typecheck-and-build, and the
-# Playwright UI suite. Each seam is one job, so a red check names the layer
-# that broke without opening logs.
+# Pull-request gate for the four seams this project checks: the backend
+# pytest suite, the serving image's build-and-import, the frontend
+# typecheck-and-build, and the Playwright UI suite. Each seam is one job, so a
+# red check names the layer that broke without opening logs.
 #
 # Job `name:` values are the status-check identifiers used for branch
 # protection. Treat them as a stable contract — renaming one silently
@@ -11,7 +11,9 @@
 # (external clients are lazily constructed, the UI tests mock at the network
 # boundary), so a keyless run is a standing assertion that they stay offline:
 # a test that acquires a live-service dependency fails here even when it
-# passes on a developer machine with a populated .env.
+# passes on a developer machine with a populated .env. The api-image job
+# extends that assertion to the artifact that actually deploys — it imports
+# the app inside a container with no environment at all.
 
 name: CI
 
@@ -65,6 +67,46 @@ jobs:
       # directory also keeps collection-order bugs catchable.
       - name: Run pytest
         run: pytest tests/ -v --tb=short
+
+  api-image:
+    name: API image (build + import)
+    runs-on: ubuntu-latest
+    # Almost entirely `pip install -r requirements.txt` inside the build. The
+    # import itself is seconds. Anything past this is a stuck build, not a slow
+    # one.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # The gap this closes: until now CI built no image (#39, #52), so nothing
+      # here ever executed Dockerfile. The backend job above installs
+      # requirements.txt on a bare runner against a full checkout, which is a
+      # different thing from the image — it never exercises the COPY allowlist,
+      # so a module the app imports but the image does not carry resolves fine
+      # in CI and fails at container start.
+      #
+      # That is not hypothetical. Dockerfile's COPY list is an enumerated
+      # allowlist, and #52 narrows `COPY pipeline/ pipeline/` to the four
+      # modules the API path actually reaches — after which adding an import to
+      # live_ingest breaks the image at *import* time with nothing in the repo
+      # to catch it. Merging to main deploys to Cloud Run, so without this job
+      # that surfaces at deploy rather than on the PR.
+      - name: Build the serving image
+        run: docker build -t scienceq-api:ci .
+
+      # `import api.main` is the whole assertion, and it is a deliberate floor
+      # rather than a smoke test of behaviour: it walks the real import graph —
+      # api → agent → pipeline, across the sys.path bridge in api/__init__.py —
+      # inside the image, which is exactly the graph an enumerated COPY can
+      # break. This is the same command #42 verified by hand; this job is that
+      # check made standing.
+      #
+      # No `-e` and no secrets, matching the header: every module-level env read
+      # in the import chain uses os.getenv with a default and every external
+      # client is lazily constructed, so a keyless import is the assertion that
+      # this stays true. An import that starts needing a key fails here.
+      - name: Smoke-import the app
+        run: docker run --rm scienceq-api:ci python -c "import api.main"
 
   frontend-build:
     name: Frontend typecheck + build
