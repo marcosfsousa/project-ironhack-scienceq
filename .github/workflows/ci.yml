@@ -67,7 +67,7 @@ jobs:
         run: pytest tests/ -v --tb=short
 
   frontend-build:
-    name: Frontend build (tsc + vite)
+    name: Frontend typecheck + build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -86,9 +86,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # `npm run build` is `tsc -b && vite build` — typecheck and bundle in the
-      # one command developers already run. No CI-only build path.
-      - name: Typecheck and build
+      # Two tsc passes, because one does not cover the tree. `tsc -b` builds
+      # tsconfig.json alone ("include": ["src"]) — neither config is composite
+      # and neither declares references, so build mode has no project graph to
+      # walk. The second pass covers tsconfig.node.json's include set: the vite,
+      # playwright and tailwind configs plus tests/. Vite and Playwright load
+      # those through esbuild, which strips types without checking them, so
+      # until this step a type error in any of them failed nowhere (#81).
+      - name: Typecheck
+        run: npm run typecheck
+
+      # `npm run build` is `tsc -b && vite build`, the same command
+      # Dockerfile.web runs — left intact so the image build keeps typechecking
+      # src/ as it already did, and so CI has no build path of its own. That
+      # repeats the src pass; a few seconds here, versus the image silently
+      # losing a guarantee.
+      - name: Build
         run: npm run build
 
   ui-tests:
