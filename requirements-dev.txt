@@ -45,7 +45,7 @@
 
 # ── Eval only ────────────────────────────────────────────────────────────────
 # LLM-as-judge scoring in run_evals and the two sweep scripts.
-openai==2.26.0
+openai==2.49.0
 
 # ── Tests only ───────────────────────────────────────────────────────────────
 # CI pins this same version explicitly (.github/workflows/ci.yml).
