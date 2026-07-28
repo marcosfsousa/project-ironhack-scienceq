@@ -22,7 +22,14 @@
 # belongs in requirements.txt. A pin here alone never reaches the API image —
 # that is exactly how requests came to float there at a version the pipeline
 # image did not ship (#42). Only put it here when the importer ships in no
-# image at all: eval/ and tests/, both excluded by .dockerignore.
+# image at all: eval/, tests/ and scripts/.
+#
+# Do not use .dockerignore as the test for that. It drops eval/ and tests/ from
+# the build context, but scripts/ is not listed there at all — it ships nowhere
+# only because neither Dockerfile's COPY allowlist names it. Both Dockerfiles
+# enumerate what they copy, so the allowlist is what decides and .dockerignore
+# narrows the context underneath it. The question to ask is whether a COPY names
+# the directory, not whether .dockerignore excludes it.
 #
 # The earlier rule read "only put it here when nothing under api/ or agent/
 # imports it", which was written before anyone weighed the pipeline/ COPY. Under

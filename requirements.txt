@@ -92,7 +92,11 @@ typing-extensions==4.16.0
 #
 # The API image had already floated to 2.34.2, so this moves only the batch job,
 # across 2.33.0 → 2.34.2. Runtime behaviour changed in that span only in greedy
-# no_proxy matching and duplicate leading slashes in URI paths; the rest is
-# inline typing replacing typeshed, a PEP 517 build, and dropping Python 3.9
-# (both images are 3.11). Neither fix touches a fixed-URL GET with no proxy set.
+# no_proxy matching and duplicate leading slashes in URI paths; neither touches
+# a fixed-URL GET with no proxy set. The remainder is inline typing replacing
+# typeshed, a PEP 517 build, and dropping Python 3.9 (both images are 3.11),
+# plus two dependency floors 2.33.0 raised: urllib3 >=1.21.1 → >=1.26 and
+# certifi >=2017.4.17 → >=2023.5.7. Both images resolve well clear of those
+# (urllib3 2.7.0, certifi 2026.7.22), so they are recorded here, not a
+# constraint to work around.
 requests==2.34.2
