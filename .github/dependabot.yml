@@ -1,0 +1,129 @@
+# Watches the pinned dependency manifests for successor releases (#40).
+#
+# Why this file exists: #37 pinned the last four floating direct imports, and
+# the rest of requirements.txt was already pinned. Pinning is the right call —
+# a silent major bump landing in the serving image on a rebuild is the worse
+# failure — but it only pays if something notices when a successor ships.
+# Before this file, nothing did: every version in the deploy manifest stayed
+# frozen until a human edited the line.
+#
+# IMPORTANT — this file is only half the coverage. It configures *version*
+# updates: a scheduled sweep that opens a PR when a newer release exists,
+# whatever the reason for it. *Security* updates — the immediate PR triggered
+# by a Dependabot alert on a known CVE — are a repository setting, not a config
+# file, and must be enabled under Settings → Code security → Dependabot
+# security updates. Without that toggle a CVE published on a Tuesday waits for
+# the Monday sweep below. Turning it on is the other half of closing #40.
+#
+# Base images are deliberately not watched. Dockerfile and Dockerfile.pipeline
+# ride python:3.11-slim and Dockerfile.web rides node:20-alpine; both majors
+# are chosen to match a runtime (Cloud Run's Python, and the Node that
+# ci.yml's setup-node pins) rather than to track latest. A bot proposing 3.12
+# or node 22 is proposing a runtime migration, not applying a patch, so that
+# stays a human decision. The floating `-slim`/`-alpine` tags do pick up
+# upstream patch rebuilds on every image build regardless.
+
+version: 2
+
+updates:
+  # ── Python: the deploy manifest and its dev/pipeline superset ──────────────
+  # One entry covers both requirements.txt and requirements-dev.txt — the pip
+  # ecosystem reads the requirements files in the directory, and the `-r
+  # requirements.txt` at the top of requirements-dev.txt means a shared pin is
+  # updated once, in the file that declares it.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    # requirements.txt is a pin list, not a range list. `increase` moves the
+    # `==` to the new version; the default `auto` could widen a pin into a
+    # range, which would undo #37.
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # The coupling #37 documents, made reviewable. fastapi declares
+      # `starlette>=0.46.0` with no upper bound and the resolver already walked
+      # that to 1.3.1; api/limiter.py and api/routes.py import
+      # starlette.requests.Request directly. A lone starlette PR is not
+      # reviewable without the fastapi it has to land beside, and slowapi sits
+      # on the same seam — it wraps starlette's request/response types, so a
+      # starlette major without a matching slowapi is the same failure.
+      fastapi-stack:
+        patterns:
+          - fastapi
+          - starlette
+          - uvicorn*
+          - pydantic*
+          - slowapi
+      # Same argument one layer up: langchain-core 1.5.1 sits exactly on the
+      # floor langchain-openai declares, and the integration packages
+      # (langchain-groq, langchain-pinecone) track the core release train.
+      # Bumping one alone is how the floor conflicts in #37 get discovered the
+      # hard way.
+      langchain:
+        patterns:
+          - langchain*
+          - langgraph
+          - langsmith
+
+  # ── GitHub Actions used by ci.yml ─────────────────────────────────────────
+  # These are pinned to floating majors (actions/checkout@v4), so only a major
+  # release produces a PR — a handful a year. One grouped PR, since they are
+  # reviewed as "does CI still pass", not one at a time.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  # frontend/package-lock.json is as frozen as requirements.txt and had the
+  # same problem. Grouped by what has to move together, with majors deliberately
+  # left ungrouped so each arrives as its own reviewable PR.
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      # react, react-dom and their @types move as a unit — a React major with
+      # last major's @types typechecks against the wrong API, and `npm run
+      # build` is `tsc -b && vite build`, so that fails the frontend CI job
+      # rather than showing up at runtime. Majors stay in the group for exactly
+      # that reason.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - "@types/react"
+          - "@types/react-dom"
+      # Build tooling, minor and patch only. A vite or typescript major changes
+      # the build contract and gets its own PR.
+      frontend-tooling:
+        patterns:
+          - vite
+          - "@vitejs/*"
+          - typescript
+          - tailwindcss
+          - postcss
+          - autoprefixer
+          - "@types/node"
+        update-types:
+          - minor
+          - patch
+    # @playwright/test is intentionally in no group. ci.yml caches browser
+    # binaries keyed on its exact version, so a Playwright bump is also a cache
+    # miss and a browser reinstall — worth seeing on its own.

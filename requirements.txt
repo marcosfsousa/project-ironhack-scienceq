@@ -52,9 +52,13 @@ slowapi==0.1.9
 # Scope, so the next reader is not misled: this pins what api/ and agent/
 # import by name. The transitive tree still floats entirely (anyio, httpx,
 # limits, tenacity, numpy, ...) and there are no hashes, so builds are more
-# reproducible than before, not reproducible. Nor is there a dependabot or
-# renovate config in the repo — nothing watches these pins for security
-# releases, so bumps are manual until that changes.
+# reproducible than before, not reproducible. Successor releases are watched
+# now: .github/dependabot.yml (#40) opens a weekly PR when a newer release of
+# a pin below exists, grouping fastapi+starlette and the langchain train so a
+# coupled bump arrives as one reviewable diff. That covers this file, not the
+# transitive tree — an alert on an undeclared transitive needs Dependabot
+# security updates enabled in the repository settings, which is a toggle
+# rather than a file. Bumps still merge by hand; the bot only surfaces them.
 #
 # One known gap, tracked separately rather than fixed by widening this change:
 # pipeline/sponsorblock.py and pipeline/enrich_metadata.py import requests at
