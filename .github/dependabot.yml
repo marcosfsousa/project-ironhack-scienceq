@@ -112,6 +112,29 @@ updates:
           - langchain*
           - langgraph
           - langsmith
+      # The long tail, collapsed. This is the group the open-pull-requests-limit
+      # note above describes the absence of: on the first sweep, yt-dlp,
+      # requests, pinecone, google-cloud-storage, groq, pytest, cohere and
+      # openai each arrived as their own PR — eight of the ten slots, none of
+      # them individually interesting.
+      #
+      # Must stay last among the pip groups. A dependency joins the first group
+      # whose patterns match, in the order groups are written here, so a `*`
+      # pattern above fastapi-stack or langchain would swallow both and undo
+      # the coupling they exist to preserve. It is deliberately not restated as
+      # exclude-patterns: duplicating those two lists here would be a second
+      # place to keep in sync, and ordering already decides it.
+      #
+      # Minor and patch only, so every major still arrives alone. That is the
+      # same line the frontend-tooling group draws, and for the same reason —
+      # a major is not a review-by-reading change, and this file's whole
+      # premise is that the diff is where a bump gets judged.
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
 
     # Two majors that cannot be taken at all, not two we would rather defer.
     # The langchain integration packages cap them, and in both cases the
@@ -226,9 +249,38 @@ updates:
         update-types:
           - minor
           - patch
-    # @playwright/test is intentionally in no group. ci.yml caches browser
-    # binaries keyed on its exact version, so a Playwright bump is also a cache
-    # miss and a browser reinstall — worth seeing on its own.
+      # The same long-tail catch as the pip block, and last for the same
+      # ordering reason — but read this one as forward-looking rather than as
+      # a fix. It is a no-op today: all eleven entries in frontend/package.json
+      # already sit in the react or frontend-tooling group except
+      # @playwright/test, which is excluded below on purpose. It exists so that
+      # the *next* dependency added to this frontend does not arrive ungrouped
+      # by default, which is how the pip long tail accumulated.
+      frontend-minor-patch:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@playwright/test"
+        update-types:
+          - minor
+          - patch
+    # @playwright/test is intentionally in no group, and is excluded from the
+    # catch-all above to keep it that way. ci.yml caches browser binaries keyed
+    # on its exact version, so a Playwright bump is also a cache miss and a
+    # browser reinstall — worth seeing on its own.
+
+    # What none of these groups touch: *security* updates. A group applies to
+    # version updates unless it declares `applies-to: security-updates`, and
+    # none here does. That is why seven of the first sweep's ungrouped PRs
+    # (#44–#50) were ungrouped whatever this file said — they were alert-driven,
+    # not scheduled.
+    #
+    # Left that way deliberately. Grouping security updates would mean one
+    # unmergeable package holds up every other advisory in the same batch, and
+    # an advisory PR is the one case where the smallest possible diff, mergeable
+    # on its own, is worth more than a tidy inbox. If the volume ever justifies
+    # revisiting, the knob is a second group entry with applies-to:
+    # security-updates — not a change to the ones above.
 
     # Two parked decisions. Read this block as a different kind of thing from
     # the pip ignore above, because the lifecycle is the opposite one: those
