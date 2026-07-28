@@ -7,6 +7,15 @@
 # never drift onto different versions of langchain, pinecone, or cohere the way
 # they did before issue #29.
 #
+# That inheritance has a real cost, accepted deliberately: the pipeline image
+# also pulls the API serving stack (fastapi, uvicorn[standard], slowapi,
+# google-cloud-storage) which pipeline/ never imports. Tens of MB in a batch
+# image is a cheaper failure than two production images silently disagreeing
+# about a library version.
+#
+# The `-r` below is why Dockerfile.pipeline must COPY both files — pip resolves
+# a nested requirements path relative to the referencing file's directory.
+#
 # Adding a dependency: if the API needs it at runtime, it belongs in
 # requirements.txt. Only put it here when nothing under api/ or agent/ imports it.
 -r requirements.txt
@@ -20,6 +29,10 @@ requests==2.32.5
 openai==2.26.0
 
 # ── Tests only ───────────────────────────────────────────────────────────────
-# Kept out of requirements.txt so the serving image does not carry it. CI pins
-# this same version explicitly (.github/workflows/ci.yml).
+# CI pins this same version explicitly (.github/workflows/ci.yml).
 pytest==9.0.2
+
+# Note: .dockerignore excludes eval/ and tests/, so the pipeline image installs
+# openai and pytest for code it never copies in. Pre-existing — the freeze this
+# replaced did the same — and left alone rather than quietly narrowed, since
+# splitting this file per-consumer is a separate change from issue #29.
