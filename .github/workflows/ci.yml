@@ -7,6 +7,18 @@
 # protection. Treat them as a stable contract — renaming one silently
 # detaches any required-check configuration pointing at it.
 #
+# Since #90 that is no longer only a warning. All four names are required
+# checks on `main` (.github/rulesets/main.json), and merging to `main` deploys,
+# so a detached rule is an unprotected production branch that still shows a
+# green tick. tests/test_required_checks.py holds the two files equal in both
+# directions: a renamed job fails as a missing context, and a job added here
+# without a matching context fails as an ungated seam — which is the state the
+# api-image job below was in for the length of one PR (#87, #88).
+#
+# The ruleset is applied through the API and that file is the record of it, not
+# the enforcement. Re-export after any change made in the web UI, or the record
+# and the rule drift apart with nothing to notice.
+#
 # No secrets are configured here, deliberately. The suites are offline
 # (external clients are lazily constructed, the UI tests mock at the network
 # boundary), so a keyless run is a standing assertion that they stay offline:
