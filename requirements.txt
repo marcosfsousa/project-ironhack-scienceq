@@ -1,7 +1,31 @@
-# Direct dependencies, pinned to the known-good build verified in Docker on
-# 2026-06-08 (linux/py3.11 — the Cloud Run runtime). Bump versions deliberately.
+# Direct dependencies for the serving image, pinned. Bump versions deliberately.
 # The three blocks at the bottom were added later and carry their own dates and
 # rationale; see there.
+#
+# What backs the word "pinned", and why this paragraph replaced a date. This
+# file used to open by naming a known-good build verified by hand in Docker on
+# 2026-06-08 (linux/py3.11 — the Cloud Run runtime). That was the file's whole
+# warrant, and nothing re-derived it: every merged bump left the sentence
+# untouched while making it less true, because a version named below was not
+# part of the build that date pointed at. With a bot proposing pins every
+# Monday (#40, #53) the gap only widened.
+#
+# Since #87 the assertion is standing rather than dated. ci.yml's api-image job
+# builds Dockerfile and runs `python -c "import api.main"` inside the resulting
+# image on every pull request, so the resolve in this file and the app's import
+# graph are both checked against the artifact that actually deploys, at the
+# versions in the diff. A bump that breaks either is red before it merges.
+#
+# Dated verification notes do still appear further down — the 2026-07-28 batch,
+# and the google-cloud-storage bump that moved alone beside it. Each records
+# what was checked when that one change merged, which is worth keeping and is
+# not the same claim as this one. None of them is the file's standing warrant;
+# that is this paragraph's job now.
+#
+# The floor, so it is not over-read: the image job installs and imports, it does
+# not call. CI runs keyless by design, so no live external client is exercised.
+# The per-pin notes below say where that gap bites — google-cloud-storage and
+# langsmith each carry one.
 #
 # Six pins below moved on 2026-07-28, taking the first batch of Dependabot's
 # weekly output (#40) as one diff rather than six sequential rebases: the
@@ -17,11 +41,14 @@
 # failure that pin block exists to produce had nothing to fire on.
 #
 # Verified by CI on linux/py3.11: a real `pip install -r requirements.txt`
-# (no resolver conflict) plus the pytest suite. No Docker build was run, so
-# unlike the 2026-06-08 line above these versions are resolver-checked and
-# test-checked, not image-checked. langsmith is the one to watch on the next
-# deploy: 0.8.18 → 0.10.10 is a 0.x minor, which carries no compatibility
-# promise, and agent/rag_chain.py:354 imports it inside shipped code.
+# (no resolver conflict) plus the pytest suite. No Docker build was run — this
+# batch merged hours before #87 added the image job — so at merge time these
+# versions were resolver-checked and test-checked, not image-checked. They are
+# image-checked now, but by a later run over this file rather than by their own
+# PR, which is the weaker claim of the two. langsmith is the one to watch on
+# the next deploy: 0.8.18 → 0.10.10 is a 0.x minor, which carries no
+# compatibility promise, and agent/rag_chain.py:354 imports it inside shipped
+# code.
 #
 # google-cloud-storage moved separately on 2026-07-28 (#64), 2.18.2 → 3.13.0,
 # and alone rather than in the batch above — Dependabot opens majors ungrouped
