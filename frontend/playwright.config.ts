@@ -17,18 +17,14 @@ export default defineConfig({
   outputDir: "./test-results",
   // `list` for the live log, `html` for the report CI uploads on failure.
   reporter: [["list"], ["html", { open: "never" }]],
-  expect: {
-    toHaveScreenshot: {
-      // Baselines are generated in mcr.microsoft.com/playwright:v1.62.0-noble
-      // and compared on ubuntu-latest. Both are Ubuntu 24.04 with the same
-      // browser build, but they are not byte-identical environments, so a small
-      // allowance absorbs font antialiasing noise. Deliberately tight: a real
-      // layout regression moves far more than 1% of a full-page shot, and the
-      // committed baselines are worth nothing if this is set loose enough to
-      // hide one. If CI diffs cleanly at 0, drop this rather than raise it.
-      maxDiffPixelRatio: 0.01,
-    },
-  },
+  // No maxDiffPixelRatio: baselines generated in
+  // mcr.microsoft.com/playwright:v<version>-noble were measured to match
+  // ubuntu-latest with zero differing pixels, so no tolerance is needed and
+  // none is granted. Playwright's default per-pixel `threshold` (0.2 YIQ) still
+  // applies. If a future runner image starts producing antialiasing noise, add
+  // the smallest maxDiffPixelRatio that clears it rather than a round number —
+  // a 3px heading change measures 0.02, so anything at or above that hides real
+  // regressions.
   use: {
     baseURL: "http://localhost:5173",
     browserName: "chromium",
