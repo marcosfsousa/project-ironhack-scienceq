@@ -185,6 +185,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Reads the bundle `npm run build` just emitted, so it has to follow it.
+      # Asserts no `var()`-valued logical shorthand survived downleveling for
+      # the `build.target` pinned in vite.config.ts — the one failure mode that
+      # neither the typecheck, the build, nor the Playwright suite can see, the
+      # latter because the dev server never applies the target transform.
+      - name: Check CSS browser floor
+        run: npm run check:css-floor
+
   ui-tests:
     name: UI tests (Playwright)
     runs-on: ubuntu-latest

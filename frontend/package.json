@@ -10,6 +10,7 @@
     "dev": "vite",
     "typecheck": "tsc -b && tsc -p tsconfig.node.json --noEmit",
     "build": "tsc -b && vite build",
+    "check:css-floor": "node scripts/check-css-floor.mjs",
     "preview": "vite preview",
     "test:e2e": "playwright test"
   },

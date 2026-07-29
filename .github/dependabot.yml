@@ -348,10 +348,15 @@ updates:
     # Two findings outlive the entries. From #77: the typescript npm package no
     # longer ships a language service, so nothing here governs what an editor
     # runs — CI and the editor are two different compilers by construction now,
-    # not by drift. From #76: tailwind v4 documents a Safari 16.4 floor but
-    # ships its own @supports shim covering every @property it registers, so
-    # the migration held the browser floor pinned in #91 rather than moving it
-    # as a side effect.
+    # not by drift. From #76: tailwind v4 documents a Safari 16.4 floor, and its
+    # own @supports shim covers every @property it registers, but that shim is
+    # not the whole story — v4 also emits spacing as logical shorthands over a
+    # `--spacing` base, which Lightning CSS cannot downlevel while a var() is
+    # inside, so Safari 14.0 dropped them. The migration held the floor pinned
+    # in #91 only because index.css pins the spacing steps in @theme inline as
+    # well; scripts/check-css-floor.mjs is what keeps that true. Read a "v4 is
+    # compatible" claim as covering the shim alone unless the build output says
+    # otherwise.
     #
     # Both majors flow again, ungrouped: frontend-tooling above excludes majors
     # by update-types, so a tailwind 5 or typescript 8 still arrives as its own
