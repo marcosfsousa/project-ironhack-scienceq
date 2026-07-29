@@ -64,12 +64,11 @@ That is a smaller hole than the one it closes, and it points the right way: the
 committed file is the reviewable record, so a change made only in the UI is a
 change made outside review. Re-export after any UI edit:
 
-    gh api repos/marcosfsousa/project-ironhack-scienceq/rulesets/<id> \\
-      > .github/rulesets/main.json
+    python scripts/export_ruleset.py
 
-The parser below tolerates both shapes — the create body and GitHub's export of
-it, which adds ``id``, ``source``, ``created_at`` and ``_links`` — so the same
-file works as the thing you POST and the thing you diff.
+That script drops the fields GitHub assigns rather than accepts, so the file it
+writes is both an accurate record and a body you can POST to recreate the
+ruleset from scratch.
 
 
 Parsing ci.yml without PyYAML
@@ -106,13 +105,20 @@ _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _RULESET = _REPO_ROOT / ".github" / "rulesets" / "main.json"
 
 # The branch Cloud Build's deploy triggers watch. Written as a literal ref
-# rather than GitHub's `~DEFAULT_BRANCH` alias on purpose: the triggers match
-# `^main$` in GCP, not "whatever this repo calls its default branch", so
+# rather than GitHub's `~DEFAULT_BRANCH` alias on purpose: the triggers match a
+# branch pattern in GCP, not "whatever this repo calls its default branch", so
 # following the default would silently decouple protection from deployment if
-# the default were ever moved. Nothing in this repo can assert the trigger side
-# — that config lives in the GCP project — which is the reason to pin the
-# literal here rather than track something adjacent to it.
+# the default were ever moved.
+#
+# The live trigger config is in the GCP project and cannot be read from here.
+# scripts/create-triggers.sh is the next best thing — it is what creates both
+# triggers, so it states the branch this repo intends to deploy from, and
+# TestRulesetPinsItsDecisions checks the two against each other. It is a
+# statement of intent rather than the live value: a trigger edited in the
+# console diverges from the script with nothing to notice. Worth having anyway,
+# since the pair moving apart in the repo is the likelier mistake.
 _PROTECTED_REF = "refs/heads/main"
+_TRIGGERS = _REPO_ROOT / "scripts" / "create-triggers.sh"
 
 
 # ── Reading the workflow ───────────────────────────────────────────────────────
@@ -236,6 +242,47 @@ class TestRulesetPinsItsDecisions:
             "branch where a merge is a deploy. Widening this is fine; narrowing "
             "or moving it leaves production unprotected."
         )
+
+    def test_the_deploy_trigger_watches_the_branch_it_protects(self):
+        # The other end of the same coupling. If a trigger is ever pointed at a
+        # different branch, the ruleset does not follow it — production would
+        # deploy from a branch anyone can push to, and every check here would
+        # still be green.
+        script = _TRIGGERS.read_text(encoding="utf-8")
+        branch = re.search(r'^BRANCH="\^([A-Za-z0-9._/-]+)\$"', script, re.MULTILINE)
+        assert branch, (
+            f"No BRANCH=\"^...$\" assignment in {_TRIGGERS.name}. The deploy "
+            "branch can no longer be read from the repo, so nothing checks that "
+            "the protected branch is the one that ships."
+        )
+        assert f"refs/heads/{branch.group(1)}" == _PROTECTED_REF, (
+            f"{_TRIGGERS.name} deploys from {branch.group(1)!r} but the ruleset "
+            f"protects {_PROTECTED_REF!r}.\n"
+            "Whichever moved, the other has to follow: a deploy branch without "
+            "the ruleset is an unprotected production branch."
+        )
+
+    def test_the_admin_bypass_is_recorded(self):
+        actors = _load_ruleset().get("bypass_actors", [])
+        assert len(actors) == 1, (
+            f"Expected one bypass actor, found {len(actors)}: {actors}\n"
+            "With none, the only way past a stuck required check is to delete "
+            "or disable the ruleset — a change that leaves protection off after "
+            "the emergency instead of leaving a bypass in the log. With more "
+            "than one, say here who else may skip the checks and why."
+        )
+        actor = actors[0]
+        # 5 is GitHub's built-in Repository admin role. Read back from the API
+        # after adding the bypass through the UI rather than assumed: the role
+        # ids are not documented, and a wrong one here is a silent widening —
+        # 2 is Write, which on this repo would be the same person and would look
+        # identical in a diff.
+        assert (actor.get("actor_type"), actor.get("actor_id")) == ("RepositoryRole", 5), (
+            f"The bypass actor is {actor}, not the Repository admin role.\n"
+            "Re-run scripts/export_ruleset.py if this changed in the UI, and "
+            "check what role was actually granted before committing it."
+        )
+        assert actor.get("bypass_mode") == "always"
 
     def test_branches_must_be_up_to_date(self):
         rule = _rule(_load_ruleset(), "required_status_checks") or {}
