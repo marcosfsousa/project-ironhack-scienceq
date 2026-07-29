@@ -23,13 +23,25 @@
 #
 #   Dockerfile           python:3.11-slim
 #   Dockerfile.pipeline  python:3.11-slim
-#   Dockerfile.web       node:20-alpine   (build stage)
+#   Dockerfile.web       node:24-alpine   (build stage)
 #   Dockerfile.web       nginx:alpine     (runtime stage — what actually serves)
 #
-# The pythons and the node carry a deliberate major, chosen to match a runtime
-# rather than to track latest: Cloud Run's Python, and the Node that ci.yml's
-# setup-node pins. A bot proposing 3.12 or node 22 is proposing a runtime
-# migration, not applying a patch, so that stays a human decision. nginx is
+# The pythons and the node carry a deliberate major, chosen rather than
+# tracked. They are not chosen the same way, which an earlier version of this
+# paragraph flattened into one clause. The pythons match a runtime: Cloud
+# Run's. The node matches nothing downstream — it is a build stage whose
+# output is a static bundle nginx serves, so no runtime is waiting on it. What
+# picks its major is the floor the frontend build tooling declares in its own
+# `engines.node`, plus the Node release schedule: 20 was taken to EOL on
+# 2026-04-30 while still pinned here, and 24 (#91) is the current LTS with the
+# longest runway over the `^20.19.0 || >=22.12.0` that vite 8 and
+# @vitejs/plugin-react 6 declare once #98 installs them. Either way a bot
+# proposing 3.12 or node 26 is proposing a migration, not applying a patch, so
+# that stays a human decision — and for the node, one that starts by reading
+# the `engines.node` of vite and @vitejs/plugin-react, then the LTS calendar.
+# Not `frontend/package.json`'s engines field: that one is this pin restated,
+# so consulting it to choose the next pin only quotes the current answer back.
+# nginx is
 # the odd one out and is listed here so an audit from this paragraph does not
 # come up one short: it has no pinned major, so nginx:alpine already floats
 # across majors on every rebuild of the web image. Excluding it changes

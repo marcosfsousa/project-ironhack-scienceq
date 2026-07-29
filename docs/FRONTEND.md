@@ -37,7 +37,7 @@ gcloud builds submit \
   --project=scienceq-prod
 ```
 
-The build is two-stage: `node:20-alpine` runs `vite build`, then `nginx:alpine` serves the static bundle. `${API_URL}` is substituted at container startup via `envsubst`. Both stages run as non-root users (`nginx` user in the serving stage).
+The build is two-stage: `node:24-alpine` runs `vite build`, then `nginx:alpine` serves the static bundle. The build-stage major is pinned to match `ci.yml`'s `setup-node` and `frontend/package.json`'s `engines.node`; move all three together (#91). `${API_URL}` is substituted at container startup via `envsubst`. Both stages run as non-root users (`nginx` user in the serving stage).
 
 ---
 
