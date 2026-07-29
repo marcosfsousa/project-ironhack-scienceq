@@ -130,10 +130,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 24 matches the web image's build stage (Dockerfile.web), and both are
-      # above the `^20.19.0 || >=22.12.0` floor the frontend toolchain declares
-      # (#91). Move this, the ui-tests job below, and the Dockerfile together —
-      # a split leaves CI testing a runtime the image does not use.
+      # 24 matches the web image's build stage (Dockerfile.web). Move this, the
+      # ui-tests job below, and the Dockerfile together — a split leaves CI
+      # testing a runtime the image does not use.
+      #
+      # Not picked to clear what is installed at this commit: vite 6.4.3 asks
+      # for `^18.0.0 || ^20.0.0 || >=22.0.0` and @vitejs/plugin-react 4.7.0 for
+      # `^14.18.0 || >=16.0.0`, both of which Node 20 already satisfied. It is
+      # picked because 20 went EOL on 2026-04-30, and because the vite 8 /
+      # plugin-react 6 bump in #98 raises the declared floor to
+      # `^20.19.0 || >=22.12.0` (#91) — which 20 clears only for as long as the
+      # resolved 20.x happens to be recent enough. The second reason is the one
+      # that outlives this commit.
       - uses: actions/setup-node@v7
         with:
           node-version: "24"
