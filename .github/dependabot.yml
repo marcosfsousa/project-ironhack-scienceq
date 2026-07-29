@@ -320,54 +320,56 @@ updates:
     # revisiting, the knob is a second group entry with applies-to:
     # security-updates — not a change to the ones above.
 
-    # Two parked decisions. Read this block as a different kind of thing from
+    # One parked decision. Read this block as a different kind of thing from
     # the pip ignore above, because the lifecycle is the opposite one: those
     # two wait on an upstream ceiling nobody here controls and stay until
-    # langchain-pinecone or langchain-groq moves. These two wait on a decision
-    # this repo owns, are tracked in issues, and should be short-lived. If
-    # either is still here months from now, that is the signal to go read the
-    # issue, not to leave it alone.
+    # langchain-pinecone or langchain-groq moves. This one waits on a decision
+    # this repo owns, is tracked in an issue, and should be short-lived. If it
+    # is still here months from now, that is the signal to go read the issue,
+    # not to leave it alone.
     #
     #   tailwindcss 3.4.19 → 4.x   #58, tracked in #76
-    #   typescript  5.9.3  → 7.x   #62, tracked in #77
     #
-    # Neither PR is wrong; both are incomplete in the same way. Each edits only
-    # package.json and package-lock.json, because that is all Dependabot edits.
-    # For tailwind that is not enough to build: v4 does not read
-    # tailwind.config.ts and does not recognise the `@tailwind` directives in
-    # src/index.css, so postcss.config.js and both of those files have to change
-    # in the same commit. For typescript the bump may well be complete as
-    # proposed — 7.0 is a reimplemented compiler rather than a feature release,
-    # so it wants a deliberate verification pass (language service, the
-    # tsconfig.node.json files nothing typechecks, vite toolchain peers) rather
-    # than a green `tsc -b` read as sufficient.
+    # The PR is not wrong, it is incomplete: it edits only package.json and
+    # package-lock.json, because that is all Dependabot edits. For tailwind
+    # that is not enough to build — v4 does not read tailwind.config.ts and
+    # does not recognise the `@tailwind` directives in src/index.css, so
+    # postcss.config.js and both of those files have to change in the same
+    # commit.
+    #
+    # typescript 5.9.3 → 7.x (#62) was parked here too, tracked in #77, on the
+    # argument that a reimplemented compiler wants a deliberate verification
+    # pass rather than a green `tsc -b` read as sufficient. That pass ran and
+    # came back clean, so the entry is gone and typescript majors flow again —
+    # ungrouped, since frontend-tooling excludes majors by update-types, so a
+    # future 8.x still arrives as its own PR to be judged the same way. The
+    # findings are in #77. The one worth knowing from this file is that the
+    # typescript npm package no longer ships a language service, so nothing
+    # here governs what an editor runs: CI and the editor are now two
+    # different compilers by construction, not by drift.
     #
     # Scoped to majors, same as the pip block and for the same reason: minor
-    # and patch releases of both keep flowing, and keep arriving inside the
+    # and patch releases keep flowing, and keep arriving inside the
     # frontend-tooling group above, which already excludes majors by
     # update-types. Only the jump over the major stops.
     #
     # Security coverage is unaffected, per the correction recorded on the pip
     # block above: an `update-types` ignore reaches version updates only. A CVE
-    # fixed only in tailwind 4+ or typescript 7+ still opens a security PR.
+    # fixed only in tailwind 4+ still opens a security PR.
     #
     # Worth following that through here, because it lands differently than it
     # does for pip. There the security PR arrives red — the upstream ceiling
     # blocks it and no advisory moves it. Here it arrives *mergeable-looking*
-    # and is not: a tailwind 4 security PR still ships only package.json and the
-    # lockfile, so it still fails to build for the reasons in #76, and a
-    # typescript 7 one still skips the verification #77 scopes. The advisory
-    # changes the urgency of those issues, not their content.
+    # and is not: a tailwind 4 security PR still ships only package.json and
+    # the lockfile, so it still fails to build for the reasons in #76. The
+    # advisory changes the urgency of that issue, not its content.
     #
     # So the trigger to act is the same either way, and it is not this file:
-    # an advisory against tailwind 3.x or typescript 5.x means go do #76 or #77
-    # properly, not merge whatever the bot opened.
+    # an advisory against tailwind 3.x means go do #76 properly, not merge
+    # whatever the bot opened.
     #
-    # Delete each entry when its issue closes, whichever way it closes.
+    # Delete the entry when its issue closes, whichever way it closes.
     ignore:
       - dependency-name: tailwindcss
-        update-types:
-          - version-update:semver-major
-      - dependency-name: typescript
         update-types:
           - version-update:semver-major
