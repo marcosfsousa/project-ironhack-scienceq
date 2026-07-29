@@ -53,25 +53,41 @@
 # compatibility promise, and agent/rag_chain.py:354 imports it inside shipped
 # code.
 #
-# Five pins moved on 2026-07-29, taking that Monday's sweep (#100-#103) as one
+# Six pins moved on 2026-07-29, taking that Monday's sweep (#100-#103) as one
 # diff on the same reasoning as the batch above: fastapi 0.140.12 → 0.140.13 and
 # uvicorn 0.51.0 → 0.52.0 (the fastapi-stack group, #101), langgraph 1.2.9 →
-# 1.2.10 and langchain-core 1.5.1 → 1.5.2 (the langchain group, #102), plus
-# postcss and openai in files this one does not own. No advisories in the set.
+# 1.2.10 and langchain-core 1.5.1 → 1.5.2 (the langchain group, #102) — four in
+# this file — plus postcss and openai in files this one does not own. No
+# advisories in the set.
 #
-# uvicorn is the only non-patch, and it is the container entrypoint
-# (Dockerfile), so it was read rather than taken on green. 0.52.0 adds an
-# experimental HTTP/1.1 parser, zttp — Zig-backed, selectable with `--http
-# zttp`. It does not land here twice over: the CMD passes no `--http`, and zttp
-# is not in requires_dist at all, including under the `standard` extra this file
-# installs, so the default h11 path is what runs and the new parser is not even
-# present. `h11>=0.8` is unchanged, which is the fact the decision at the bottom
-# of this file to leave h11 unpinned rests on. The other 0.52.0 entry is a
-# websockets 17.0 header fix; nothing under api/, agent/ or pipeline/ opens a
-# websocket. fastapi 0.140.13 is a status_code fix for SSE and JSONL endpoints
-# — api/routes.py does serve SSE, but declares no status_code on the decorator
-# and returns a hand-built StreamingResponse rather than fastapi.sse, so that
-# one is inert here too.
+# Two of the six are minors rather than patches, and they sit at opposite ends
+# of how much the green checks are worth. uvicorn is the container entrypoint
+# (Dockerfile), so it was read rather than taken on green. openai is the one
+# pin in the set CI never installs — the backend job installs requirements.txt
+# alone, as requirements-dev.txt says at its openai block — so a green run is
+# quietest about the other bump that is not a patch.
+#
+# 0.52.0 adds an experimental HTTP/1.1 parser, zttp — Zig-backed, selectable
+# with `--http zttp`. It is not in this image: the CMD passes no `--http`, and
+# zttp appears nowhere in 0.52.0's requires_dist, under `standard` or any other
+# extra, so it is not installed at all.
+#
+# What that absent `--http` does select is httptools, not h11, and an earlier
+# draft of this paragraph had it backwards. uvicorn/protocols/http/auto.py
+# imports httptools and falls back to h11 only on ImportError, and the
+# `standard` extra this file installs declares `httptools>=0.8.0`. So the
+# parser on the request path is httptools; h11 ships too, but as dormant
+# fallback code. `h11>=0.8` being unchanged in 0.52.0 is true and was checked,
+# but it is not the fact the unpinned-parser decision rests on. That decision,
+# and the correction, are worked through at the clause-(2) discussion near the
+# bottom of this file, which carried the same error and is now where it is
+# stated.
+#
+# The other 0.52.0 entry is a websockets 17.0 header fix; nothing under api/,
+# agent/ or pipeline/ opens a websocket. fastapi 0.140.13 is a status_code fix
+# for SSE and JSONL endpoints — api/routes.py does serve SSE, but declares no
+# status_code on the decorator and returns a hand-built StreamingResponse
+# rather than fastapi.sse, so that one is inert here too.
 #
 # The floors were re-checked rather than assumed, since langchain-core moving is
 # exactly what the pin block below is built to catch: langgraph 1.2.10 declares
@@ -207,8 +223,10 @@ slowapi==0.1.10
 # reproducible than before, not reproducible. The one transitive held despite
 # nothing importing it is limits, pinned at the bottom of this file under a
 # two-clause criterion #41 settled; the block there states what makes it the
-# exception and works through h11 under uvicorn, which meets the first clause
-# and is still not pinned. Successor releases are watched
+# exception and works through uvicorn's HTTP/1.1 parser — httptools in this
+# image, not h11, which that block got wrong until 2026-07-29 — as the case
+# that meets the first clause and is still not pinned. Successor releases are
+# watched
 # now: .github/dependabot.yml (#40) opens a weekly PR when a newer release of
 # a pin below exists, grouping fastapi+starlette and the langchain train so a
 # coupled bump arrives as one reviewable diff. The floating transitive tree is
@@ -310,17 +328,36 @@ requests==2.34.2
 # that parent, in a diff. Only an unbounded declaration puts the child beyond
 # review, which is the exposure this pin answers.
 #
-# Clause (2) is the judgment, and h11 under uvicorn is the case that shows
-# where it stops. h11 clears clause (1) — `h11>=0.8`, no ceiling — is imported
-# by nothing here, and is where HTTP/1.1 protocol behaviour actually lives, so
-# it reaches the same question limits does. It is still not pinned, because
-# uvicorn is not a thin wrapper over it: uvicorn is a server with config,
-# lifespan, worker and signal handling, and h11 is one pluggable protocol
-# implementation inside it. slowapi has no such surface of its own — strip
-# limits out and nothing is left but the decorator. That is the line: is the
-# parent's public behaviour the child's behaviour renamed, or does the parent
-# merely run on the child. If it ever has to move, move it here in writing
-# rather than package by package.
+# Clause (2) is the judgment, and uvicorn's HTTP/1.1 parser is the case that
+# shows where it stops. Which package that is was stated wrongly here until
+# 2026-07-29, and the correction is recorded rather than quietly applied,
+# because it moves the exposure instead of removing it. This block said h11.
+# The image runs httptools.
+#
+# uvicorn/protocols/http/auto.py imports httptools and falls back to
+# H11Protocol only on ImportError, and `uvicorn[standard]` — the extra this
+# file installs — declares `httptools>=0.8.0` with no environment marker. So
+# httptools is present, AutoHTTPProtocol resolves to HttpToolsProtocol, and
+# Dockerfile passes no `--http`, which makes that default what serves. h11 is
+# in the image, unbounded and unpinned, but nothing reaches it while httptools
+# imports. The parser on the request path is httptools, equally unbounded
+# (`>=0.8.0`) and pinned in neither manifest.
+#
+# The decision does not change, which is why the fact being wrong mattered
+# less than where it pointed. httptools clears clause (1) exactly as h11 does,
+# and fails clause (2) for the same reason: uvicorn is a server with config,
+# lifespan, worker and signal handling, and httptools is one pluggable protocol
+# implementation among several — auto, h11, httptools, and zttp as of 0.52.0 —
+# not the whole of what uvicorn does. slowapi has no such surface of its own —
+# strip limits out and nothing is left but the decorator. That is the line: is
+# the parent's public behaviour the child's behaviour renamed, or does the
+# parent merely run on the child.
+#
+# What the correction does change is which package an audit of this file's
+# unpinned surface should reach for first, and how live that surface is. A
+# httptools major landing on a rebuild is on every request; the same major in
+# h11 reaches nothing until httptools stops importing. If clause (2) ever has
+# to move, move it here in writing rather than package by package.
 #
 # The unbounded floor is not hypothetical: `limits>=2.3` has already been
 # walked to 5.8.0, three majors, which is the starlette case above further down
