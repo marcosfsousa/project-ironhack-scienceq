@@ -15,6 +15,18 @@ export default defineConfig({
   projects: [
     { name: "desktop", use: { viewport: { width: 1280, height: 800 } } },
     { name: "mobile",  use: { viewport: { width: 390, height: 844 }, isMobile: true } },
+    // Gecko is opt-in via GECKO=1. Issue #93 reproduces on Gecko and not on
+    // Blink, and until this project existed nothing here had ever run on Gecko
+    // at all — but CI installs the chromium binary only (ci.yml), so an
+    // unconditional project would fail the run on a missing browser. Firefox
+    // also rejects `isMobile`; the app keys its mobile branch off
+    // window.innerWidth (useIsMobile), so the viewport alone gets us there.
+    ...(process.env.GECKO
+      ? [{
+          name: "firefox-mobile",
+          use: { browserName: "firefox" as const, viewport: { width: 365, height: 800 } },
+        }]
+      : []),
   ],
   webServer: {
     command: "npm run dev",
