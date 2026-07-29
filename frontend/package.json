@@ -12,8 +12,7 @@
     "build": "tsc -b && vite build",
     "check:css-floor": "node scripts/check-css-floor.mjs",
     "preview": "vite preview",
-    "test:e2e": "playwright test",
-    "test:e2e:baselines": "bash scripts/update-baselines.sh"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "react": "^19.2.8",

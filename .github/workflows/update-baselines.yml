@@ -1,0 +1,86 @@
+# Regenerates the committed Playwright pixel baselines on the same runner that
+# compares them (issue #89, option 1).
+#
+# Generating them anywhere else does not work, and this was measured rather than
+# assumed: baselines built in mcr.microsoft.com/playwright:v1.62.0-noble differ
+# from ubuntu-latest by up to 7% of a full-page shot, because the `→` in the
+# Hero suggestion rows is not in the primary font and each environment falls
+# back to a different system font. The substituted glyph has a different advance
+# width, so every following character shifts and the whole line reads as changed.
+# No diff tolerance can absorb that without also hiding real regressions.
+#
+# Usage — either:
+#   * push a commit whose message contains [baselines], or
+#   * run this workflow manually from the Actions tab (once it is on main).
+# Then download the `playwright-baselines` artifact and commit its contents to
+# frontend/tests/visual.spec.ts-snapshots/. Review the diff: every changed PNG
+# is a UI change you are approving.
+name: Update visual baselines
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  baselines:
+    name: Regenerate baselines
+    # Manual runs always; pushes only when the commit asks for it, so this does
+    # not add a runner to every branch push.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[baselines]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      # Every step below is kept identical to ci.yml's `ui-tests` job. That is
+      # the whole point: baselines are only valid if the environment that writes
+      # them matches the one that later compares them.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Chromium system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # Only the two projects that own baselines. preview-smoke sets
+      # ignoreSnapshots, and CI=true would otherwise start a second web server
+      # and a `vite build` for nothing.
+      - name: Regenerate baselines
+        run: npx playwright test --update-snapshots --project=desktop --project=mobile
+
+      - name: Upload baselines
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-baselines
+          path: frontend/tests/visual.spec.ts-snapshots/
+          retention-days: 7
+          if-no-files-found: error

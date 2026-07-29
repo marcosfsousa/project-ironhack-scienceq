@@ -33,15 +33,19 @@ test.beforeEach(async ({ page }) => {
 //
 // So Linux compares, and everything else falls back to the previous
 // capture-only behaviour rather than failing on a baseline it cannot have.
-// CI is ubuntu-latest, so CI is always the arbiter. To regenerate locally
-// without a Linux box, use the image CI's browser build comes from:
 //
-//   docker run --rm -v "$(pwd)/..:/w" -v /w/frontend/node_modules \
-//     -w /w/frontend mcr.microsoft.com/playwright:v1.62.0-noble \
-//     bash -lc "npm ci && npx playwright test --update-snapshots"
+// "Linux" is not specific enough on its own, though: baselines must come from
+// the *same* Linux as the comparison. Generating them in
+// mcr.microsoft.com/playwright:v1.62.0-noble and comparing on ubuntu-latest was
+// tried and measured at up to 7% differing pixels on a full-page shot — the `→`
+// in Hero's suggestion rows is not in the primary font, the two environments
+// fall back to different system fonts, and the substituted glyph's advance
+// width shifts every character after it. That is far too large to absorb with a
+// diff tolerance that still catches real regressions.
 //
-// (the anonymous node_modules volume keeps the container's Linux binaries from
-// overwriting the host's — see npm run test:e2e:baselines)
+// So CI both writes and reads them. Regenerate with the "Update visual
+// baselines" workflow — push a commit whose message contains [baselines], or
+// run it from the Actions tab — then commit the artifact it uploads.
 const PIXEL_BASELINES = process.platform === "linux";
 
 async function snap(page: Page, testInfo: TestInfo, name: string) {
