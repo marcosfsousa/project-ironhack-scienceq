@@ -17,6 +17,20 @@ import { SSE_FIXTURE } from "./sse-fixture";
 // style in privacy.spec.ts: substance is pinned, exact copy is not.
 
 test.beforeEach(async ({ page }) => {
+  // Registered first so the /api mocks below, being registered later, still win
+  // — Playwright resolves the most recently added matching route.
+  //
+  // VideoEmbed renders a live youtube.com/embed iframe, so without this the
+  // answer baseline captures whatever thumbnail YouTube serves that day. That
+  // is not a property of this app: it would drift when the CDN does, and fail
+  // outright on a runner with no egress. Everything off-origin is stubbed to an
+  // empty document so the embed is a stable black box.
+  await page.route("**/*", (route) => {
+    const { hostname } = new URL(route.request().url());
+    if (hostname === "localhost" || hostname === "127.0.0.1") return route.continue();
+    return route.fulfill({ status: 200, contentType: "text/html", body: "" });
+  });
+
   await page.route("/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(CATALOG_FIXTURE) })
   );
