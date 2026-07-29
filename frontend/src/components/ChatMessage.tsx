@@ -65,8 +65,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
         ) : (
           <div className="whitespace-pre-wrap text-[15.5px] leading-[1.78] text-mut-250">
             {done ? cleanAnswer(message.text) : message.text}
+            {/* The caret uses `transform:` rather than a translate-y-* utility —
+                v4 emits those as the individual `translate` property, which is
+                above the build.target floor and cannot be downleveled. Only a
+                2px nudge here, unlike Sidebar.tsx, but the same defect. Named
+                with a `*` on purpose: v4 scans comment text too, so spelling a
+                real utility here would regenerate the declaration. */}
             {streaming && (
-              <span className="ml-px inline-block h-[15px] w-2 translate-y-0.5 animate-blink bg-accent align-[-2px]" />
+              <span className="ml-px inline-block h-[15px] w-2 [transform:translateY(0.125rem)] animate-blink bg-accent align-[-2px]" />
             )}
           </div>
         )}

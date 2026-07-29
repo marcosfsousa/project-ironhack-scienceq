@@ -278,9 +278,14 @@ updates:
       # `tailwindcss` and `@tailwindcss/*` are listed together on purpose: since
       # #76 the PostCSS plugin is a separate package that upstream versions in
       # lockstep with the framework, so splitting them across two PRs would let
-      # one land without the other and mismatch the pair. `autoprefixer` came
-      # off this list in the same change — v4 handles vendor prefixing, so it is
-      # no longer a dependency.
+      # one land without the other and mismatch the pair. Note the scope though
+      # — this group is minor/patch only, so a tailwind *major* still arrives as
+      # two ungrouped PRs, exactly the split this grouping avoids for minors. In
+      # practice the pair cannot functionally mismatch (`@tailwindcss/postcss`
+      # pins its `tailwindcss` peer to the same exact version), and a major is a
+      # migration to be judged as one anyway — as #76 itself was. `autoprefixer`
+      # came off this list in the same change — v4 handles vendor prefixing, so
+      # it is no longer a dependency.
       frontend-tooling:
         patterns:
           - vite
@@ -348,15 +353,27 @@ updates:
     # Two findings outlive the entries. From #77: the typescript npm package no
     # longer ships a language service, so nothing here governs what an editor
     # runs — CI and the editor are two different compilers by construction now,
-    # not by drift. From #76: tailwind v4 documents a Safari 16.4 floor, and its
-    # own @supports shim covers every @property it registers, but that shim is
-    # not the whole story — v4 also emits spacing as logical shorthands over a
-    # `--spacing` base, which Lightning CSS cannot downlevel while a var() is
-    # inside, so Safari 14.0 dropped them. The migration held the floor pinned
-    # in #91 only because index.css pins the spacing steps in @theme inline as
-    # well; scripts/check-css-floor.mjs is what keeps that true. Read a "v4 is
-    # compatible" claim as covering the shim alone unless the build output says
-    # otherwise.
+    # not by drift. From #76, and this took two rounds of review to get right:
+    # tailwind v4 documents a Safari 16.4 floor, and its own @supports shim does
+    # cover every @property it registers — but the shim is not the whole story,
+    # and "v4 ships a compatibility shim" is not the same claim as "v4 stays
+    # inside build.target". v4 also emits modern CSS *properties* the shim says
+    # nothing about, and two of them breached the pin:
+    #
+    #   - spacing as logical shorthands over a `--spacing` base, which Lightning
+    #     CSS cannot downlevel while a var() is inside (Safari 14.0)
+    #   - the individual translate/scale/rotate properties in place of v3's
+    #     `transform`, which cannot be downleveled at all, and which are above
+    #     the pin on Chrome and Edge too, not just Safari
+    #
+    # Both are fixed in-tree rather than by moving the pin, so the migration did
+    # hold the floor from #91 — but read that as "introduced no regression",
+    # not as "the app is verified at safari14". aspect-ratio and flexbox gap were
+    # already emitted and already unsupported there before v4.
+    # scripts/check-css-floor.mjs guards exactly the two failures above and
+    # says so at the top; it is not a general floor certificate. Treat any
+    # future "v4 is compatible" claim as covering the shim alone until the build
+    # output says otherwise.
     #
     # Both majors flow again, ungrouped: frontend-tooling above excludes majors
     # by update-types, so a tailwind 5 or typescript 8 still arrives as its own

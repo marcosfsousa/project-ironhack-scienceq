@@ -146,6 +146,31 @@
   --color-accent-bd: var(--acc-bd);
 }
 
+/* ---- Do not use the translate / scale / rotate utilities -----------------
+   The sibling of the spacing problem above, and the reason Sidebar.tsx and
+   ChatMessage.tsx write `[transform:translateX(…)]` instead of `translate-x-*`.
+
+   v4 emits the *individual* `translate` / `scale` / `rotate` properties where v3
+   composed `transform: translate(…)`. Those properties are Chrome 104 / Edge 104
+   / Safari 14.1 — above `build.target` on every engine it pins — and unlike the
+   spacing shorthands Lightning CSS has no downlevel path for them at all: a
+   fully static `translate: -100% 0` is left untouched too, so there is no
+   `@theme inline` trick to reach for. Raising the pin to safari14.1 would not
+   help either, since Chrome/Edge 88-103 are below it as well.
+
+   This shipped once. The mobile drawer's closed state was a negative
+   translate-x-* utility alone, so with the declaration dropped it kept
+   `fixed left-0 z-50` and covered the app permanently while inert and
+   aria-hidden. (Utility names are written with a `*` throughout this file on
+   purpose. v4 scans raw text for candidates, so spelling a real one in prose
+   regenerates the very declaration the note is warning about — that happened
+   once already, in a ChatMessage.tsx comment, and the check caught it.)
+
+   Write offsets as `transform:` values. `transition-transform` resolves to
+   `transition-property: transform,translate,scale,rotate`, so animation is
+   unaffected. scripts/check-css-floor.mjs fails the build on any individual
+   `translate:` / `scale:` / `rotate:` declaration. */
+
 /* ---- `hover:` is conditional under v4 ------------------------------------
    Not a local rule, but the one v4 default that changed behaviour here rather
    than output: v4 wraps every `hover:` utility in `@media (hover: hover)`, so
