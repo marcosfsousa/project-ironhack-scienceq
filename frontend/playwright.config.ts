@@ -21,6 +21,8 @@ export default defineConfig({
     // unconditional project would fail the run on a missing browser. Firefox
     // also rejects `isMobile`; the app keys its mobile branch off
     // window.innerWidth (useIsMobile), so the viewport alone gets us there.
+    // Needs the browser first: `npx playwright install firefox`, then
+    // `GECKO=1 npm run test:e2e -- --project=firefox-mobile`.
     ...(process.env.GECKO
       ? [{
           name: "firefox-mobile",

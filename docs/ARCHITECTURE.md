@@ -229,6 +229,16 @@ Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for t
 
 CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend typecheck + build`, and `UI tests (Playwright)`.
 
+The Playwright check runs the `desktop` and `mobile` projects, both Chromium — CI installs that browser binary alone. A third project, `firefox-mobile`, is gated behind the `GECKO` environment variable and never runs in CI. It exists because [#93](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/93) reproduced on Gecko and not on Blink, and running it locally needs the browser installed first:
+
+```
+cd frontend
+npx playwright install firefox
+GECKO=1 npm run test:e2e -- --project=firefox-mobile
+```
+
+Note that this project runs the whole suite, not just the spec that motivated it. Firefox is a small enough share of mobile traffic that the ongoing CI cost is not worth it, so the Blink-only matrix is deliberate — which is also why `tests/composer-overflow.spec.ts` asserts the underlying CSS invariant and not only the layout symptom, since the symptom is unobservable in Chromium.
+
 The frontend check runs two `tsc` passes, because one does not cover the tree. `tsc -b` builds `frontend/tsconfig.json`, whose `include` is `src` alone; `frontend/tsconfig.node.json` declares a separate set (the vite/playwright/tailwind configs and `tests/`) and needs its own invocation. Neither config is `composite` and neither declares `references`, so build mode has no project graph to walk and will not reach the second one on its own. Both passes live in `npm run typecheck` ([#81](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/81)).
 
 ---
