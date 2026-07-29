@@ -33,12 +33,15 @@
 # and yt-dlp. Two of those close advisories — yt-dlp GHSA-6v4j-43gg-vj32
 # (high) and langchain GHSA-gr75-jv2w-4656 (medium).
 #
-# The four #37 pins below did not move, and that is a checked result, not an
-# omission: langchain 1.3.14, langgraph 1.2.9 and langchain-groq 1.1.3 declare
-# langchain-core floors of >=1.4.9, >=1.4.7 and >=1.4.0, all under the pinned
-# 1.5.1, and langsmith 0.10.10 needs only pydantic>=2, typing-extensions>=4.0.0
-# and requests>=2.0.0. So this batch did not tighten the solve — the loud
-# failure that pin block exists to produce had nothing to fire on.
+# The four #37 pins below did not move in that batch, and that is a checked
+# result, not an omission: langchain 1.3.14, langgraph 1.2.9 and langchain-groq
+# 1.1.3 declare langchain-core floors of >=1.4.9, >=1.4.7 and >=1.4.0, all under
+# the langchain-core pinned that day, 1.5.1, and langsmith 0.10.10 needs only
+# pydantic>=2, typing-extensions>=4.0.0 and requests>=2.0.0. So this batch did
+# not tighten the solve — the loud failure that pin block exists to produce had
+# nothing to fire on. Read the version numbers in this paragraph as the state on
+# 2026-07-28: langgraph and langchain-core have both moved since, in the batch
+# recorded below, and the pin lines are the current answer.
 #
 # Verified by CI on linux/py3.11: a real `pip install -r requirements.txt`
 # (no resolver conflict) plus the pytest suite. No Docker build was run — this
@@ -49,6 +52,43 @@
 # the next deploy: 0.8.18 → 0.10.10 is a 0.x minor, which carries no
 # compatibility promise, and agent/rag_chain.py:354 imports it inside shipped
 # code.
+#
+# Five pins moved on 2026-07-29, taking that Monday's sweep (#100-#103) as one
+# diff on the same reasoning as the batch above: fastapi 0.140.12 → 0.140.13 and
+# uvicorn 0.51.0 → 0.52.0 (the fastapi-stack group, #101), langgraph 1.2.9 →
+# 1.2.10 and langchain-core 1.5.1 → 1.5.2 (the langchain group, #102), plus
+# postcss and openai in files this one does not own. No advisories in the set.
+#
+# uvicorn is the only non-patch, and it is the container entrypoint
+# (Dockerfile), so it was read rather than taken on green. 0.52.0 adds an
+# experimental HTTP/1.1 parser, zttp — Zig-backed, selectable with `--http
+# zttp`. It does not land here twice over: the CMD passes no `--http`, and zttp
+# is not in requires_dist at all, including under the `standard` extra this file
+# installs, so the default h11 path is what runs and the new parser is not even
+# present. `h11>=0.8` is unchanged, which is the fact the decision at the bottom
+# of this file to leave h11 unpinned rests on. The other 0.52.0 entry is a
+# websockets 17.0 header fix; nothing under api/, agent/ or pipeline/ opens a
+# websocket. fastapi 0.140.13 is a status_code fix for SSE and JSONL endpoints
+# — api/routes.py does serve SSE, but declares no status_code on the decorator
+# and returns a hand-built StreamingResponse rather than fastapi.sse, so that
+# one is inert here too.
+#
+# The floors were re-checked rather than assumed, since langchain-core moving is
+# exactly what the pin block below is built to catch: langgraph 1.2.10 declares
+# `langchain-core<2,>=1.4.7` and langchain-openai 1.4.1 `langchain-core<2.0.0,
+# >=1.5.1`, both cleared by 1.5.2. fastapi 0.140.13 still declares
+# `starlette>=0.46.0` with no upper bound and `pydantic>=2.9.0`, so the starlette
+# and pydantic pins below still satisfy it and the coupling that block describes
+# is unchanged.
+#
+# One mechanism this batch surfaced, worth knowing before the next one.
+# Dependabot rewrites version strings inside comments, not just on pin lines: it
+# edited the `fastapi==0.140.12` in the starlette paragraph below to 0.140.13 on
+# its own. That is correct this time — 0.140.13 does still declare
+# `starlette>=0.46.0`, checked above — but it is a blind string substitution, so
+# it will silently restate a claim nobody re-verified. It reaches `pkg==version`
+# form only, which is why the langchain prose here and below, written as bare
+# numbers, went stale instead and had to be amended by hand.
 #
 # google-cloud-storage moved separately on 2026-07-28 (#64), 2.18.2 → 3.13.0,
 # and alone rather than in the batch above — Dependabot opens majors ungrouped
@@ -146,11 +186,20 @@ slowapi==0.1.10
 # The trade this accepts: bumping fastapi now requires a deliberate matching
 # starlette bump instead of letting it float. That is the point — do not remove
 # this pin as redundant just because fastapi already depends on starlette.
-# langchain-core carries the same trade in a tighter form: 1.5.1 sits exactly
-# on the floor declared by langchain-openai 1.4.1 (`>=1.5.1`), and
-# langchain-openai is itself transitive and unpinned, so one of its future
-# releases can raise that floor and fail this build outright. That failure is
+# langchain-core carries the same trade in a tighter form. langchain-openai
+# 1.4.1 declares `langchain-core<2.0.0,>=1.5.1`, and langchain-openai is itself
+# transitive and unpinned, so one of its future releases can raise that floor
+# past whatever is pinned here and fail this build outright. That failure is
 # loud and shows up in a diff, which is the trade working, not breaking.
+#
+# How much room there is, since this is the number that decides whether the next
+# langchain-openai release fails the build: through 2026-07-28 the answer was
+# none — 1.5.1 was pinned and 1.5.1 was the floor, sitting exactly on it. The
+# 2026-07-29 batch (#102) moved the pin to 1.5.2 while the floor stayed at
+# 1.5.1, so there is now one patch of clearance. That is slack, not safety: a
+# floor is raised by a langchain-openai release, not by distance, and one that
+# declares >=1.5.3 fails this build the same way. Re-read the floor when
+# langchain-openai moves rather than trusting the gap.
 #
 # Scope, so the next reader is not misled: this pins what api/ and agent/
 # import by name. The transitive tree still floats almost entirely (anyio,
