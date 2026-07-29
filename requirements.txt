@@ -107,7 +107,7 @@
 langchain==1.3.14
 langchain-groq==1.1.3
 langchain-pinecone==0.2.13
-langgraph==1.2.9
+langgraph==1.2.10
 langsmith==0.10.11
 pinecone==7.3.0
 cohere==7.0.8
@@ -168,7 +168,7 @@ slowapi==0.1.10
 # rather than this file. That half is a repository setting, so no file here
 # can guarantee it is still on. Bumps still merge by hand either way; the bot
 # only surfaces them.
-langchain-core==1.5.1
+langchain-core==1.5.2
 pydantic==2.13.4
 starlette==1.3.1
 typing-extensions==4.16.0
