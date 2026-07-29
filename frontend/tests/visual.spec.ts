@@ -1,19 +1,28 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import path from "path";
 import { CATALOG_FIXTURE } from "../src/data/fixtures";
 import { ACCENTS } from "../src/data/accents";
 import { SSE_FIXTURE } from "./sse-fixture";
+import { stubOffOrigin } from "./net-fixture";
 
 // Issue #89: these four tests used to end in a `page.screenshot()` and assert
 // nothing — they passed if the selectors resolved and the page did not throw,
 // while the PNGs landed in test-results/ (which Playwright wipes between runs)
-// and nothing ever compared them. The captures are kept as failure artefacts,
-// but every test now pins something first.
+// and nothing ever compared them. #109 gave every test a DOM assertion first
+// (option 2 on the issue); this file now also does the pixel comparison the
+// filename has always promised (option 1). The two are complementary: the DOM
+// assertions catch structural regressions and read as documentation, the
+// baselines catch visual ones that no selector would notice.
 //
-// Assertions query the accessibility tree by role/name, matching the house
+// DOM assertions query the accessibility tree by role/name, matching the house
 // style in privacy.spec.ts: substance is pinned, exact copy is not.
 
 test.beforeEach(async ({ page }) => {
+  // YouTube stubbed, IBM Plex served from committed fixtures — see net-fixture.
+  // Registered before the /api mocks so those still win: Playwright resolves
+  // routes in reverse registration order.
+  await stubOffOrigin(page);
+
   await page.route("/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(CATALOG_FIXTURE) })
   );
@@ -22,8 +31,52 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-function shot(testInfo: { project: { name: string } }, name: string) {
-  return path.join("test-results", `${name}-${testInfo.project.name}.png`);
+// Baselines are committed for Linux only, under tests/visual.spec.ts-snapshots/
+// as `<name>-<project>-linux.png`. Font rasterisation differs enough across
+// platforms that a Windows or macOS baseline will not match a Linux one, and
+// committing a set per platform means every deliberate UI change has to be
+// re-approved three times by whoever happens to have that OS.
+//
+// So Linux compares, and everything else falls back to the previous
+// capture-only behaviour rather than failing on a baseline it cannot have.
+//
+// "Linux" is not specific enough on its own, though: baselines must come from
+// the *same* Linux as the comparison. Generating them in
+// mcr.microsoft.com/playwright:v1.62.0-noble and comparing on ubuntu-latest was
+// tried and measured at up to 7% differing pixels on a full-page shot.
+//
+// The cause is glyph fallback, not webfont availability: both environments load
+// IBM Plex fine (probed — document.fonts.check() returns true in the container),
+// but the `→` in Hero's suggestion rows is not in IBM Plex, so each substitutes
+// a different *system* font and the substituted glyph's advance width shifts
+// every character after it on that line. Serving the webfont from a fixture, as
+// this file now does, therefore does NOT remove the need to generate on CI: the
+// arrow still falls back to whatever the host provides. 7% is far too large to
+// absorb with a diff tolerance that still catches real regressions.
+//
+// So CI both writes and reads them. Regenerate with the "Update visual
+// baselines" workflow — push a commit whose message contains [baselines], or
+// run it from the Actions tab — then commit the artifact it uploads.
+const PIXEL_BASELINES = process.platform === "linux";
+
+async function snap(page: Page, testInfo: TestInfo, name: string) {
+  // The font link uses display=swap, so text paints in the fallback first and
+  // swaps when IBM Plex arrives. Screenshotting inside that window captures the
+  // fallback and produces a diff that looks like a UI change. networkidle does
+  // not cover it — the swap is a rendering step after the response lands.
+  await page.evaluate(() => document.fonts.ready);
+
+  if (PIXEL_BASELINES) {
+    // `animations: "disabled"` is the default and matters here: the composer
+    // has a blinking caret (animate-blink) and the answer fades up, either of
+    // which would make this flaky if left running.
+    await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true });
+    return;
+  }
+  await page.screenshot({
+    path: path.join("test-results", `${name}-${testInfo.project.name}.png`),
+    fullPage: true,
+  });
 }
 
 test("hero — empty state", async ({ page }, testInfo) => {
@@ -34,7 +87,7 @@ test("hero — empty state", async ({ page }, testInfo) => {
   await expect(page.getByText(/ScienceQ is an AI assistant/i)).toBeVisible();
   await expect(page.getByPlaceholder(/ask about the videos/i)).toBeVisible();
 
-  await page.screenshot({ path: shot(testInfo, "hero"), fullPage: true });
+  await snap(page, testInfo, "hero");
 });
 
 test("sidebar", async ({ page, isMobile }, testInfo) => {
@@ -51,7 +104,7 @@ test("sidebar", async ({ page, isMobile }, testInfo) => {
   // Sidebar content is in the accessibility tree, not merely painted.
   await expect(page.getByRole("button", { name: /new conversation/i })).toBeVisible();
 
-  await page.screenshot({ path: shot(testInfo, "sidebar"), fullPage: true });
+  await snap(page, testInfo, "sidebar");
 });
 
 test(
@@ -82,7 +135,7 @@ test(
     // [META] is consumed by the parser, never rendered as answer text.
     await expect(page.getByText("[META]")).toHaveCount(0);
 
-    await page.screenshot({ path: shot(testInfo, "answer"), fullPage: true });
+    await snap(page, testInfo, "answer");
   }
 );
 
@@ -103,7 +156,7 @@ test("ingest panel", async ({ page }, testInfo) => {
   await expect(page.getByText("Index a video", { exact: true })).toBeVisible();
   await expect(page.getByPlaceholder(/^paste a youtube url/i)).toBeVisible();
 
-  await page.screenshot({ path: shot(testInfo, "ingest"), fullPage: true });
+  await snap(page, testInfo, "ingest");
 });
 
 // The accent radiogroup was the one React 19 semantic change in the tree and
