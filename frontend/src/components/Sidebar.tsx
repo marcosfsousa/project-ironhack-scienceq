@@ -33,8 +33,18 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
+  // The offsets are written as `transform:` rather than with `translate-x-*`
+  // on purpose, and this one is load-bearing rather than cosmetic. v4's
+  // translate utilities emit the *individual* `translate` property, which is
+  // Chrome 104 / Safari 14.1 — above the build.target floor in vite.config.ts,
+  // and unlike the spacing shorthands there is no downlevel path for it at all.
+  // Dropped here, the closed drawer would keep `fixed left-0 z-50` and sit over
+  // the app permanently, inert and aria-hidden. `transition-transform` covers
+  // `transform` as well as `translate`, so the animation is unaffected.
+  // See the spacing note in index.css; scripts/check-css-floor.mjs fails the
+  // build if a `translate:` / `scale:` / `rotate:` declaration reappears.
   const positionClasses = isMobile
-    ? `fixed left-0 top-0 z-50 h-full w-[284px] transition-transform duration-300 ease-[cubic-bezier(.22,.61,.36,1)] ${isOpen ? "translate-x-0" : "-translate-x-full"}`
+    ? `fixed left-0 top-0 z-50 h-full w-[284px] transition-transform duration-300 ease-[cubic-bezier(.22,.61,.36,1)] ${isOpen ? "[transform:translateX(0)]" : "[transform:translateX(-100%)]"}`
     : "relative h-full w-[312px] shrink-0";
 
   return (
@@ -68,7 +78,7 @@ export function Sidebar({
           onClick={() => { onNewConversation(); if (isMobile) onClose(); }}
           className="mt-3.5 flex w-full cursor-pointer items-center justify-center gap-[7px] rounded-[9px] border border-line-strong bg-ink-panel py-2.5 text-[13px] font-medium text-mut-200 hover:bg-[#1a1f27]"
         >
-          <span className="relative inline-block h-[13px] w-[13px] rounded border-[1.5px] border-mut-500" />
+          <span className="relative inline-block h-[13px] w-[13px] rounded-sm border-[1.5px] border-mut-500" />
           New conversation
         </button>
       </div>

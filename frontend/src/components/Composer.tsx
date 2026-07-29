@@ -42,7 +42,7 @@ export function Composer({ onSend, onIngest, onOpenPrivacy, isMobile }: Composer
 
   return (
     <div
-      className="shrink-0 bg-gradient-to-b from-transparent to-ink px-3 pt-3 sm:px-6"
+      className="shrink-0 bg-linear-to-b from-transparent to-ink px-3 pt-3 sm:px-6"
       style={{
         paddingBottom: isMobile
           ? "max(14px, env(safe-area-inset-bottom))"
@@ -74,7 +74,11 @@ export function Composer({ onSend, onIngest, onOpenPrivacy, isMobile }: Composer
               }
             }}
             placeholder={placeholder}
-            className={`max-h-[140px] min-w-0 flex-1 resize-none border-0 bg-transparent px-1 leading-[1.45] text-mut-100 outline-none${isMobile ? " placeholder:text-[14px]" : ""}`}
+            // placeholder:text-mut-400 is explicit on purpose. v3's preflight
+            // pinned placeholders to a fixed grey; v4 derives them from
+            // currentColor at 50%, which against text-mut-100 renders dimmer.
+            // Naming the colour keeps this off framework defaults entirely.
+            className={`max-h-[140px] min-w-0 flex-1 resize-none border-0 bg-transparent px-1 leading-[1.45] text-mut-100 outline-hidden placeholder:text-mut-400${isMobile ? " placeholder:text-[14px]" : ""}`}
             style={{
               minHeight: isMobile ? "44px" : "34px",
               fontSize: isMobile ? "16px" : "14.5px",

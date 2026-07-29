@@ -154,8 +154,8 @@ jobs:
       # Two tsc passes, because one does not cover the tree. `tsc -b` builds
       # tsconfig.json alone ("include": ["src"]) — neither config is composite
       # and neither declares references, so build mode has no project graph to
-      # walk. The second pass covers tsconfig.node.json's include set: the vite,
-      # playwright and tailwind configs plus tests/. Those are loaded by a
+      # walk. The second pass covers tsconfig.node.json's include set: the vite
+      # and playwright configs plus tests/. Those are loaded by a
       # transpiler that strips types without checking them, so until this step
       # a type error in any of them failed nowhere (#81).
       #
@@ -184,6 +184,14 @@ jobs:
       # losing a guarantee.
       - name: Build
         run: npm run build
+
+      # Reads the bundle `npm run build` just emitted, so it has to follow it.
+      # Asserts no `var()`-valued logical shorthand survived downleveling for
+      # the `build.target` pinned in vite.config.ts — the one failure mode that
+      # neither the typecheck, the build, nor the Playwright suite can see, the
+      # latter because the dev server never applies the target transform.
+      - name: Check CSS browser floor
+        run: npm run check:css-floor
 
   ui-tests:
     name: UI tests (Playwright)

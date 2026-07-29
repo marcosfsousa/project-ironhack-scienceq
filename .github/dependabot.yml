@@ -274,14 +274,26 @@ updates:
           - "@types/react-dom"
       # Build tooling, minor and patch only. A vite or typescript major changes
       # the build contract and gets its own PR.
+      #
+      # `tailwindcss` and `@tailwindcss/*` are listed together on purpose: since
+      # #76 the PostCSS plugin is a separate package that upstream versions in
+      # lockstep with the framework, so splitting them across two PRs would let
+      # one land without the other and mismatch the pair. Note the scope though
+      # — this group is minor/patch only, so a tailwind *major* still arrives as
+      # two ungrouped PRs, exactly the split this grouping avoids for minors. In
+      # practice the pair cannot functionally mismatch (`@tailwindcss/postcss`
+      # pins its `tailwindcss` peer to the same exact version), and a major is a
+      # migration to be judged as one anyway — as #76 itself was. `autoprefixer`
+      # came off this list in the same change — v4 handles vendor prefixing, so
+      # it is no longer a dependency.
       frontend-tooling:
         patterns:
           - vite
           - "@vitejs/*"
           - typescript
           - tailwindcss
+          - "@tailwindcss/*"
           - postcss
-          - autoprefixer
           - "@types/node"
         update-types:
           - minor
@@ -320,56 +332,60 @@ updates:
     # revisiting, the knob is a second group entry with applies-to:
     # security-updates — not a change to the ones above.
 
-    # One parked decision. Read this block as a different kind of thing from
-    # the pip ignore above, because the lifecycle is the opposite one: those
-    # two wait on an upstream ceiling nobody here controls and stay until
-    # langchain-pinecone or langchain-groq moves. This one waits on a decision
-    # this repo owns, is tracked in an issue, and should be short-lived. If it
-    # is still here months from now, that is the signal to go read the issue,
-    # not to leave it alone.
+    # The parked-decisions block that sat here is now empty, which is worth
+    # recording rather than deleting silently. Two npm majors were withheld by
+    # `ignore` while the migrations they actually required got done, and both
+    # have since landed:
     #
-    #   tailwindcss 3.4.19 → 4.x   #58, tracked in #76
+    #   tailwindcss 3.4.19 → 4.x   #58, migrated in #76
+    #   typescript  5.9.3  → 7.x   #62, verified in #77
     #
-    # The PR is not wrong, it is incomplete: it edits only package.json and
-    # package-lock.json, because that is all Dependabot edits. For tailwind
-    # that is not enough to build — v4 does not read tailwind.config.ts and
-    # does not recognise the `@tailwind` directives in src/index.css, so
-    # postcss.config.js and both of those files have to change in the same
-    # commit.
+    # Neither Dependabot PR was wrong; both were incomplete in the same way,
+    # editing only package.json and the lockfile because that is all Dependabot
+    # edits. For tailwind that could not build — v4 does not read
+    # tailwind.config.ts and does not recognise the `@tailwind` directives in
+    # src/index.css, so postcss.config.js and both of those had to move in the
+    # same commit. For typescript the bump was complete as proposed, but 7.0 is
+    # a reimplemented compiler rather than a feature release, so it wanted a
+    # deliberate verification pass rather than a green `tsc -b` read as
+    # sufficient.
     #
-    # typescript 5.9.3 → 7.x (#62) was parked here too, tracked in #77, on the
-    # argument that a reimplemented compiler wants a deliberate verification
-    # pass rather than a green `tsc -b` read as sufficient. That pass ran and
-    # came back clean, so the entry is gone and typescript majors flow again —
-    # ungrouped, since frontend-tooling excludes majors by update-types, so a
-    # future 8.x still arrives as its own PR to be judged the same way. The
-    # findings are in #77. The one worth knowing from this file is that the
-    # typescript npm package no longer ships a language service, so nothing
-    # here governs what an editor runs: CI and the editor are now two
-    # different compilers by construction, not by drift.
+    # Two findings outlive the entries. From #77: the typescript npm package no
+    # longer ships a language service, so nothing here governs what an editor
+    # runs — CI and the editor are two different compilers by construction now,
+    # not by drift. From #76, and this took two rounds of review to get right:
+    # tailwind v4 documents a Safari 16.4 floor, and its own @supports shim does
+    # cover every @property it registers — but the shim is not the whole story,
+    # and "v4 ships a compatibility shim" is not the same claim as "v4 stays
+    # inside build.target". v4 also emits modern CSS *properties* the shim says
+    # nothing about, and two of them breached the pin:
     #
-    # Scoped to majors, same as the pip block and for the same reason: minor
-    # and patch releases keep flowing, and keep arriving inside the
-    # frontend-tooling group above, which already excludes majors by
-    # update-types. Only the jump over the major stops.
+    #   - spacing as logical shorthands over a `--spacing` base, which Lightning
+    #     CSS cannot downlevel while a var() is inside (Safari 14.0)
+    #   - the individual translate/scale/rotate properties in place of v3's
+    #     `transform`, which cannot be downleveled at all, and which are above
+    #     the pin on Chrome and Edge too, not just Safari
     #
-    # Security coverage is unaffected, per the correction recorded on the pip
-    # block above: an `update-types` ignore reaches version updates only. A CVE
-    # fixed only in tailwind 4+ still opens a security PR.
+    # Both are fixed in-tree rather than by moving the pin, so the migration did
+    # hold the floor from #91 — but read that as "introduced no regression",
+    # not as "the app is verified at safari14". aspect-ratio and flexbox gap were
+    # already emitted and already unsupported there before v4.
+    # scripts/check-css-floor.mjs guards exactly the two failures above and
+    # says so at the top; it is not a general floor certificate. Treat any
+    # future "v4 is compatible" claim as covering the shim alone until the build
+    # output says otherwise.
     #
-    # Worth following that through here, because it lands differently than it
-    # does for pip. There the security PR arrives red — the upstream ceiling
-    # blocks it and no advisory moves it. Here it arrives *mergeable-looking*
-    # and is not: a tailwind 4 security PR still ships only package.json and
-    # the lockfile, so it still fails to build for the reasons in #76. The
-    # advisory changes the urgency of that issue, not its content.
+    # Both majors flow again, ungrouped: frontend-tooling above excludes majors
+    # by update-types, so a tailwind 5 or typescript 8 still arrives as its own
+    # PR, to be judged the way these two were. That is this block's whole
+    # lifecycle run end to end, and it is the opposite of the pip ignore above
+    # — that one waits on an upstream ceiling nobody here controls and stays
+    # until langchain-pinecone or langchain-groq moves; these waited on a
+    # decision this repo owns, and so they went away.
     #
-    # So the trigger to act is the same either way, and it is not this file:
-    # an advisory against tailwind 3.x means go do #76 properly, not merge
-    # whatever the bot opened.
-    #
-    # Delete the entry when its issue closes, whichever way it closes.
-    ignore:
-      - dependency-name: tailwindcss
-        update-types:
-          - version-update:semver-major
+    # There is deliberately no `ignore:` key for npm now. If a future major
+    # needs parking, the shape to copy is the pip block above, and the rule
+    # that made these two safe to park is worth restating: an `update-types`
+    # ignore reaches version updates only, so a CVE fixed only above the pin
+    # still opens a security PR. That PR arrives mergeable-looking and may not
+    # be — which is why the trigger to act is the tracking issue, not this file.
