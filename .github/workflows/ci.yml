@@ -155,9 +155,16 @@ jobs:
       # tsconfig.json alone ("include": ["src"]) — neither config is composite
       # and neither declares references, so build mode has no project graph to
       # walk. The second pass covers tsconfig.node.json's include set: the vite,
-      # playwright and tailwind configs plus tests/. Vite and Playwright load
-      # those through esbuild, which strips types without checking them, so
-      # until this step a type error in any of them failed nowhere (#81).
+      # playwright and tailwind configs plus tests/. Those are loaded by a
+      # transpiler that strips types without checking them, so until this step
+      # a type error in any of them failed nowhere (#81).
+      #
+      # Which transpiler is not the point, and this comment used to name one:
+      # it said esbuild, true when #81 wrote it and false as of the vite 8 bump
+      # in #98, which took esbuild out of the tree entirely (82 lock references
+      # down to 2, both unmet optional peers) in favour of rolldown/Oxc. The
+      # reason survives the swap — none of them typecheck — so the argument is
+      # stated without the name to avoid the next bump falsifying it again.
       - name: Typecheck
         run: npm run typecheck
 
