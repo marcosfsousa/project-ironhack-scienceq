@@ -25,16 +25,35 @@ stays POSTable as well as accurate:
 
 The second is the one worth naming. It answers "can *the caller* bypass this",
 so it is a property of the token, not of the ruleset — committing it would
-record an admin's view as if it were config. A field the API grows that is in
-neither class stops this script rather than being dropped silently: an
-unclassified field is either new config that belongs in the record, or a new
-piece of server state that belongs in the list above, and both are decisions
-for a person.
+record an admin's view as if it were config.
+
+**Anywhere this script enumerates keys, it refuses to run on one it does not
+recognise.** An unclassified field is either new config that belongs in the
+record or new server state that does not, and both are decisions for a person.
+That check used to be top-level only, which made the guarantee above false in
+the place it mattered most: ``conditions`` was rebuilt as a hardcoded
+``{"ref_name": {include, exclude}}``, so a condition narrowing *where* the
+ruleset applies would have been dropped without a word — and this file is
+advertised as a POST body, so re-creating from a record that lost a condition
+recreates the ruleset at a different scope. Every enumeration point is now
+guarded: ``conditions``, ``ref_name``, each ``rules[]`` entry, and each
+``bypass_actors[]`` entry.
+
+Two places pass unknown keys through rather than rejecting them, because they
+are copied wholesale and copying is lossless: ``rules[].parameters`` and the
+values inside a bypass actor. A new parameter lands in the record and shows up
+in the diff, which is the outcome wanted.
 
 Keys are ordered rather than sorted, so a diff of this file reads in the order
 the ruleset is reasoned about — what it is, then who skips it, then where it
 applies, then what it does. Parameters within a rule are sorted, since they have
 no such order.
+
+Line endings are pinned to LF and the idempotency check compares **bytes**. Both
+matter on Windows: ``write_text`` translates to ``os.linesep`` and ``read_text``
+normalises on the way back, so a CRLF rewrite of all 65 lines reported itself as
+"already matches". It is the only file in this repo that has ever been CRLF, and
+that is how it got there.
 """
 
 import json
@@ -46,7 +65,11 @@ from pathlib import Path
 
 REPO = "marcosfsousa/project-ironhack-scienceq"
 RULESET_NAME = "main"
-TARGET = Path(__file__).resolve().parent.parent / ".github" / "rulesets" / "main.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+TARGET = REPO_ROOT / ".github" / "rulesets" / "main.json"
+# Every path this script prints is repo-root-relative and posix-separated, so a
+# command it suggests can be pasted from the repo root on any platform.
+RELATIVE = TARGET.relative_to(REPO_ROOT).as_posix()
 
 # Order is the argument, not alphabetics. See the module docstring.
 SETTABLE = ["name", "target", "enforcement", "bypass_actors", "conditions", "rules"]
@@ -78,7 +101,7 @@ def _find_ruleset_id() -> int:
         sys.exit(
             f"No ruleset named {RULESET_NAME!r} on {REPO}.\n"
             "If it has not been created yet:\n"
-            f"  gh api -X POST repos/{REPO}/rulesets --input {TARGET.name}"
+            f"  gh api -X POST repos/{REPO}/rulesets --input {RELATIVE}"
         )
     if len(matches) > 1:
         sys.exit(
@@ -88,29 +111,72 @@ def _find_ruleset_id() -> int:
     return matches[0]["id"]
 
 
-def _normalize(live: dict) -> OrderedDict:
-    unclassified = set(live) - set(SETTABLE) - SERVER_STATE
-    if unclassified:
+def _known(mapping: dict, allowed: set, where: str, remedy: str) -> dict:
+    """
+    ``mapping``, or exit naming what is unrecognised.
+
+    Called at every point where this script picks keys out by name, because
+    picking by name is exactly where a field goes missing.
+    """
+    unknown = set(mapping) - allowed
+    if unknown:
         sys.exit(
-            "The rulesets API returned fields this script does not classify:\n"
-            + "\n".join(f"  {name}" for name in sorted(unclassified))
-            + "\n\nAdd each to SETTABLE if it is configuration that belongs in "
-            "the committed record, or to SERVER_STATE if it is assigned by "
-            "GitHub. Guessing is what this check exists to prevent."
+            f"The rulesets API returned fields this script does not classify, "
+            f"in {where}:\n"
+            + "\n".join(f"  {name}" for name in sorted(unknown))
+            + f"\n\n{remedy}\n"
+            "Until then this export would drop them, and the file is a POST "
+            "body as well as a record — a dropped field recreates a different "
+            "ruleset. Guessing is what this check exists to prevent."
         )
+    return mapping
+
+
+def _normalize(live: dict) -> OrderedDict:
+    _known(
+        live, set(SETTABLE) | SERVER_STATE, "the ruleset",
+        "Add each to SETTABLE if it is configuration that belongs in the "
+        "committed record, or to SERVER_STATE if it is assigned by GitHub.",
+    )
 
     def rule(entry: dict) -> OrderedDict:
+        _known(
+            entry, {"type", "parameters"}, f"the {entry.get('type')!r} rule",
+            "A rule entry carrying something other than a type and its "
+            "parameters is a shape this script has not seen; extend rule().",
+        )
         out = OrderedDict(type=entry["type"])
         if "parameters" in entry:
+            # Copied wholesale, so a new parameter is kept rather than
+            # rejected — it lands in the record and shows up in the diff.
             out["parameters"] = OrderedDict(sorted(entry["parameters"].items()))
         return out
 
-    ref_name = live["conditions"]["ref_name"]
+    def actor(entry: dict) -> OrderedDict:
+        _known(
+            entry, {"actor_id", "actor_type", "bypass_mode"}, "a bypass actor",
+            "A new field on a bypass actor changes who may skip the rules or "
+            "how; decide what it means before recording it.",
+        )
+        return OrderedDict(sorted(entry.items()))
+
+    conditions = _known(
+        live["conditions"], {"ref_name"}, "conditions",
+        "A condition other than ref_name narrows *where* the ruleset applies. "
+        "Dropping one silently is the failure this guard exists for: extend "
+        "_normalize to carry it.",
+    )
+    ref_name = _known(
+        conditions["ref_name"], {"include", "exclude"}, "conditions.ref_name",
+        "A new key inside ref_name changes which refs match; carry it through "
+        "rather than letting the export decide it does not exist.",
+    )
+
     return OrderedDict(
         name=live["name"],
         target=live["target"],
         enforcement=live["enforcement"],
-        bypass_actors=[OrderedDict(sorted(a.items())) for a in live["bypass_actors"]],
+        bypass_actors=[actor(entry) for entry in live["bypass_actors"]],
         conditions={
             "ref_name": OrderedDict(
                 include=ref_name["include"], exclude=ref_name["exclude"]
@@ -125,15 +191,18 @@ if __name__ == "__main__":
     exported = json.dumps(_normalize(_gh(f"repos/{REPO}/rulesets/{ruleset_id}")), indent=2)
     exported += "\n"
 
-    before = TARGET.read_text(encoding="utf-8") if TARGET.is_file() else None
-    TARGET.write_text(exported, encoding="utf-8")
+    # Bytes on both sides, LF on the way out. Text mode hides a line-ending
+    # rewrite from the comparison while performing one — see the docstring.
+    payload = exported.encode("utf-8")
+    before = TARGET.read_bytes() if TARGET.is_file() else None
+    with open(TARGET, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(exported)
 
-    relative = TARGET.relative_to(TARGET.parent.parent.parent)
-    if before == exported:
-        print(f"{relative} already matches ruleset {ruleset_id}.")
+    if before == payload:
+        print(f"{RELATIVE} already matches ruleset {ruleset_id}.")
     else:
         print(
-            f"{relative} updated from ruleset {ruleset_id}.\n"
+            f"{RELATIVE} updated from ruleset {ruleset_id}.\n"
             "Review the diff: what changed here changed in repository settings, "
             "and this is the only place it gets read."
         )

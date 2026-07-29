@@ -167,6 +167,43 @@ def _job_contexts(workflow: Path) -> dict[str, str]:
     return contexts
 
 
+def _trigger_branches(workflow: Path) -> dict[str, list[str]]:
+    """
+    ``{event: [branch, ...]}`` from the workflow's ``on:`` block.
+
+    Only the inline form (``branches: [main]``) is read. A block list parses as
+    no branches at all, which fails the assertion rather than passing it — the
+    wrong direction to be lenient in, given what the check is for.
+    """
+    branches: dict[str, list[str]] = {}
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+
+    try:
+        start = next(i for i, line in enumerate(lines) if line.rstrip() == "on:")
+    except StopIteration:  # pragma: no cover - asserted directly below
+        return branches
+
+    current: str | None = None
+    for line in lines[start + 1:]:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith(" "):
+            break
+        event = re.match(r"^  ([A-Za-z_]+):\s*$", line)
+        if event:
+            current = event.group(1)
+            branches.setdefault(current, [])
+            continue
+        listed = re.match(r"^    branches:\s*\[(.*)\]\s*$", line)
+        if listed and current:
+            branches[current] = [
+                item.strip().strip("'\"")
+                for item in listed.group(1).split(",")
+                if item.strip()
+            ]
+    return branches
+
+
 # ── Reading the ruleset ────────────────────────────────────────────────────────
 
 def _rule(ruleset: dict, rule_type: str) -> dict | None:
@@ -226,6 +263,38 @@ class TestEveryJobIsRequired:
         )
 
 
+class TestChecksCanActuallyReport:
+    """
+    A required check that never runs is the same failure as one that was
+    renamed, reached from the other side.
+
+    ``ci.yml`` runs on pull requests to ``main`` and on pushes to it. Both are
+    written as a branch filter, so both can be edited. Point either somewhere
+    else and the four required contexts stop arriving on PRs to ``main``: the
+    rule waits on a check that will never report, and the PR sits pending
+    forever rather than failing. Same class as the rename this file already
+    guards, and invisible in the same way.
+
+    The push trigger matters less but is not decorative — it is what gives each
+    commit on the baseline its own verdict, and what puts a passing run on
+    ``main`` for a branch to be compared against.
+    """
+
+    def test_ci_runs_on_the_protected_branch(self):
+        branch = _PROTECTED_REF.removeprefix("refs/heads/")
+        triggers = _trigger_branches(_WORKFLOW)
+        for event in ("pull_request", "push"):
+            assert branch in triggers.get(event, []), (
+                f"ci.yml's `on.{event}.branches` is {triggers.get(event)!r} and "
+                f"does not include {branch!r}.\n"
+                "The four required checks would stop reporting on PRs to "
+                f"{branch}, and a required check that never arrives leaves the "
+                "PR pending rather than red — indistinguishable from one still "
+                "running. Either restore the branch here or narrow the ruleset "
+                "to a branch CI actually covers."
+            )
+
+
 class TestRulesetPinsItsDecisions:
     """
     The ruleset file is re-exported from GitHub after any UI edit, so the
@@ -249,17 +318,42 @@ class TestRulesetPinsItsDecisions:
         # deploy from a branch anyone can push to, and every check here would
         # still be green.
         script = _TRIGGERS.read_text(encoding="utf-8")
-        branch = re.search(r'^BRANCH="\^([A-Za-z0-9._/-]+)\$"', script, re.MULTILINE)
-        assert branch, (
-            f"No BRANCH=\"^...$\" assignment in {_TRIGGERS.name}. The deploy "
-            "branch can no longer be read from the repo, so nothing checks that "
-            "the protected branch is the one that ships."
+
+        # findall, not search. `search` takes the first match and bash takes the
+        # last, so a second `BRANCH=` further down the file would deploy from
+        # somewhere this test never looks at — passing green on exactly the
+        # scenario it was written for. Anything that is not a single plain
+        # assignment stops here instead: the shell's rules for which one wins
+        # are not worth reimplementing.
+        assignments = re.findall(
+            r'^BRANCH="\^([A-Za-z0-9._/-]+)\$"', script, re.MULTILINE
         )
-        assert f"refs/heads/{branch.group(1)}" == _PROTECTED_REF, (
-            f"{_TRIGGERS.name} deploys from {branch.group(1)!r} but the ruleset "
+        assert len(assignments) == 1, (
+            f"{_TRIGGERS.name} has {len(assignments)} BRANCH=\"^...$\" "
+            f"assignments {assignments}; expected exactly one.\n"
+            "With none, the deploy branch can no longer be read from the repo "
+            "and nothing checks that the protected branch is the one that "
+            "ships. With several, the last one wins at runtime and this test "
+            "cannot tell you which that is."
+        )
+        assert f"refs/heads/{assignments[0]}" == _PROTECTED_REF, (
+            f"{_TRIGGERS.name} deploys from {assignments[0]!r} but the ruleset "
             f"protects {_PROTECTED_REF!r}.\n"
             "Whichever moved, the other has to follow: a deploy branch without "
             "the ruleset is an unprotected production branch."
+        )
+
+        # Reading the variable proves nothing unless the variable is what
+        # reaches gcloud. Both trigger creations must interpolate it — a literal
+        # --branch-pattern="^release$" on either would satisfy every assertion
+        # above while deploying from release.
+        interpolated = script.count('--branch-pattern="$BRANCH"')
+        assert interpolated == 2, (
+            f'{_TRIGGERS.name} passes --branch-pattern="$BRANCH" '
+            f"{interpolated} times; expected 2, one per trigger.\n"
+            "A hardcoded pattern at a gcloud call deploys from a branch the "
+            "BRANCH assignment above does not mention, and nothing else here "
+            "would notice."
         )
 
     def test_the_admin_bypass_is_recorded(self):
@@ -282,7 +376,21 @@ class TestRulesetPinsItsDecisions:
             "Re-run scripts/export_ruleset.py if this changed in the UI, and "
             "check what role was actually granted before committing it."
         )
-        assert actor.get("bypass_mode") == "always"
+        # `pull_request`, not `always`, and the difference is the whole point of
+        # the bypass. It buys the emergency path this was granted for — open a
+        # PR, merge it past a red or stuck check, leave the trail in the PR and
+        # the audit log. `always` would additionally permit pushing straight to
+        # main with no PR and no diff, and would skip the deletion and
+        # non_fast_forward rules too. On this repo a push to main is a
+        # production deploy, so that is a strictly larger grant than the
+        # argument for having a bypass at all.
+        assert actor.get("bypass_mode") == "pull_request", (
+            f"The bypass mode is {actor.get('bypass_mode')!r}, not "
+            "'pull_request'.\n"
+            "'always' permits a direct push to main — which deploys — and "
+            "bypasses force-push and deletion protection with it. If that is "
+            "wanted, say why here; it is wider than an emergency merge needs."
+        )
 
     def test_branches_must_be_up_to_date(self):
         rule = _rule(_load_ruleset(), "required_status_checks") or {}
@@ -385,6 +493,24 @@ class TestGuardIsNotVacuous:
             # No `name:`, so GitHub reports the job id — and so does this.
             "unnamed": "unnamed",
         }
+
+    def test_trigger_branches_are_collected(self, tmp_path):
+        assert _trigger_branches(_WORKFLOW) == {
+            "pull_request": ["main"],
+            "push": ["main"],
+        }
+        # A block list is not read, and must therefore fail closed rather than
+        # reporting an empty filter as "no restriction".
+        workflow = tmp_path / "w.yml"
+        workflow.write_text(
+            "on:\n"
+            "  pull_request:\n"
+            "    branches:\n"
+            "      - main\n"
+            "jobs:\n",
+            encoding="utf-8",
+        )
+        assert _trigger_branches(workflow) == {"pull_request": []}
 
     def test_keys_after_the_jobs_block_are_not_jobs(self, tmp_path):
         # `permissions:` above sits after `jobs:` in the fixture and must not be
