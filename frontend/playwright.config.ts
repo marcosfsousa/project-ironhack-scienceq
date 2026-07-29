@@ -17,6 +17,18 @@ export default defineConfig({
   outputDir: "./test-results",
   // `list` for the live log, `html` for the report CI uploads on failure.
   reporter: [["list"], ["html", { open: "never" }]],
+  expect: {
+    toHaveScreenshot: {
+      // Baselines are generated in mcr.microsoft.com/playwright:v1.62.0-noble
+      // and compared on ubuntu-latest. Both are Ubuntu 24.04 with the same
+      // browser build, but they are not byte-identical environments, so a small
+      // allowance absorbs font antialiasing noise. Deliberately tight: a real
+      // layout regression moves far more than 1% of a full-page shot, and the
+      // committed baselines are worth nothing if this is set loose enough to
+      // hide one. If CI diffs cleanly at 0, drop this rather than raise it.
+      maxDiffPixelRatio: 0.01,
+    },
+  },
   use: {
     baseURL: "http://localhost:5173",
     browserName: "chromium",
@@ -49,6 +61,11 @@ export default defineConfig({
       ? [{
           name: "preview-smoke",
           grep: /@smoke/,
+          // Baselines are keyed by project name, so without this the @smoke path
+          // would demand a third committed set that duplicates `desktop`'s at the
+          // same viewport. This project exists to prove the built bundle runs,
+          // not to re-approve its pixels — `desktop`/`mobile` own that.
+          ignoreSnapshots: true,
           use: { viewport: { width: 1280, height: 800 }, baseURL: "http://localhost:4173" },
         }]
       : []),
