@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { CATALOG_FIXTURE } from "../src/data/fixtures";
 import { SSE_FIXTURE } from "./sse-fixture";
+import { stubOffOrigin } from "./net-fixture";
 
 // Functional tests for the EU AI Act Article 50(1)/(5) disclosure surfaces
 // (issue #11). Backend is mocked at the network boundary, mirroring
@@ -8,6 +9,11 @@ import { SSE_FIXTURE } from "./sse-fixture";
 // tree by role/name — never class names or DOM structure.
 
 test.beforeEach(async ({ page }) => {
+  // This spec streams an answer too, so it renders the same live
+  // youtube.com/embed iframe visual.spec.ts does — it just never screenshotted
+  // it, which hid the dependency rather than removing it.
+  await stubOffOrigin(page);
+
   await page.route("/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(CATALOG_FIXTURE) })
   );

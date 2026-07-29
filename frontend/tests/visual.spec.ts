@@ -3,6 +3,7 @@ import path from "path";
 import { CATALOG_FIXTURE } from "../src/data/fixtures";
 import { ACCENTS } from "../src/data/accents";
 import { SSE_FIXTURE } from "./sse-fixture";
+import { stubOffOrigin } from "./net-fixture";
 
 // Issue #89: these four tests used to end in a `page.screenshot()` and assert
 // nothing — they passed if the selectors resolved and the page did not throw,
@@ -17,28 +18,10 @@ import { SSE_FIXTURE } from "./sse-fixture";
 // style in privacy.spec.ts: substance is pinned, exact copy is not.
 
 test.beforeEach(async ({ page }) => {
-  // Registered first so the /api mocks below, being registered later, still win
-  // — Playwright resolves the most recently added matching route.
-  //
-  // VideoEmbed renders a live youtube.com/embed iframe, so without this the
-  // answer baseline captures whatever thumbnail YouTube serves that day. That
-  // is not a property of this app: it would drift when the CDN does, and fail
-  // outright on a runner with no egress.
-  //
-  // Google Fonts is deliberately NOT blocked. index.html loads IBM Plex Sans
-  // and Mono from it, and blocking them drops the whole UI to system-ui — the
-  // baselines would then depict a page no user ever sees, and every
-  // font-dependent layout regression would be invisible. The cost is that
-  // baselines require egress, which both the generating and the comparing job
-  // have, since they are now the same job.
-  const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
-  await page.route("**/*", (route) => {
-    const { hostname } = new URL(route.request().url());
-    if (hostname === "localhost" || hostname === "127.0.0.1" || FONT_HOSTS.has(hostname)) {
-      return route.continue();
-    }
-    return route.fulfill({ status: 200, contentType: "text/html", body: "" });
-  });
+  // YouTube stubbed, IBM Plex served from committed fixtures — see net-fixture.
+  // Registered before the /api mocks so those still win: Playwright resolves
+  // routes in reverse registration order.
+  await stubOffOrigin(page);
 
   await page.route("/api/catalog", (route) =>
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(CATALOG_FIXTURE) })
@@ -60,11 +43,16 @@ test.beforeEach(async ({ page }) => {
 // "Linux" is not specific enough on its own, though: baselines must come from
 // the *same* Linux as the comparison. Generating them in
 // mcr.microsoft.com/playwright:v1.62.0-noble and comparing on ubuntu-latest was
-// tried and measured at up to 7% differing pixels on a full-page shot — the `→`
-// in Hero's suggestion rows is not in the primary font, the two environments
-// fall back to different system fonts, and the substituted glyph's advance
-// width shifts every character after it. That is far too large to absorb with a
-// diff tolerance that still catches real regressions.
+// tried and measured at up to 7% differing pixels on a full-page shot.
+//
+// The cause is glyph fallback, not webfont availability: both environments load
+// IBM Plex fine (probed — document.fonts.check() returns true in the container),
+// but the `→` in Hero's suggestion rows is not in IBM Plex, so each substitutes
+// a different *system* font and the substituted glyph's advance width shifts
+// every character after it on that line. Serving the webfont from a fixture, as
+// this file now does, therefore does NOT remove the need to generate on CI: the
+// arrow still falls back to whatever the host provides. 7% is far too large to
+// absorb with a diff tolerance that still catches real regressions.
 //
 // So CI both writes and reads them. Regenerate with the "Update visual
 // baselines" workflow — push a commit whose message contains [baselines], or

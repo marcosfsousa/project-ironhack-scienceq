@@ -3,11 +3,17 @@
 #
 # Generating them anywhere else does not work, and this was measured rather than
 # assumed: baselines built in mcr.microsoft.com/playwright:v1.62.0-noble differ
-# from ubuntu-latest by up to 7% of a full-page shot, because the `→` in the
-# Hero suggestion rows is not in the primary font and each environment falls
-# back to a different system font. The substituted glyph has a different advance
-# width, so every following character shifts and the whole line reads as changed.
-# No diff tolerance can absorb that without also hiding real regressions.
+# from ubuntu-latest by up to 7% of a full-page shot. No diff tolerance can
+# absorb that without also hiding real regressions — a 3px heading change
+# measures 0.02.
+#
+# The cause is glyph fallback, not webfont availability. Both environments load
+# IBM Plex fine (probed: document.fonts.check() is true inside the container),
+# and the suite now serves the webfont from a committed fixture anyway. But the
+# `→` in the Hero suggestion rows is not in IBM Plex, so each host substitutes a
+# different *system* font, and the substituted glyph's advance width shifts
+# every character after it on that line. Self-hosting the webfont does not fix
+# that, which is why this workflow exists rather than being obviated.
 #
 # Usage — either:
 #   * push a commit whose message contains [baselines], or
@@ -25,6 +31,12 @@ on:
 
 permissions:
   contents: read
+
+# Matches ci.yml's posture: two [baselines] pushes in quick succession would
+# otherwise both run to completion and race to publish the artifact.
+concurrency:
+  group: update-baselines-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   baselines:
@@ -71,13 +83,26 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      # Only the two projects that own baselines. preview-smoke sets
-      # ignoreSnapshots, and CI=true would otherwise start a second web server
-      # and a `vite build` for nothing.
+      # Only the two projects that own baselines — preview-smoke sets
+      # ignoreSnapshots, so running it would regenerate nothing.
+      #
+      # Note this does NOT avoid the preview build: `previewEnabled` keys off
+      # process.env.CI alone and the webServer array is independent of
+      # --project, so Actions still runs `npm run build && vite preview`.
+      # Skipping the project is not skipping its server.
       - name: Regenerate baselines
         run: npx playwright test --update-snapshots --project=desktop --project=mobile
 
+      # `always()` is load-bearing. Without it the upload inherits the default
+      # success() and a single red test discards all eight regenerated PNGs,
+      # including the ones that regenerated correctly. That is the normal case,
+      # not a corner one: you regenerate because the UI changed deliberately,
+      # and a deliberate change usually trips a DOM assertion in the same spec
+      # before snap() is ever reached — rename the Hero heading and
+      # getByRole("heading", …) throws first. Any flake in the ~40 other tests
+      # this run executes has the same effect.
       - name: Upload baselines
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-baselines
