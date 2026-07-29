@@ -166,13 +166,14 @@ jobs:
       # reason survives the swap — none of them typecheck — so the argument is
       # stated without the name to avoid the next bump falsifying it again.
       #
-      # Since #77 this step is also the only place the project's own compiler
-      # runs. typescript 7 is a native binary that ships `tsc` and no language
-      # service — no tsserver, no importable API beyond an `unstable/*` surface
-      # — so an editor cannot use the workspace copy and falls back to whatever
-      # TypeScript it bundles, which is a 5.x. Nothing is misconfigured and
-      # there is nothing to fix here; it means a green editor is weaker
-      # evidence than it looks, and this job is what decides.
+      # Since #77 the compiler this repo declares runs in CI and nowhere else —
+      # here, in the Build step below, and again in Dockerfile.web — but never
+      # in anyone's editor. typescript 7 is a native binary shipping `tsc` and
+      # no language service: no tsserver, no importable API beyond an
+      # `unstable/*` surface. So an editor cannot load the workspace copy and
+      # falls back to whatever TypeScript it bundles, which is a 5.x. Nothing
+      # is misconfigured and there is nothing to fix here; it means a green
+      # editor is weaker evidence than it looks, and these jobs are what decide.
       - name: Typecheck
         run: npm run typecheck
 
