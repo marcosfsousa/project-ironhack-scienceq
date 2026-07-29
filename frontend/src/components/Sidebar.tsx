@@ -68,7 +68,7 @@ export function Sidebar({
           onClick={() => { onNewConversation(); if (isMobile) onClose(); }}
           className="mt-3.5 flex w-full cursor-pointer items-center justify-center gap-[7px] rounded-[9px] border border-line-strong bg-ink-panel py-2.5 text-[13px] font-medium text-mut-200 hover:bg-[#1a1f27]"
         >
-          <span className="relative inline-block h-[13px] w-[13px] rounded border-[1.5px] border-mut-500" />
+          <span className="relative inline-block h-[13px] w-[13px] rounded-sm border-[1.5px] border-mut-500" />
           New conversation
         </button>
       </div>

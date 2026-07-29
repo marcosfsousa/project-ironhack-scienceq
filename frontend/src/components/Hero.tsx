@@ -14,7 +14,7 @@ export function Hero({ suggestions, onPick, onOpenPrivacy }: HeroProps) {
         <h1 className="m-0 text-[30px] font-bold tracking-[-0.02em]">ScienceQ</h1>
       </div>
 
-      <div className="my-[18px] h-0.5 w-full bg-gradient-to-r from-accent to-transparent" />
+      <div className="my-[18px] h-0.5 w-full bg-linear-to-r from-accent to-transparent" />
 
       <p className="mb-2 text-[15px] leading-[1.65] text-mut-300">
         <b className="font-semibold text-mut-100">ScienceQ is an AI assistant</b> — answers are

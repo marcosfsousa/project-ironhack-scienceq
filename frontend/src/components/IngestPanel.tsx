@@ -41,7 +41,7 @@ export function IngestPanel({ state, onClose, onAsk, onStart }: IngestPanelProps
             onChange={(e) => setInputUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && submit()}
             placeholder="Paste a YouTube URL…"
-            className="mt-3 w-full rounded-lg border border-line bg-ink-panel px-3 py-2 font-mono text-[11.5px] text-mut-200 outline-none placeholder:text-mut-700 focus:border-accent"
+            className="mt-3 w-full rounded-lg border border-line bg-ink-panel px-3 py-2 font-mono text-[11.5px] text-mut-200 outline-hidden placeholder:text-mut-700 focus:border-accent"
           />
           <button
             onClick={submit}
@@ -69,7 +69,7 @@ export function IngestPanel({ state, onClose, onAsk, onStart }: IngestPanelProps
           </button>
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-line bg-ink-panel px-2.5 py-2.5">
-          <span className="h-[7px] w-[7px] shrink-0 rounded-sm bg-[#ff5252]" />
+          <span className="h-[7px] w-[7px] shrink-0 rounded-xs bg-[#ff5252]" />
           <span className="truncate font-mono text-[11.5px] text-mut-400">
             {state.url || "youtube.com/watch?v=…"}
           </span>

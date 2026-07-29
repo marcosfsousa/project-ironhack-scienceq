@@ -12,7 +12,6 @@
   "include": [
     "vite.config.ts",
     "playwright.config.ts",
-    "tailwind.config.ts",
     "tests/**/*.ts"
   ]
 }

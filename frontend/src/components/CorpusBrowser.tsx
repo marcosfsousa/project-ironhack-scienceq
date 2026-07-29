@@ -52,7 +52,7 @@ export function CorpusBrowser({ groups, density, onPickVideo, defaultOpen }: Cor
                         <span className="text-[10px] text-[#4d535b]">·</span>
                         <span className="font-mono text-[10.5px] text-mut-600">{v.duration}</span>
                         {v.source === "live" && (
-                          <span className="rounded border border-accent-bd bg-accent-soft px-1 py-px text-[9px] font-semibold tracking-[0.06em] text-accent">
+                          <span className="rounded-sm border border-accent-bd bg-accent-soft px-1 py-px text-[9px] font-semibold tracking-[0.06em] text-accent">
                             LIVE
                           </span>
                         )}

@@ -1,6 +1,113 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* ---- Design tokens -------------------------------------------------------
+   v4 is CSS-first: what used to be `theme.extend` in tailwind.config.ts lives
+   here. Source files are discovered automatically, so the old `content` array
+   has no replacement — it is gone rather than ported. */
+@theme {
+  --color-ink: #0a0c0f; /* page */
+  --color-ink-sidebar: #0d1014;
+  --color-ink-card: #101419; /* source cards / video card */
+  --color-ink-panel: #14181e; /* composer, chips, ingest url box */
+  --color-ink-raised: #12161c; /* suggestion buttons */
+  --color-ink-hover: #131820;
+  --color-ink-chip: #1b2129;
+
+  --color-line: rgba(255, 255, 255, 0.06);
+  --color-line-strong: rgba(255, 255, 255, 0.1);
+
+  --color-ok: #2bb673;
+  --color-ok-soft: #6ee7a8;
+
+  /* Muted text ramp lifted verbatim from the prototype. */
+  --color-mut-100: #e7e9ec;
+  --color-mut-200: #d2d6dc;
+  --color-mut-250: #d6d9de;
+  --color-mut-300: #b9bdc5;
+  --color-mut-400: #9aa0a8;
+  --color-mut-500: #8a9099;
+  --color-mut-600: #767c85;
+  --color-mut-700: #5d636c;
+  --color-mut-800: #565c64;
+
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --animate-blink: blink 1.05s steps(1) infinite;
+  --animate-pulse2: pulse 1s ease-in-out infinite;
+  --animate-spin2: spin 0.7s linear infinite;
+  --animate-fadeUp: fadeUp 0.32s ease both;
+  --animate-slideIn: slideIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  --animate-barGrow: barGrow 0.5s ease both;
+
+  /* `pulse` deliberately shadows Tailwind's built-in keyframe of the same name,
+     as it did in v3. `spin2` reuses the built-in `spin` keyframe at a faster
+     duration; v4 emits it because an animation in use references it. */
+  @keyframes blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(0.7);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 1;
+    }
+  }
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(7px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slideIn {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes barGrow {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* `inline` inlines the value into the utility — `.text-accent { color: var(--acc) }`,
+   byte for byte what v3 produced — instead of emitting `--color-accent: var(--acc)`
+   at :root and having utilities reference `var(--color-accent)`.
+
+   Both forms work today, because App.tsx sets data-accent on <html>, which is
+   the same element @theme emits into, so the indirection resolves against the
+   right --acc either way. They diverge only if --acc is ever reassigned below
+   :root: a plain @theme has already substituted the value at :root and a nested
+   override would never reach the utility. `inline` is chosen so that keeps
+   working, and because it reproduces the v3 output exactly. Both properties are
+   pinned by tests/accent.spec.ts. */
+@theme inline {
+  --color-accent: var(--acc);
+  --color-accent-soft: var(--acc-soft);
+  --color-accent-bd: var(--acc-bd);
+}
 
 /* ---- Accent system -------------------------------------------------------
    Set on <html data-accent="…"> by App.tsx. Static Tailwind classes

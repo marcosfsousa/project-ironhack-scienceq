@@ -154,8 +154,8 @@ jobs:
       # Two tsc passes, because one does not cover the tree. `tsc -b` builds
       # tsconfig.json alone ("include": ["src"]) — neither config is composite
       # and neither declares references, so build mode has no project graph to
-      # walk. The second pass covers tsconfig.node.json's include set: the vite,
-      # playwright and tailwind configs plus tests/. Those are loaded by a
+      # walk. The second pass covers tsconfig.node.json's include set: the vite
+      # and playwright configs plus tests/. Those are loaded by a
       # transpiler that strips types without checking them, so until this step
       # a type error in any of them failed nowhere (#81).
       #
