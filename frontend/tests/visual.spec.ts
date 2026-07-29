@@ -23,11 +23,20 @@ test.beforeEach(async ({ page }) => {
   // VideoEmbed renders a live youtube.com/embed iframe, so without this the
   // answer baseline captures whatever thumbnail YouTube serves that day. That
   // is not a property of this app: it would drift when the CDN does, and fail
-  // outright on a runner with no egress. Everything off-origin is stubbed to an
-  // empty document so the embed is a stable black box.
+  // outright on a runner with no egress.
+  //
+  // Google Fonts is deliberately NOT blocked. index.html loads IBM Plex Sans
+  // and Mono from it, and blocking them drops the whole UI to system-ui — the
+  // baselines would then depict a page no user ever sees, and every
+  // font-dependent layout regression would be invisible. The cost is that
+  // baselines require egress, which both the generating and the comparing job
+  // have, since they are now the same job.
+  const FONT_HOSTS = new Set(["fonts.googleapis.com", "fonts.gstatic.com"]);
   await page.route("**/*", (route) => {
     const { hostname } = new URL(route.request().url());
-    if (hostname === "localhost" || hostname === "127.0.0.1") return route.continue();
+    if (hostname === "localhost" || hostname === "127.0.0.1" || FONT_HOSTS.has(hostname)) {
+      return route.continue();
+    }
     return route.fulfill({ status: 200, contentType: "text/html", body: "" });
   });
 
@@ -63,6 +72,12 @@ test.beforeEach(async ({ page }) => {
 const PIXEL_BASELINES = process.platform === "linux";
 
 async function snap(page: Page, testInfo: TestInfo, name: string) {
+  // The font link uses display=swap, so text paints in the fallback first and
+  // swaps when IBM Plex arrives. Screenshotting inside that window captures the
+  // fallback and produces a diff that looks like a UI change. networkidle does
+  // not cover it — the swap is a rendering step after the response lands.
+  await page.evaluate(() => document.fonts.ready);
+
   if (PIXEL_BASELINES) {
     // `animations: "disabled"` is the default and matters here: the composer
     // has a blinking caret (animate-blink) and the answer fades up, either of
