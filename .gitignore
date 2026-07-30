@@ -1,7 +1,10 @@
-# Daily Handoffs
+# Docs
 
-docs/daily_handoff*.md
+docs/archive/
+docs/assets/
 docs/design/
+docs/research/
+docs/specs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
