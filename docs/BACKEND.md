@@ -101,7 +101,7 @@ curl https://scienceq-api-886463515307.europe-west1.run.app/api/ingest/a1b2c3d4
 # → {"status":"complete","title":"...","channel":"...","topic":"...","chunk_count":12,...}
 ```
 
-Video metadata (title, channel) is fetched via the YouTube oEmbed API — no auth, ~80ms. oEmbed does not return duration, so a `yt-dlp --dump-json` subprocess runs afterwards to fill that one field; it fires on every successful ingest, and yt-dlp is also the fallback for title and channel if oEmbed fails.
+Video metadata (title, channel) is fetched via the YouTube oEmbed API — no auth, ~80ms. oEmbed does not return duration, so a `yt-dlp --dump-json` subprocess runs afterwards to fill that one field; it fires on every ingest that reaches the metadata step, and yt-dlp is also the fallback for title and channel if oEmbed fails. Duplicate URLs short-circuit before that step and make no network calls.
 
 ---
 

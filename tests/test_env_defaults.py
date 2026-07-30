@@ -155,11 +155,20 @@ def _env_example_values(path: Path) -> dict[str, str]:
 
 def _getenv_defaults(path: Path) -> list[tuple[str, str, int]]:
     """
-    ``[(name, default, lineno)]`` for each ``os.getenv(NAME, default)`` in a file
-    where both arguments are string literals.
+    ``[(name, default, lineno)]`` for each defaulted environment read in a file
+    where both the name and the default are string literals.
+
+    Both spellings count, because the codebase uses both and they are the same
+    statement about configuration: ``os.getenv(NAME, default)`` and
+    ``os.environ.get(NAME, default)``. Matching only the first left
+    ``pipeline/live_ingest.py``'s namespace reads — ``PINECONE_NAMESPACE_LIVE``
+    and ``PINECONE_NAMESPACE_CORPUS``, both of which ``.env.example`` sets —
+    free to drift with every test in this file still passing.
 
     ``os.environ[...]`` is not collected: it has no default to disagree with,
-    and a variable read that way is required rather than defaulted.
+    and a variable read that way is required rather than defaulted. That is the
+    stricter form, and on a write path it is the better one — see
+    ``pipeline/indexer.py``.
     """
     found: list[tuple[str, str, int]] = []
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -168,11 +177,23 @@ def _getenv_defaults(path: Path) -> list[tuple[str, str, int]]:
         if not isinstance(node, ast.Call) or len(node.args) != 2:
             continue
         func = node.func
+        # `os.getenv` / `getenv` — an Attribute or Name ending in `getenv`.
         is_getenv = (
             (isinstance(func, ast.Attribute) and func.attr == "getenv")
             or (isinstance(func, ast.Name) and func.id == "getenv")
         )
-        if not is_getenv:
+        # `os.environ.get` / `environ.get` — `.get` on something named `environ`.
+        # Checked structurally rather than by matching the string "environ.get",
+        # so `some_dict.get(a, b)` is not swept up.
+        is_environ_get = (
+            isinstance(func, ast.Attribute)
+            and func.attr == "get"
+            and (
+                (isinstance(func.value, ast.Attribute) and func.value.attr == "environ")
+                or (isinstance(func.value, ast.Name) and func.value.id == "environ")
+            )
+        )
+        if not (is_getenv or is_environ_get):
             continue
         name, default = node.args
         if not (isinstance(name, ast.Constant) and isinstance(name.value, str)):
@@ -362,6 +383,37 @@ class TestGuardIsNotVacuous:
             ("LITERAL", "kept", 2),
             ("BARE", "also-kept", 7),
         ]
+
+    def test_environ_get_is_collected_too(self, tmp_path):
+        # The blind spot this file shipped with: live_ingest.py reads two
+        # namespace variables via os.environ.get, and matching only `getenv`
+        # exempted them silently.
+        source = tmp_path / "m.py"
+        source.write_text(
+            "import os\n"
+            "from os import environ\n"
+            "A = os.environ.get('VIA_OS', 'kept')\n"
+            "B = environ.get('VIA_BARE', 'also-kept')\n"
+            "C = os.environ.get('NO_DEFAULT')\n"
+            "D = some_mapping.get('NOT_ENV', 'ignored')\n"
+            "E = self.config.get('ALSO_NOT_ENV', 'ignored')\n",
+            encoding="utf-8",
+        )
+        assert _getenv_defaults(source) == [
+            ("VIA_OS", "kept", 3),
+            ("VIA_BARE", "also-kept", 4),
+        ]
+
+    def test_the_real_environ_get_sites_are_collected(self):
+        # Anchored to the live file, so this cannot pass on a fixture while the
+        # real reads go unchecked.
+        by_site = {
+            (path, name): default
+            for name, entries in _code_defaults().items()
+            for path, default, _ in entries
+        }
+        assert by_site[("pipeline/live_ingest.py", "PINECONE_NAMESPACE_LIVE")] == "live"
+        assert by_site[("pipeline/live_ingest.py", "PINECONE_NAMESPACE_CORPUS")] == "corpus"
 
     def test_a_real_mismatch_is_caught(self):
         # The Phase 5 regression, reconstructed: .env.example carries the sweep
