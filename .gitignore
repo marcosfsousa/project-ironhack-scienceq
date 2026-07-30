@@ -153,8 +153,14 @@ celerybeat.pid
 # Pipeline runtime artifacts
 data/logs/
 
-# Eval run outputs (raw JSON, tracked in LangSmith)
-eval/results/
+# Eval run outputs. Checkpoint runs are tracked -- LangSmith alone was the
+# system of record for every pre-#114 checkpoint and it does not hold the
+# retrieval config, which is why those scores cannot be reproduced. Sweeps stay
+# local; they are self-describing and rerunnable.
+# Note the trailing /*: with `eval/results/` git never descends into the
+# directory, so a !negation below it is silently inert.
+eval/results/*
+!eval/results/run_*.json
 
 # Keep data/videos out due to size
 data/videos/
