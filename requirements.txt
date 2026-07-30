@@ -170,7 +170,7 @@ cohere==7.0.8
 youtube-transcript-api==1.2.4
 python-dotenv==1.2.2
 groq==0.37.1
-fastapi==0.140.13
+fastapi==0.141.1
 uvicorn[standard]==0.52.0
 yt-dlp==2026.7.4
 google-cloud-storage==3.13.0
@@ -193,7 +193,7 @@ slowapi==0.1.10
 # 1.4.1. Never re-derive on a developer machine: environment markers differ by
 # platform and a Windows resolve reports a different set.
 #
-# starlette is the reason this is not just tidiness. fastapi==0.140.13 declares
+# starlette is the reason this is not just tidiness. fastapi==0.141.1 declares
 # `starlette>=0.46.0` with no upper bound, and the resolver has already walked
 # that across a major version to 1.3.1. api/limiter.py and api/routes.py import
 # starlette.requests.Request directly, so absent this pin the next major lands
