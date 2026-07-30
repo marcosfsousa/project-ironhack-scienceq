@@ -516,6 +516,14 @@ def run(
         )
         log.info(f"Adversarial cases written to {MANUAL_REVIEW_PATH}")
 
+    # ── Capture the config this run will use ──────────────────────────────────
+    # Above the dry-run exit deliberately: --dry-run is then a free preflight
+    # that shows the exact config a real run would use — including which values
+    # fall back to code defaults — without spending an API call. Also means a
+    # run aborted midway still has its config on record.
+    run_config = _capture_run_config()
+    _log_run_config(run_config)
+
     if dry_run:
         log.info("DRY RUN — listing automated cases only:")
         for c in automated:
@@ -547,12 +555,6 @@ def run(
     # ── Set experiment name ────────────────────────────────────────────────────
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     exp_name  = experiment_name or f"youtube-qa-bot-eval-{timestamp}"
-
-    # ── Capture the config this run will use ──────────────────────────────────
-    # Captured before the first case so the log shows it up front, and so a run
-    # aborted midway still has it on record.
-    run_config = _capture_run_config()
-    _log_run_config(run_config)
 
     # ── Create/fetch LangSmith dataset ────────────────────────────────────────
     if ls_available:
