@@ -182,13 +182,14 @@ Each video was verified through:
 
 ## Eval Set
 
-A separate evaluation dataset of 38 cases is stored in `eval/eval_set.json`:
+A separate evaluation dataset of 46 cases is stored in `eval/eval_set.json`:
 
 | Type | Count | Description |
 |---|---|---|
 | Factual RAG | 20 | English questions answered from English corpus chunks |
 | Cross-lingual RAG | 8 | English questions answered from non-English corpus chunks (ES/DE/FR/PT) |
 | Multi-turn | 5 | Pronoun resolution across conversation turns |
-| Adversarial | 5 | Prompt injection, out-of-scope, hallucination bait |
+| Multi-turn (vague reference) | 3 | Vague/underspecified follow-ups, added in Phase 5 to stress-test the query rewriter |
+| Adversarial | 10 | Prompt injection, out-of-scope, hallucination bait, plus identity-disclosure and prompt-exposure guards (adv_006–010, added in #15) |
 
 Adversarial cases are excluded from automated scoring and reviewed manually. The 8 cross-lingual cases validate that English queries retrieve semantically relevant chunks in all four non-English languages above the 0.25 score threshold.

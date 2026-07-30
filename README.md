@@ -121,7 +121,7 @@ SCORE_THRESHOLD=0.25
 ├── agent/              # LangGraph agent, RAG chain, retriever, tools, memory, prompts
 ├── api/                # FastAPI service (Cloud Run) — main, routes, service, schemas, catalog
 ├── data/               # metadata.json, per-video transcript/chunk/embedding files
-├── docs/               # ARCHITECTURE.md, BACKEND.md, FRONTEND.md, EVALUATION.md, DATASET.md
+├── docs/               # ARCHITECTURE.md, BACKEND.md, FRONTEND.md, EVALUATION.md, DATASET.md, COMPLIANCE.md
 ├── eval/               # Eval set, sweep scripts, LangSmith runner, results
 ├── frontend/           # React SPA — src/, nginx.conf.template, Vite + Tailwind config
 ├── pipeline/           # Corpus pipeline (extract → clean → chunk → embed → index)
@@ -149,6 +149,7 @@ SCORE_THRESHOLD=0.25
 | [`docs/FRONTEND.md`](docs/FRONTEND.md) | React SPA features, local dev, nginx, Docker |
 | [`docs/EVALUATION.md`](docs/EVALUATION.md) | Eval methodology, rubric, checkpoint results |
 | [`docs/DATASET.md`](docs/DATASET.md) | Corpus videos, pipeline steps, metadata schema |
+| [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md) | EU AI Act Article 50 obligations, status, feature tripwires |
 
 ---
 
