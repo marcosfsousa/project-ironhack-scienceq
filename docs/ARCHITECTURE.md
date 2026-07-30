@@ -98,7 +98,7 @@ Built with LangChain LCEL. Two execution paths:
 - **Blocking** (`answer()`) — used by the agent graph and eval runner
 - **Streaming** (`stream_answer()`) — yields tokens to the agent's `stream_chat()`, which `api/service.py` forwards as SSE
 
-Both paths share the same prompt template from `prompts.py`. The chain applies a `score_threshold=0.40` gate: queries scoring below this on all retrieved chunks receive a no-context fallback response rather than a hallucinated answer. Groq 429 rate limit errors are handled with exponential backoff (3 attempts, 2s → 4s → 8s).
+Both paths share the same prompt template from `prompts.py`. The chain applies a `score_threshold=0.25` gate: queries scoring below this on all retrieved chunks receive a no-context fallback response rather than a hallucinated answer. Groq 429 rate limit errors are handled with exponential backoff (3 attempts, 2s → 4s → 8s).
 
 ### Retriever (`agent/retriever.py`)
 
@@ -195,7 +195,7 @@ At query time, the path is reversed: query → embedding → Pinecone → top-k 
 
 **Cohere asymmetric embeddings** — `embed-multilingual-v3.0` with separate `input_type` values (`search_document` at index time, `search_query` at retrieval time) is natively designed for asymmetric retrieval. This removes the need for title-prepended chunk text and improves precision, especially for short queries. Cosine scores with this model run higher (~0.49–0.78 for on-topic factual questions) than the old MiniLM model (~0.27–0.35). The 1024-dimensional vectors also support multilingual corpus expansion without re-indexing.
 
-**Score threshold gate (0.40)** — calibrated via `eval/calibrate_threshold.py` against the 30-question eval set after Cohere re-indexing. `rag_factual` questions had a minimum top score of 0.49; adversarial out-of-corpus questions had a minimum of 0.39. The 0.40 gap preserves 100% hit rate on factual questions while providing a first-pass filter on the weakest off-topic matches. Adversarial intent filtering (prompt injection, out-of-scope requests) is handled by the LLM system prompt, not the score gate.
+**Score threshold gate (0.25)** — originally calibrated to 0.40 via `eval/calibrate_threshold.py` against the 30-question eval set after Cohere re-indexing, using a minimum top score of 0.49 on `rag_factual` questions and 0.39 on adversarial out-of-corpus questions. That value was tuned for the old MiniLM embedding space; Phase 5's retrieval sweep found 0.40 too aggressive for Cohere `embed-multilingual-v3.0` and recalibrated to 0.25 — factual queries score 0.49–0.78, adversarial out-of-corpus queries fall below 0.25, and multilingual chunks score 0.52–0.70. See [`DATASET.md`](DATASET.md#retrieval-configuration) for the full rationale. Adversarial intent filtering (prompt injection, out-of-scope requests) is handled by the LLM system prompt, not the score gate.
 
 **Cohere Rerank v3.5 (optional)** — a cross-encoder reranker sits between Pinecone retrieval and the LLM. Bi-encoder cosine similarity (used at Pinecone query time) is fast but imprecise — it encodes query and document independently. A cross-encoder like Cohere Rerank jointly attends to both, producing more accurate relevance scores at the cost of one additional API call per query. The design over-retrieves 10 candidates from Pinecone, reranks them, and passes the top 5 to the LLM. Toggled via `RERANKER_ENABLED` env var to enable A/B comparison without code changes. Impact is quantified by `eval/sweep_reranker.py`, which runs the full eval set with and without the reranker and outputs a per-dimension side-by-side table.
 
@@ -227,7 +227,7 @@ A unit test suite covers all pure pipeline and agent logic with no live API call
 
 Run `pytest tests/` from the repo root, or `python tests/run_all_tests.py` for the same run with `-v --tb=short` preset. Both discover test files rather than reading a list, so a new file is picked up without being registered anywhere — and a local run and a CI run cannot disagree. Per-file test counts are deliberately not recorded here: nothing enforces them, and they drifted unnoticed once already ([#28](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/28)).
 
-CI (`.github/workflows/ci.yml`) gates every pull request on three checks — `Backend tests (pytest)`, `Frontend typecheck + build`, and `UI tests (Playwright)`.
+CI (`.github/workflows/ci.yml`) gates every pull request on four checks — `Backend tests (pytest)`, `API image (build + import)` (builds the Cloud Run serving image and smoke-imports the app, #87), `Frontend typecheck + build`, and `UI tests (Playwright)`. All four are required status checks on `main`'s branch-protection ruleset (see `CLAUDE.md`).
 
 The Playwright check runs the `desktop` and `mobile` projects, both Chromium — CI installs that browser binary alone. A third project, `firefox-mobile`, is gated behind the `GECKO` environment variable and never runs in CI. It exists because [#93](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/93) reproduced on Gecko and not on Blink, and running it locally needs the browser installed first:
 
@@ -245,7 +245,7 @@ The frontend check runs two `tsc` passes, because one does not cover the tree. `
 
 ## Evaluation
 
-Evaluated using a 38-case eval set (`eval/eval_set.json`): 20 English factual RAG cases, 8 cross-lingual RAG cases, 5 multi-turn cases, and 5 adversarial cases for manual review. GPT-4.1 is used as the judge across 4 dimensions.
+Evaluated using a 46-case eval set (`eval/eval_set.json`): 20 English factual RAG cases, 8 cross-lingual RAG cases, 5 multi-turn cases, 3 vague-reference multi-turn cases, and 10 adversarial cases for manual review (5 identity-disclosure/prompt-exposure guards added in #15). GPT-4.1 is used as the judge across 4 dimensions.
 
 | Experiment | Cases | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|---|

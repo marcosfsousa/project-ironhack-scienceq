@@ -1,6 +1,6 @@
 # Evaluation
 
-Evaluated on 33 automated cases (20 English factual + 8 cross-lingual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually.
+Evaluated on 33 automated cases (20 English factual + 8 cross-lingual + 5 multi-turn) with GPT-4.1 as judge across four rubric dimensions (1–5). Five adversarial cases are excluded from automated scoring and reviewed manually. The eval set has since grown to 46 cases — 3 vague-reference multi-turn cases (Phase 5) and 5 more adversarial cases for identity-disclosure/prompt-exposure guards (#15) — not yet reflected in the checkpoint runs below; see [`DATASET.md`](DATASET.md#eval-set) for the current breakdown.
 
 | Checkpoint | Cases | Correctness | Tone | Grounding | Conciseness | Mean |
 |---|---|---|---|---|---|---|
