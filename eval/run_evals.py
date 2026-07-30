@@ -49,6 +49,7 @@ import argparse
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 import uuid
@@ -82,6 +83,8 @@ for p in [str(_AGENT_DIR), str(_PIPELINE_DIR)]:
         sys.path.insert(0, p)
 
 from agent import YouTubeQAAgent  # noqa: E402
+import rag_chain as _rag_chain  # noqa: E402
+import retriever as _retriever  # noqa: E402
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 JUDGE_MODEL    = "gpt-4.1"              # stronger than the evaluated model (gpt-oss-120b)
@@ -89,6 +92,100 @@ EVAL_SET_PATH  = _EVAL_DIR / "eval_set.json"
 MANUAL_REVIEW_PATH = _EVAL_DIR / "manual_review.json"
 RATE_LIMIT_SLEEP   = 1.0               # seconds between judge calls (OpenAI safety)
 INTER_CASE_SLEEP   = 3.0               # seconds between cases (Groq rate limit safety)
+
+
+# ── Run configuration capture ──────────────────────────────────────────────────
+#
+# Every checkpoint before #114 recorded only the judge model and case counts, so
+# the retrieval config a given score was produced under is unrecoverable — the
+# run resolved RETRIEVER_TOP_N / SCORE_THRESHOLD / RERANKER_ENABLED through
+# retriever.py's module-level os.getenv, which silently falls back to a code
+# literal when the key is absent from .env. That is how Phase 6 validated
+# against a threshold the Phase 5 sweep had already rejected (see the comment
+# above the constants in agent/retriever.py). Recording the config here is what
+# stops the same question being unanswerable about this run.
+
+# Env vars whose absence means the run used a code fallback rather than an
+# explicit setting. Keyed by var name → the module attribute holding the
+# effective value.
+_TRACKED_ENV = {
+    "RERANKER_ENABLED":   (_retriever, "RERANKER_ENABLED"),
+    "RETRIEVER_FETCH_K":  (_retriever, "RETRIEVER_FETCH_K"),
+    "RETRIEVER_TOP_N":    (_retriever, "RETRIEVER_TOP_N"),
+    "SCORE_THRESHOLD":    (_retriever, "SCORE_THRESHOLD"),
+    "PINECONE_INDEX_NAME": (_retriever, "PINECONE_INDEX_NAME"),
+}
+
+
+def _git_commit() -> Optional[str]:
+    """Short SHA of the code under test, or None outside a git checkout."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=_ROOT, capture_output=True, text=True, timeout=5,
+        )
+        return out.stdout.strip() or None if out.returncode == 0 else None
+    except Exception:
+        return None
+
+
+def _capture_run_config() -> dict:
+    """
+    Snapshot the retrieval and model configuration this run actually used.
+
+    Reads the *effective* module-level values rather than os.getenv, so an
+    override applied by monkeypatching the module (the pattern
+    sweep_retrieval.py and sweep_reranker.py both use) is recorded as what
+    really ran. `env_source` separately records whether each value came from an
+    explicit env var or from the code fallback — the distinction that made the
+    pre-#114 checkpoints unverifiable.
+
+    Also pins the git commit, since prompt revisions and eval-set growth move
+    scores independently of config and are not otherwise recoverable from a
+    results file.
+    """
+    return {
+        "git_commit": _git_commit(),
+        "retrieval": {
+            "reranker_enabled":  _retriever.RERANKER_ENABLED,
+            "reranker_model":    _retriever.RERANKER_MODEL,
+            "retriever_fetch_k": _retriever.RETRIEVER_FETCH_K,
+            "retriever_top_n":   _retriever.RETRIEVER_TOP_N,
+            "score_threshold":   _retriever.SCORE_THRESHOLD,
+            "embedding_model":   _retriever.COHERE_MODEL,
+            "pinecone_index":    _retriever.PINECONE_INDEX_NAME,
+        },
+        "models": {
+            "answer_model":       _rag_chain.GROQ_MODEL,
+            "answer_temperature": _rag_chain.GROQ_TEMPERATURE,
+            "rewrite_model":      _rag_chain.REWRITE_MODEL,
+            "judge_model":        JUDGE_MODEL,
+        },
+        # "env" = explicit value in the environment/.env; "code-default" = the
+        # os.getenv fallback in agent/retriever.py was used.
+        "env_source": {
+            name: ("env" if os.getenv(name) is not None else "code-default")
+            for name in _TRACKED_ENV
+        },
+    }
+
+
+def _log_run_config(cfg: dict) -> None:
+    """Print the captured config up front so it is visible in the run log too."""
+    r, m = cfg["retrieval"], cfg["models"]
+    log.info("─── Run config ───────────────────────────────────────────")
+    log.info(f"  commit         {cfg['git_commit'] or 'unknown'}")
+    log.info(f"  answer model   {m['answer_model']} (temp={m['answer_temperature']})")
+    log.info(f"  judge model    {m['judge_model']}")
+    log.info(f"  reranker       {r['reranker_enabled']} ({r['reranker_model']})")
+    log.info(f"  fetch_k/top_n  {r['retriever_fetch_k']}/{r['retriever_top_n']}")
+    log.info(f"  threshold      {r['score_threshold']}")
+    log.info(f"  index          {r['pinecone_index']}")
+    fallbacks = [n for n, src in cfg["env_source"].items() if src == "code-default"]
+    if fallbacks:
+        log.warning(
+            "  Using code defaults (not set in env): " + ", ".join(sorted(fallbacks))
+        )
 
 # ── Judge prompts ──────────────────────────────────────────────────────────────
 
@@ -314,10 +411,15 @@ def _push_experiment_results(
     dataset_id: str,
     experiment_name: str,
     results: list[dict],
+    run_config: Optional[dict] = None,
 ) -> None:
     """
     Push scored results to LangSmith as a named experiment run.
     Each result becomes a feedback entry on the corresponding example.
+
+    `run_config` rides along on every run's `extra` so a LangSmith experiment is
+    self-describing even when no local results file survives — which is the
+    state every pre-#114 checkpoint is in.
     """
     try:
         for result in results:
@@ -336,6 +438,7 @@ def _push_experiment_results(
                     "case_id":   result["case_id"],
                     "case_type": result["case_type"],
                     "scores":    result["scores"],
+                    "config":    run_config or {},
                 },
             )
             ls_client.update_run(run_id, end_time=datetime.now(timezone.utc))
@@ -445,6 +548,12 @@ def run(
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     exp_name  = experiment_name or f"youtube-qa-bot-eval-{timestamp}"
 
+    # ── Capture the config this run will use ──────────────────────────────────
+    # Captured before the first case so the log shows it up front, and so a run
+    # aborted midway still has it on record.
+    run_config = _capture_run_config()
+    _log_run_config(run_config)
+
     # ── Create/fetch LangSmith dataset ────────────────────────────────────────
     if ls_available:
         try:
@@ -551,6 +660,7 @@ def run(
         "experiment":  exp_name,
         "timestamp":   timestamp,
         "judge_model": JUDGE_MODEL,
+        "config":      run_config,
         "total_cases": total,
         "scored":      len(scored),
         "adversarial_flagged": len(adversarial),
@@ -562,7 +672,7 @@ def run(
 
     # ── Push to LangSmith ──────────────────────────────────────────────────────
     if ls_available and ls_client and dataset_id:
-        _push_experiment_results(ls_client, dataset_id, exp_name, results)
+        _push_experiment_results(ls_client, dataset_id, exp_name, results, run_config)
         log.info(f"LangSmith experiment: {exp_name}")
     elif ls_available and not dataset_id:
         log.warning("LangSmith dataset_id is None — skipping experiment push. "
