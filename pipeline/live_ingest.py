@@ -6,7 +6,7 @@ On-the-fly ingestion of a YouTube URL into the Pinecone 'live' namespace.
 Pipeline (in order):
   1. Parse video ID from URL
   2. Check Pinecone for existing vectors → skip if already indexed (Option A)
-  3. Fetch real metadata via yt-dlp (title, channel, duration)
+  3. Fetch real metadata — title/channel via YouTube oEmbed, duration via yt-dlp
   4. Extract transcript via youtube-transcript-api
   5. Clean transcript using cleaner.clean_text()
   6. Chunk transcript using chunker.chunk_segments()
@@ -20,7 +20,8 @@ Edge cases handled:
   - Duplicate URL: detected via Pinecone fetch before any extraction work
   - No captions available: caught, returns descriptive error
   - Private / unavailable video: caught, returns descriptive error
-  - yt-dlp unavailable: falls back to LLM-inferred title/channel
+  - oEmbed unreachable: falls back to yt-dlp for the whole metadata record
+  - oEmbed and yt-dlp both unavailable: falls back to LLM-inferred title/channel
   - Any unexpected exception: caught, logged, returned in .error
 
 Usage (standalone):
@@ -478,7 +479,7 @@ def ingest_url(url: str, dry_run: bool = False) -> IngestResult:
             f"{'auto-generated' if is_generated else 'human'} captions"
         )
 
-        # ── 6. LLM fallback metadata if yt-dlp failed ─────────────────────────
+        # ── 6. LLM fallback metadata if oEmbed and yt-dlp both failed ────────
         first_words = " ".join(
             seg["text"] for seg in segments[:40]  # ~first 500 words
         )

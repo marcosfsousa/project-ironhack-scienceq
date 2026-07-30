@@ -60,7 +60,7 @@ load_dotenv()
 
 GROQ_API_KEY      = os.getenv("GROQ_API_KEY", "")
 LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY", "")
-LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "youtube-qa-bot")
+LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "scienceq")
 
 # Tracing is governed entirely by the environment (issue #17). Production sets
 # these flags to "false" so real user questions are never sent to LangSmith;
