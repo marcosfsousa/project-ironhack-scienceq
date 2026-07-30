@@ -119,7 +119,20 @@ _TRACKED_ENV = {
 
 
 def _git_commit() -> Optional[str]:
-    """Short SHA of the code under test, or None outside a git checkout."""
+    """
+    Short SHA of the code under test, or None if it cannot be determined.
+
+    EVAL_GIT_COMMIT takes precedence because the container route has no way to
+    work it out for itself: the API image ships no git binary, and under a git
+    worktree .git is a file pointing outside the bind mount. Both make the
+    subprocess fall back to None, which would leave the one field that pins
+    *which code produced this score* empty. Pass it in from the host:
+
+        docker run -e EVAL_GIT_COMMIT=$(git rev-parse --short HEAD) ...
+    """
+    pinned = os.getenv("EVAL_GIT_COMMIT", "").strip()
+    if pinned:
+        return pinned
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -181,7 +194,7 @@ def _log_run_config(cfg: dict) -> None:
     """Print the captured config up front so it is visible in the run log too."""
     r, m = cfg["retrieval"], cfg["models"]
     log.info("─── Run config ───────────────────────────────────────────")
-    log.info(f"  commit         {cfg['git_commit'] or 'unknown'}")
+    log.info(f"  commit         {cfg['git_commit'] or 'UNKNOWN — pass EVAL_GIT_COMMIT to pin it'}")
     log.info(f"  answer model   {m['answer_model']} (temp={m['answer_temperature']})")
     log.info(f"  judge model    {m['judge_model']}")
     log.info(f"  namespaces     {', '.join(r['namespaces_queried'])}"
