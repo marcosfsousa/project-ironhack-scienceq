@@ -440,8 +440,9 @@ def _push_experiment_results(
     Each result becomes a feedback entry on the corresponding example.
 
     `run_config` rides along on every run's `extra` so a LangSmith experiment is
-    self-describing even when no local results file survives — which is the
-    state every pre-#114 checkpoint is in.
+    self-describing even when the local results file does not reach the repo —
+    which is what happened to every pre-#114 checkpoint, whose results files
+    were written but left untracked under the old `eval/results/` ignore rule.
     """
     try:
         for result in results:
