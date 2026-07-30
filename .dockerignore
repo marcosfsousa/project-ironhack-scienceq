@@ -32,8 +32,13 @@ __pycache__/
 docs/
 notebooks/
 
-# Dev-only files
+# Dev-only files. Both lines are needed: these patterns are root-anchored, so
+# `tests/` does not cover frontend/tests, and Dockerfile.web's `COPY frontend/ .`
+# would otherwise pull the committed pixel baselines (~1 MB of PNGs) into the
+# build context. The final image is unaffected — only dist/ is copied out — but
+# the context stays clean.
 tests/
+frontend/tests
 
 # Frontend build artifacts (not needed in API image)
 frontend/node_modules
