@@ -83,6 +83,7 @@ for p in [str(_AGENT_DIR), str(_PIPELINE_DIR)]:
         sys.path.insert(0, p)
 
 from agent import YouTubeQAAgent  # noqa: E402
+import agent as _agent_mod  # noqa: E402
 import rag_chain as _rag_chain  # noqa: E402
 import retriever as _retriever  # noqa: E402
 
@@ -147,6 +148,12 @@ def _capture_run_config() -> dict:
     return {
         "git_commit": _git_commit(),
         "retrieval": {
+            "multi_namespace":   _agent_mod.MULTI_NAMESPACE,
+            "namespaces_queried": (
+                [_retriever.PINECONE_NAMESPACE_CORPUS, _retriever.PINECONE_NAMESPACE_LIVE]
+                if _agent_mod.MULTI_NAMESPACE
+                else [_retriever.PINECONE_NAMESPACE_CORPUS]
+            ),
             "reranker_enabled":  _retriever.RERANKER_ENABLED,
             "reranker_model":    _retriever.RERANKER_MODEL,
             "retriever_fetch_k": _retriever.RETRIEVER_FETCH_K,
@@ -177,6 +184,8 @@ def _log_run_config(cfg: dict) -> None:
     log.info(f"  commit         {cfg['git_commit'] or 'unknown'}")
     log.info(f"  answer model   {m['answer_model']} (temp={m['answer_temperature']})")
     log.info(f"  judge model    {m['judge_model']}")
+    log.info(f"  namespaces     {', '.join(r['namespaces_queried'])}"
+             f"{'' if r['multi_namespace'] else '  (corpus-only — not the production path)'}")
     log.info(f"  reranker       {r['reranker_enabled']} ({r['reranker_model']})")
     log.info(f"  fetch_k/top_n  {r['retriever_fetch_k']}/{r['retriever_top_n']}")
     log.info(f"  threshold      {r['score_threshold']}")
@@ -473,7 +482,16 @@ def run(
     case_filter:     Optional[str] = None,
     type_filter:     Optional[str] = None,
     experiment_name: Optional[str] = None,
+    multi_namespace: bool          = False,
 ) -> None:
+
+    # ── Pin retrieval scope ────────────────────────────────────────────────────
+    # Corpus-only by default. The 'live' namespace accumulates every URL
+    # ingested through production, so scoring against it means the retrieval
+    # pool moves between runs and a checkpoint cannot be compared to the next
+    # one. --multi-namespace opts back into the production path when the point
+    # of the run is to measure what users actually get.
+    _agent_mod.MULTI_NAMESPACE = multi_namespace
 
     # ── Load eval set ──────────────────────────────────────────────────────────
     if not EVAL_SET_PATH.exists():
@@ -709,6 +727,12 @@ if __name__ == "__main__":
         metavar="TYPE",
         help="Run only cases of this type (e.g. rag_multilingual, rag_factual, rag_multi_turn).",
     )
+    parser.add_argument(
+        "--multi-namespace",
+        action="store_true",
+        help="Query corpus + live, as production does. Default is corpus-only, "
+             "so the retrieval pool is stable between checkpoints.",
+    )
     args = parser.parse_args()
 
     run(
@@ -716,4 +740,5 @@ if __name__ == "__main__":
         case_filter     = args.case,
         type_filter     = args.type,
         experiment_name = args.experiment_name,
+        multi_namespace = args.multi_namespace,
     )

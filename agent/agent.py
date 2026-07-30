@@ -10,7 +10,7 @@ Architecture:
       URL detected       → ingest_node  (live_ingest pipeline)
       Identity question  → identity_node (static AI disclosure, no LLM call)
       Metadata keywords  → metadata_node (VideoMetadataTool)
-      Everything else    → rag_node (RAGRetrieverTool, multi_namespace=True)
+      Everything else    → rag_node (RAGRetrieverTool, scope per MULTI_NAMESPACE)
   - Custom ConversationMemory (5-turn sliding window) from memory.py
   - LangSmith tracing configured via .env (LANGSMITH_TRACING, LANGSMITH_ENDPOINT)
 
@@ -27,7 +27,8 @@ CLI:
 
 Changes from Day 3:
   - Added 'ingest' intent classification and ingest node
-  - multi_namespace=True by default (corpus + live queried together)
+  - MULTI_NAMESPACE=True by default (corpus + live queried together); eval runs
+    override it to pin retrieval to the curated corpus
   - ingest_url() imported from pipeline/live_ingest.py
   - Last ingest result stored on the graph state for the caller to inspect
 """
@@ -74,6 +75,19 @@ from live_ingest import ingest_url, IngestResult           # noqa: E402
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, START, END
 from typing_extensions import TypedDict
+
+# ── Retrieval scope ────────────────────────────────────────────────────────────
+#
+# True = query the 'corpus' and 'live' namespaces together, which is what the
+# product does: a user who ingests a URL expects to ask about it immediately.
+#
+# Exposed as a module global rather than inlined at the call sites so an eval
+# run can pin retrieval to the curated corpus alone — 'live' accumulates every
+# URL ingested through production, so a benchmark that reads it is scoring
+# against a pool that changes underneath it. eval/run_evals.py overrides this
+# and records the value it used. Same override pattern as the sweep scripts in
+# eval/, which rebind retriever's module globals.
+MULTI_NAMESPACE = True
 
 # ── Intent keywords ────────────────────────────────────────────────────────────
 
@@ -202,13 +216,14 @@ def _route_after_classify(state: AgentState) -> str:
 def rag_node(state: AgentState) -> AgentState:
     """
     Call rag_chain.answer() with the current question + conversation history.
-    multi_namespace=True queries both corpus and live namespaces.
+    Retrieval scope follows MULTI_NAMESPACE (read at call time so an eval run
+    can override it).
     """
     history  = state["messages"][:-1]  # exclude current HumanMessage
     response: RAGResponse = answer(
         question        = state["question"],
         history         = history,
-        multi_namespace = True,
+        multi_namespace = MULTI_NAMESPACE,
     )
     return {
         **state,
@@ -458,7 +473,7 @@ class YouTubeQAAgent:
             token_stream, chunks = stream_answer(
                 question=        question,
                 history=         history,
-                multi_namespace= True,
+                multi_namespace= MULTI_NAMESPACE,
             )
             # Provenance is known once retrieval has run (chunks in hand) and is
             # set *before* the first token is yielded, so the SSE layer can emit
