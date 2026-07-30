@@ -79,7 +79,7 @@ METADATA_PATH = DATA_DIR / "metadata.json"
 INDEX_LOG     = LOGS_DIR / "indexing_log.json"
 
 # ── Pinecone config ────────────────────────────────────────────────────────────
-INDEX_NAME   = os.getenv("PINECONE_INDEX_NAME", "youtube-qa-bot")
+INDEX_NAME   = os.getenv("PINECONE_INDEX_NAME", "scienceq-prod")
 METRIC       = "cosine"
 DEFAULT_NS   = os.getenv("PINECONE_NAMESPACE_CORPUS", "corpus")
 LIVE_NS      = os.getenv("PINECONE_NAMESPACE_LIVE", "live")

@@ -97,7 +97,7 @@ Fetches closed captions via `youtube-transcript-api` v1.2.4 (instance-based API)
 
 Human-generated captions are preferred. Auto-generated captions are accepted as fallback. Videos with no available captions are excluded from the corpus.
 
-**Note on live ingestion:** for on-the-fly URL ingestion, `yt-dlp` is used separately to fetch video title and channel before transcript extraction. The corpus pipeline does not use `yt-dlp` — titles and channels are manually curated in `metadata.json`.
+**Note on live ingestion:** for on-the-fly URL ingestion, metadata is fetched before transcript extraction — title and channel from the YouTube oEmbed API, duration from a `yt-dlp` call that runs on every ingest because oEmbed omits it. yt-dlp is also the fallback for title and channel when oEmbed fails. The corpus pipeline uses neither — titles and channels are manually curated in `metadata.json`. See [`ARCHITECTURE.md`](ARCHITECTURE.md#live-ingest-pipeline-pipelinelive_ingestpy) for the full chain.
 
 ### Stage 2 — Cleaning (`pipeline/cleaner.py`)
 
@@ -176,7 +176,7 @@ Each video was verified through:
 1. **Manual question testing** — 3–5 questions per video run against the retriever to confirm relevant chunks are returned above the score threshold
 2. **Timestamp alignment** — source pills verified to deep-link to the correct moment in the video
 3. **Hallucination risk check** — videos heavily dependent on visuals (without verbal explanation) were excluded
-4. **Eval set coverage** — 20 of the 42 videos are covered by at least one case in `eval/eval_set.json`
+4. **Eval set coverage** — 29 of the 50 videos are covered by at least one case in `eval/eval_set.json`: 21 of the 42 English videos and all 8 non-English ones. Broken out by case type, the 20 `rag_factual` cases cover 20 distinct English videos, the 8 cross-lingual cases cover all 8 non-English videos, and the 5 multi-turn plus 3 vague-reference cases cover 8 English videos that overlap the factual set on all but one.
 
 ---
 

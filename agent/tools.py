@@ -33,7 +33,8 @@ from pydantic import BaseModel, Field
 from rag_chain import answer, RAGResponse
 from retriever import PINECONE_NAMESPACE_CORPUS, PINECONE_NAMESPACE_LIVE, _get_index
 
-SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "0.40"))
+# Keep in step with retriever.SCORE_THRESHOLD and .env.example (Phase 5 sweep).
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD", "0.25"))
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 log = logging.getLogger(__name__)

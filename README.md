@@ -25,6 +25,7 @@ Built as the final project for the [Ironhack](https://www.ironhack.com) AI Engin
 - Streams answers token by token with clickable source timestamp pills
 - Maintains 5-turn conversation memory with query rewriting for follow-up questions
 - Stays grounded: if no relevant chunks are found above the confidence threshold, it says so rather than hallucinating
+- Discloses that it is an AI on three surfaces, as EU AI Act Art. 50(1) requires: a landing-page disclosure before first interaction, an `AI` badge on every generated answer (screen-reader labelled), and a deterministic `identity` intent that answers "are you a bot?" honestly without invoking the LLM — see [`docs/COMPLIANCE.md`](docs/COMPLIANCE.md)
 
 ---
 

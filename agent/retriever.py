@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 load_dotenv()
 
 PINECONE_API_KEY          = os.getenv("PINECONE_API_KEY", "")
-PINECONE_INDEX_NAME       = os.getenv("PINECONE_INDEX_NAME", "youtube-qa-bot")
+PINECONE_INDEX_NAME       = os.getenv("PINECONE_INDEX_NAME", "scienceq-prod")
 PINECONE_NAMESPACE_CORPUS = os.getenv("PINECONE_NAMESPACE_CORPUS", "corpus")
 PINECONE_NAMESPACE_LIVE   = os.getenv("PINECONE_NAMESPACE_LIVE", "live")
 
@@ -53,9 +53,15 @@ COHERE_MODEL  = "embed-multilingual-v3.0"
 # code changes (same pattern as RERANKER_ENABLED).
 RERANKER_ENABLED  = os.getenv("RERANKER_ENABLED",  "false").lower() == "true"
 RERANKER_MODEL    = "rerank-v3.5"
+# Defaults track the Phase 5 retrieval sweep (April 2026) and must stay equal to
+# .env.example — tests/test_env_defaults.py enforces that. No cloudbuild manifest
+# sets these, so unless they are set out-of-band on the Cloud Run service, the
+# fallbacks below are the values that actually run. SCORE_THRESHOLD's pre-Phase-5
+# value (0.40) was calibrated for MiniLM and is too aggressive for Cohere
+# embed-multilingual-v3.0.
 RETRIEVER_FETCH_K = int(os.getenv("RETRIEVER_FETCH_K", "10"))
-RETRIEVER_TOP_N   = int(os.getenv("RETRIEVER_TOP_N",   "5"))
-SCORE_THRESHOLD   = float(os.getenv("SCORE_THRESHOLD", "0.40"))
+RETRIEVER_TOP_N   = int(os.getenv("RETRIEVER_TOP_N",   "3"))
+SCORE_THRESHOLD   = float(os.getenv("SCORE_THRESHOLD", "0.25"))
 
 
 # ── Data types ─────────────────────────────────────────────────────────────────
@@ -260,13 +266,13 @@ def retrieve(
         query:            Natural language question or search text.
         namespace:        Pinecone namespace — "corpus" (pre-built) or "live" (on-the-fly).
         top_k:            Chunks to return after reranking (or directly from Pinecone when
-                          reranker is off). Defaults to RETRIEVER_TOP_N env var (default 5).
+                          reranker is off). Defaults to RETRIEVER_TOP_N env var (default 3).
         filter_topic:     Optional metadata filter — only return chunks from this topic
                           (e.g. "Physics", "Biology"). Case-sensitive, matches metadata.json.
         filter_channel:   Optional metadata filter — only return chunks from this channel
                           (e.g. "Veritasium"). Case-sensitive.
         score_threshold:  Minimum cosine similarity score to include a result.
-                          Defaults to SCORE_THRESHOLD env var (default 0.40).
+                          Defaults to SCORE_THRESHOLD env var (default 0.25).
 
     Returns:
         List of RetrievedChunk objects, sorted by score descending.
