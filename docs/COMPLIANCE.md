@@ -14,7 +14,7 @@ locally and not tracked in this repository.
 |---|---|---|
 | Art. 50(1)/(5) — inform users they are interacting with an AI system, before first interaction, accessibly | UI surfaces shipped (landing-page disclosure + per-answer AI badge) and satisfy first-interaction on their own; the chat-path identity intent is implemented, unit-tested, and confirmed by the [live probe on the regex-miss tail](https://github.com/marcosfsousa/project-ironhack-scienceq/pull/31#issuecomment-5096475667) (2026-07-27), which also showed non-English identity questions answered honestly in the user's own language | [#15](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/15) |
 | Art. 50(2) — machine-readable marking of AI-generated output | Provenance substrate first, full marking to follow | [#18](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/18) |
-| Art. 50(3), 50(4) — emotion recognition / deepfakes / published public-interest text | Not triggered by the current product (see tripwires) | — |
+| Art. 50(3), 50(4) — emotion recognition / deepfakes / published public-interest text | Not triggered by the current product (see tripwires); tripwire 2 considered and cleared for committed eval artifacts on 2026-07-31 (see recorded assessments) | — |
 | High-risk classification (Art. 6 / Annex III) | Not applicable | — |
 
 The React SPA is the only user-facing surface. The legacy Streamlit frontend, which
@@ -59,6 +59,44 @@ Also re-assess on: adding emotion recognition or any biometric feature (Art. 50(
 generating audio, image, or video output (Art. 50(4) deepfake regime — its modality
 list is image/audio/video); any feature resembling education assessment or scoring
 (Annex III area 3, high-risk).
+
+## Recorded assessments
+
+Conclusions reached when a tripwire was considered and cleared. A tripwire that is
+assessed and *not* recorded here has not been assessed — the point of this section is
+that the reasoning is auditable rather than implicit in whoever last thought about it.
+
+### 2026-07-31 — committed eval artifacts (tripwire 2)
+
+**What was assessed.** `eval/results/run_*.json` files contain the model's generated
+answers for every scored eval case, and are tracked in this public repository. Four
+such files have been tracked since March 2026;
+[#117](https://github.com/marcosfsousa/project-ironhack-scienceq/pull/117) adds a
+`.gitignore` rule that tracks each future checkpoint run, which makes the practice
+systematic rather than incidental. Raised in review of that PR against tripwire 2,
+"a public answer archive or history".
+
+**Conclusion: Art. 50(4) does not attach.** Its second subparagraph applies to text
+"published with the purpose of informing the public on matters of public interest".
+These artifacts are engineering records of system behaviour under measurement — the
+generated text is the object being scored, not content offered to any reader as
+information. The purpose test is not met, so the obligation does not attach and the
+human-editorial-review exemption is not reached.
+
+**This conclusion rests entirely on purpose, so it does not transfer.** It covers eval
+artifacts only. Surfacing the same generated answers as content — a rendered results
+page, a docs page quoting answers as examples, anything crawlable — is a different
+purpose and re-fires tripwires 1–3. Re-assess rather than citing this entry.
+
+**Not the reason.** Per the standing rule below, the repository being public and
+open-source is not a basis for this conclusion and must never be recorded as one. The
+conclusion would be identical in a private repository; publication is what raised the
+question, not what answers it.
+
+**Left open.** These artifacts are AI-generated text without machine-readable marking.
+Art. 50(2) marking is tracked separately in
+[#18](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/18); whether
+committed eval outputs fall within that work is a question for it, not for this entry.
 
 ## Standing rules
 
