@@ -153,10 +153,17 @@ celerybeat.pid
 # Pipeline runtime artifacts
 data/logs/
 
-# Eval run outputs. Checkpoint runs are tracked -- LangSmith alone was the
-# system of record for every pre-#114 checkpoint and it does not hold the
-# retrieval config, which is why those scores cannot be reproduced. Sweeps stay
-# local; they are self-describing and rerunnable.
+# Eval run outputs. New checkpoint runs are tracked: the four checkpoints in
+# docs/EVALUATION.md -- Phase 6, prompt-v3, gpt-oss-120b, prompt-v4 -- were
+# pushed to LangSmith and nowhere else, and that payload carries case_id,
+# case_type and scores but no retrieval config, which is why their numbers
+# cannot be reproduced. New sweeps stay local: they set their parameters
+# explicitly and are rerunnable.
+#
+# This governs new files only. Nine artifacts predate the rule and remain
+# tracked -- four run_*.json from the prompt-v1/v2 era and five sweep outputs --
+# because an ignore rule cannot untrack what is already in the index.
+#
 # Note the trailing /*: with `eval/results/` git never descends into the
 # directory, so a !negation below it is silently inert.
 eval/results/*
