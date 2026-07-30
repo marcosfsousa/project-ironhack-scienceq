@@ -13,14 +13,19 @@ they drifted — silently, and in the one direction that is hardest to notice.
 Why this is not a style rule
 ----------------------------
 
-``cloudbuild-api.yaml`` sets no retrieval variables. Neither does
-``cloudbuild-pipeline.yaml``. Whatever is not set out-of-band on the Cloud Run
-service is therefore *the code literal*, not the ``.env.example`` line — so the
-file that reads like the configuration is not the configuration, and the value
-that actually runs is the one nobody is looking at.
+No cloudbuild manifest sets the retrieval variables. The Cloud Run service binds
+them out-of-band instead — verified 30 July 2026 against the serving revision,
+which carries the sweep winner correctly. So production is *not* what this file
+protects.
 
-That is not hypothetical either, and the shape of how it happened is the
-argument for this file existing.
+What it protects is everything that runs unconfigured: local development without
+a ``.env``, the image run bare, and — the one that actually bit — the eval
+scripts, which import these modules and inherit whatever the literals say. A
+value that lives only in ``.env.example`` is documentation of something that is
+not happening anywhere the variable is unset.
+
+That is not hypothetical, and the shape of how it happened is the argument for
+this file existing.
 
 ``1d188bf`` ("feat: Phase 5 — retrieval parameter sweep and tuned defaults") ran
 a two-stage sweep over eleven retrieval shapes and five thresholds, declared
@@ -30,13 +35,15 @@ the pre-sweep values the sweep had just rejected. ``docs/retrieval_sweep_results
 called 0.40 "confirmed stale" in the same commit that kept it. It stayed that way
 for three months.
 
-The damage was not only runtime. Downstream work read the fallbacks and believed
-them: ``eval/validate_multilingual.py`` inherits ``SCORE_THRESHOLD`` from
+It never reached production, which sets the variables explicitly — and that is
+precisely why it survived three months. The cost landed on the measurement
+instead: ``eval/validate_multilingual.py`` inherits ``SCORE_THRESHOLD`` from
 ``retriever``, so the Phase 6 multilingual validation ran against 0.40 and
-``docs/ARCHITECTURE.md`` recorded 0.40 as the gate — a documented result
-describing a configuration the project had already decided against. Two docs then
-quoted ``.env.example`` and two quoted the code, which is what a contradiction
-between four files looks like when nobody is wrong on their own terms.
+``docs/ARCHITECTURE.md`` recorded 0.40 as the gate — a result describing a
+configuration the project had already rejected, produced by the one code path
+with no deployment env to correct it. Two docs then quoted ``.env.example`` and
+two quoted the code, which is what a contradiction between four files looks like
+when nobody is wrong on their own terms.
 
 Two more of the same class were found when this test was first written, both
 naming a project that no longer exists: ``PINECONE_INDEX_NAME`` defaulted to
@@ -112,23 +119,6 @@ _EXPECTED_DIVERGENCE: dict[str, str] = {
         "the failure #17 exists to prevent. LANGSMITH_TRACING is the same "
         "switch read a second way and needs no entry: it is absent from "
         ".env.example, so nothing claims a value for it to disagree with."
-    ),
-    "RERANKER_ENABLED": (
-        "Unresolved, not settled — .env.example says true, agent/retriever.py "
-        "falls back to false. Everything else in the project assumes true: the "
-        "Phase 5 sweep ran the reranker on for all 16 combinations, and the "
-        "RETRIEVER_FETCH_K=10 / RETRIEVER_TOP_N=3 pair it produced only means "
-        "anything with a reranker to narrow the 10 down to 3 (with it off, "
-        "retrieve() ignores FETCH_K entirely). docs/ARCHITECTURE.md and the "
-        "README flow diagram both draw Cohere Rerank in the default path. "
-        "Against that, the code default is almost certainly the stale side — "
-        "but flipping it turns on an extra billed Cohere call per query for "
-        "anyone running unconfigured, so it is a cost decision rather than a "
-        "typo, and cloudbuild-api.yaml does not set the variable either way. "
-        "Resolve by reading the live service — `gcloud run services describe "
-        "scienceq-api --format=...` per the env-inspection recipe in "
-        "cloudbuild-api.yaml's header comment — then either align the default "
-        "or replace this entry with the reason the divergence is correct."
     ),
 }
 
@@ -341,6 +331,9 @@ class TestGuardIsNotVacuous:
         }
         assert by_site[("agent/retriever.py", "RETRIEVER_TOP_N")] == "3"
         assert by_site[("agent/retriever.py", "SCORE_THRESHOLD")] == "0.25"
+        # Carried an exemption until the production value was read (true). Pinned
+        # here so it cannot quietly revert to the false it defaulted to before.
+        assert by_site[("agent/retriever.py", "RERANKER_ENABLED")] == "true"
         # tools.py reads the same threshold independently of retriever.py, which
         # is what test_a_variable_has_one_default_everywhere covers.
         assert by_site[("agent/tools.py", "SCORE_THRESHOLD")] == "0.25"
