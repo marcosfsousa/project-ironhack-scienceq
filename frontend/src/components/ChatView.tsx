@@ -1,11 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import type { Accent, ChatMessage as Msg } from "@/types";
+import { ACCENTS } from "@/data/accents";
 import { ChatMessage } from "./ChatMessage";
 import { Hero } from "./Hero";
 import { Composer } from "./Composer";
 import { PrivacyNotice } from "./PrivacyNotice";
 
-const ACCENTS: Accent[] = ["Indigo", "Blue", "Amber", "Cyan"];
 const SWATCH: Record<Accent, string> = {
   Indigo: "#8b93f8",
   Blue: "#4d96ff",
