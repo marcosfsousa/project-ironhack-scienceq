@@ -118,29 +118,81 @@ _TRACKED_ENV = {
 }
 
 
+def _git(*args: str) -> Optional[str]:
+    """
+    Stdout of a git command, or None when git cannot answer at all.
+
+    The None-vs-"" distinction is the whole reason this is a helper: `git status
+    --porcelain` prints nothing on a clean tree, so collapsing empty output into
+    None — as the earlier inline call did — would make a clean tree and a
+    missing git binary the same answer. They are opposite answers here.
+    """
+    try:
+        out = subprocess.run(
+            ["git", *args], cwd=_ROOT, capture_output=True, text=True, timeout=5,
+        )
+    except Exception:
+        return None
+    return out.stdout.strip() if out.returncode == 0 else None
+
+
 def _git_commit() -> Optional[str]:
     """
-    Short SHA of the code under test, or None if it cannot be determined.
+    Description of the code under test, or None if it cannot be determined.
+
+    `git describe` rather than `rev-parse --short HEAD`: the bare SHA reads
+    identically whether the tree was clean or not, so an eval run from a
+    modified working copy pins a commit the score cannot be reproduced at, and
+    nothing in the record says so. The checkpoints predating this file carried
+    the marker (`...-g3a3744a-dirty` in LangSmith), so this restores a signal
+    rather than inventing one.
+
+    Each flag closes one way of losing the SHA, which is the field's whole job:
+
+      --long    without it, a HEAD sitting exactly on a tag describes as the
+                bare tag name — `v1.4-multilingual`, no SHA at all. Tags are
+                movable, so that pins nothing, and a release-tagged eval run is
+                exactly when someone will want to reproduce the score. --long
+                forces the full `<tag>-<distance>-g<sha>` form always.
+      --always  falls back to a bare SHA in a clone with no tags, where
+                describe would otherwise fail outright.
+      --dirty   appends the marker. It ignores untracked files, which is why
+                _git_dirty() exists beside this.
 
     EVAL_GIT_COMMIT takes precedence because the container route has no way to
     work it out for itself: the API image ships no git binary, and under a git
     worktree .git is a file pointing outside the bind mount. Both make the
     subprocess fall back to None, which would leave the one field that pins
-    *which code produced this score* empty. Pass it in from the host:
+    *which code produced this score* empty. Pass it in from the host, with the
+    same flags:
 
-        docker run -e EVAL_GIT_COMMIT=$(git rev-parse --short HEAD) ...
+        docker run -e EVAL_GIT_COMMIT="$(git describe --always --long --dirty)" ...
     """
     pinned = os.getenv("EVAL_GIT_COMMIT", "").strip()
     if pinned:
         return pinned
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=_ROOT, capture_output=True, text=True, timeout=5,
-        )
-        return out.stdout.strip() or None if out.returncode == 0 else None
-    except Exception:
-        return None
+    return _git("describe", "--always", "--long", "--dirty") or None
+
+
+def _git_dirty() -> Optional[bool]:
+    """
+    Whether the tree that produced this run carried uncommitted changes.
+    None means unknowable, which is not the same as clean.
+
+    Recorded as its own field rather than left to the `-dirty` suffix because
+    `git describe --dirty` ignores untracked files, and a new-but-uncommitted
+    module is exactly the case that makes a recorded commit unreproducible.
+    `git status --porcelain` counts it.
+
+    A pinned EVAL_GIT_COMMIT is the host's statement about its own tree: the
+    suffix is believed if present, but its absence proves nothing (the host may
+    have passed a bare SHA), so that reads None rather than False.
+    """
+    pinned = os.getenv("EVAL_GIT_COMMIT", "").strip()
+    if pinned:
+        return True if pinned.endswith("-dirty") else None
+    status = _git("status", "--porcelain")
+    return None if status is None else bool(status)
 
 
 def _capture_run_config() -> dict:
@@ -156,10 +208,12 @@ def _capture_run_config() -> dict:
 
     Also pins the git commit, since prompt revisions and eval-set growth move
     scores independently of config and are not otherwise recoverable from a
-    results file.
+    results file — with `git_dirty` beside it, because a commit that describes
+    a tree the run did not use pins nothing.
     """
     return {
         "git_commit": _git_commit(),
+        "git_dirty":  _git_dirty(),
         "retrieval": {
             "multi_namespace":   _agent_mod.MULTI_NAMESPACE,
             "namespaces_queried": (
@@ -207,6 +261,16 @@ def _log_run_config(cfg: dict) -> None:
     if fallbacks:
         log.warning(
             "  Using code defaults (not set in env): " + ", ".join(sorted(fallbacks))
+        )
+    if cfg["git_dirty"]:
+        log.warning(
+            "  Working tree is DIRTY — the commit above does not describe the "
+            "code that produced this score, and checking it out will not reproduce it."
+        )
+    elif cfg["git_dirty"] is None:
+        log.warning(
+            "  Clean/dirty state unknown — git could not be asked, or "
+            "EVAL_GIT_COMMIT was pinned without a -dirty marker."
         )
 
 # ── Judge prompts ──────────────────────────────────────────────────────────────
@@ -540,14 +604,6 @@ def run(
         f"{len(adversarial)} adversarial (flagged for manual review)"
     )
 
-    # Write adversarial cases to manual_review.json
-    if adversarial:
-        MANUAL_REVIEW_PATH.write_text(
-            json.dumps({"cases": adversarial}, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        log.info(f"Adversarial cases written to {MANUAL_REVIEW_PATH}")
-
     # ── Capture the config this run will use ──────────────────────────────────
     # Above the dry-run exit deliberately: --dry-run is then a free preflight
     # that shows the exact config a real run would use — including which values
@@ -562,6 +618,19 @@ def run(
             q = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
             log.info(f"  [{c['id']}] ({c['type']}) {q[:80]}")
         return
+
+    # ── Write adversarial cases to manual_review.json ─────────────────────────
+    # Below the dry-run exit deliberately, unlike the config capture above:
+    # manual_review.json is tracked, so writing it during a preflight left a
+    # dirty working tree for a command that spends nothing and decides nothing
+    # — and fed the LF-rewrite churn that file already produces. A dry run is
+    # now read-only.
+    if adversarial:
+        MANUAL_REVIEW_PATH.write_text(
+            json.dumps({"cases": adversarial}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        log.info(f"Adversarial cases written to {MANUAL_REVIEW_PATH}")
 
     # ── Initialise clients ─────────────────────────────────────────────────────
     openai_key = os.getenv("OPENAI_API_KEY")
