@@ -140,28 +140,38 @@ def _git_commit() -> Optional[str]:
     """
     Description of the code under test, or None if it cannot be determined.
 
-    `git describe --always --dirty` rather than `rev-parse --short HEAD`: the
-    bare SHA reads identically whether the tree was clean or not, so an eval run
-    from a modified working copy pins a commit the score cannot be reproduced
-    at, and nothing in the record says so. The checkpoints predating this file
-    carried the marker (`...-g3a3744a-dirty` in LangSmith), so this restores a
-    signal rather than inventing one. Tags in this repo are annotated, so the
-    output is `<tag>-<distance>-g<sha>[-dirty]` and still contains the SHA;
-    --always keeps it working in a clone with no tags.
+    `git describe` rather than `rev-parse --short HEAD`: the bare SHA reads
+    identically whether the tree was clean or not, so an eval run from a
+    modified working copy pins a commit the score cannot be reproduced at, and
+    nothing in the record says so. The checkpoints predating this file carried
+    the marker (`...-g3a3744a-dirty` in LangSmith), so this restores a signal
+    rather than inventing one.
+
+    Each flag closes one way of losing the SHA, which is the field's whole job:
+
+      --long    without it, a HEAD sitting exactly on a tag describes as the
+                bare tag name — `v1.4-multilingual`, no SHA at all. Tags are
+                movable, so that pins nothing, and a release-tagged eval run is
+                exactly when someone will want to reproduce the score. --long
+                forces the full `<tag>-<distance>-g<sha>` form always.
+      --always  falls back to a bare SHA in a clone with no tags, where
+                describe would otherwise fail outright.
+      --dirty   appends the marker. It ignores untracked files, which is why
+                _git_dirty() exists beside this.
 
     EVAL_GIT_COMMIT takes precedence because the container route has no way to
     work it out for itself: the API image ships no git binary, and under a git
     worktree .git is a file pointing outside the bind mount. Both make the
     subprocess fall back to None, which would leave the one field that pins
-    *which code produced this score* empty. Pass it in from the host, keeping
-    the marker:
+    *which code produced this score* empty. Pass it in from the host, with the
+    same flags:
 
-        docker run -e EVAL_GIT_COMMIT="$(git describe --always --dirty)" ...
+        docker run -e EVAL_GIT_COMMIT="$(git describe --always --long --dirty)" ...
     """
     pinned = os.getenv("EVAL_GIT_COMMIT", "").strip()
     if pinned:
         return pinned
-    return _git("describe", "--always", "--dirty") or None
+    return _git("describe", "--always", "--long", "--dirty") or None
 
 
 def _git_dirty() -> Optional[bool]:
