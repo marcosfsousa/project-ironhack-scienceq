@@ -70,9 +70,11 @@ Corpus and pipeline details: [`docs/DATASET.md`](docs/DATASET.md)
 
 ## Evaluation
 
-Best checkpoint (gpt-oss-120b): **mean 4.67/5** across 33 cases — correctness 4.64, grounding 4.58, conciseness 4.79, tone 4.67.
+Highest-scoring checkpoint (gpt-oss-120b): **mean 4.67/5** across 33 cases — correctness 4.64, grounding 4.58, conciseness 4.79, tone 4.67.
 
-Full results and per-checkpoint breakdown: [`docs/EVALUATION.md`](docs/EVALUATION.md)
+Read those numbers with care. The eval set grew after this run, so they are not directly comparable to the later checkpoints scored against a larger pool; and no committed results file or recorded retrieval config backs them, which makes the run itself unreproducible.
+
+Full results, per-checkpoint breakdown, and what backs each row: [`docs/EVALUATION.md`](docs/EVALUATION.md)
 
 ---
 
