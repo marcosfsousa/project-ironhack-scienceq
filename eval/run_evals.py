@@ -594,14 +594,6 @@ def run(
         f"{len(adversarial)} adversarial (flagged for manual review)"
     )
 
-    # Write adversarial cases to manual_review.json
-    if adversarial:
-        MANUAL_REVIEW_PATH.write_text(
-            json.dumps({"cases": adversarial}, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        log.info(f"Adversarial cases written to {MANUAL_REVIEW_PATH}")
-
     # ── Capture the config this run will use ──────────────────────────────────
     # Above the dry-run exit deliberately: --dry-run is then a free preflight
     # that shows the exact config a real run would use — including which values
@@ -616,6 +608,19 @@ def run(
             q = c["turns"][2]["content"] if c["type"] in ("rag_multi_turn", "rag_multi_turn_vague") else c["question"]
             log.info(f"  [{c['id']}] ({c['type']}) {q[:80]}")
         return
+
+    # ── Write adversarial cases to manual_review.json ─────────────────────────
+    # Below the dry-run exit deliberately, unlike the config capture above:
+    # manual_review.json is tracked, so writing it during a preflight left a
+    # dirty working tree for a command that spends nothing and decides nothing
+    # — and fed the LF-rewrite churn that file already produces. A dry run is
+    # now read-only.
+    if adversarial:
+        MANUAL_REVIEW_PATH.write_text(
+            json.dumps({"cases": adversarial}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        log.info(f"Adversarial cases written to {MANUAL_REVIEW_PATH}")
 
     # ── Initialise clients ─────────────────────────────────────────────────────
     openai_key = os.getenv("OPENAI_API_KEY")
