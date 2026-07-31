@@ -62,19 +62,27 @@ list is image/audio/video); any feature resembling education assessment or scori
 
 ## Recorded assessments
 
-Conclusions reached when a tripwire was considered and cleared. A tripwire that is
-assessed and *not* recorded here has not been assessed — the point of this section is
-that the reasoning is auditable rather than implicit in whoever last thought about it.
+Conclusions reached when a tripwire was considered and cleared. From 2026-07-31, a
+tripwire cleared without an entry here has not been cleared — the point of this section
+is that the reasoning is auditable rather than implicit in whoever last thought about
+it.
+
+The rule runs forward only. Two earlier conclusions sit outside it rather than being
+unmade by it: the detailed 2026-07 assessment named at the top of this file, which is
+maintained off-repo, and the standing "not triggered by the current product" position in
+the Art. 50(3)/(4) status row. Each is revisited when its own tripwire fires, not on
+this section's silence.
 
 ### 2026-07-31 — committed eval artifacts (tripwire 2)
 
 **What was assessed.** `eval/results/run_*.json` files contain the model's generated
-answers for every scored eval case, and are tracked in this public repository. Four
-such files have been tracked since March 2026;
-[#117](https://github.com/marcosfsousa/project-ironhack-scienceq/pull/117) adds a
-`.gitignore` rule that tracks each future checkpoint run, which makes the practice
-systematic rather than incidental. Raised in review of that PR against tripwire 2,
-"a public answer archive or history".
+answers for every scored eval case, and are tracked in this public repository. Five are
+tracked as of this assessment: three added 2026-03-08/09, a fourth on 2026-04-10, and
+`run_20260730_191842.json` committed by
+[#117](https://github.com/marcosfsousa/project-ironhack-scienceq/pull/117) itself —
+which also adds a `.gitignore` rule that tracks each future checkpoint run, making the
+practice systematic rather than incidental. Raised in review of that PR against tripwire
+2, "a public answer archive or history".
 
 **Conclusion: Art. 50(4) does not attach.** Its second subparagraph applies to text
 "published with the purpose of informing the public on matters of public interest".
