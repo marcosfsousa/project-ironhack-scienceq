@@ -95,6 +95,20 @@ rule, and no future sweep output is tracked by it. Raised in review of #117 agai
 tripwire 2, "a public answer archive or history", and widened to the sweep artifacts in
 review of [#121](https://github.com/marcosfsousa/project-ironhack-scienceq/pull/121).
 
+**The figures above are a scope, not a total, and they go stale on any commit that adds
+a tracked artifact.** The way that happens without anyone deciding it: seven `run_*.json`
+files sit untracked on the machine that produced them, and #117's `.gitignore` rule ends
+`eval/results/*` with `!eval/results/run_*.json` so that every future checkpoint is
+tracked — which leaves those seven un-ignored and one `git add -A` away from being
+committed. That would take this entry from eight files to fifteen while it still read
+562, and reverse the decision [`EVALUATION.md`](EVALUATION.md) records not to commit
+them. `tests/test_eval_artifact_census.py` holds the two against each other: it counts
+the generated answers in every tracked file under `eval/results/` and fails the backend
+suite until the numbers here match, so widening the scope of this assessment costs a
+deliberate edit. It also fails on a tracked file of a shape this entry does not
+describe — the conclusion below reasons about two shapes, and a third has not been
+assessed ([#124](https://github.com/marcosfsousa/project-ironhack-scienceq/issues/124)).
+
 **Conclusion: Art. 50(4) does not attach.** Its second subparagraph applies to text
 "published with the purpose of informing the public on matters of public interest".
 These artifacts are engineering records of system behaviour under measurement — the
