@@ -79,7 +79,7 @@
 # is eval/ — imported at run_evals.py:59 and both sweeps, none of which ships
 # in either image or runs in CI. A break here costs a local eval run, not a
 # deploy; the next `python -m eval.run_evals` is the real test.
-openai==2.50.0
+openai==2.52.0
 
 # ── Tests only ───────────────────────────────────────────────────────────────
 # CI pins this same version explicitly (.github/workflows/ci.yml) — that pin is
