@@ -173,7 +173,7 @@ groq==0.37.1
 fastapi==0.141.1
 uvicorn[standard]==0.52.0
 yt-dlp==2026.7.4
-google-cloud-storage==3.13.0
+google-cloud-storage==3.13.1
 slowapi==0.1.10
 
 # ── Imported by name, previously left to the resolver (#37) ──────────────────
