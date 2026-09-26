@@ -53,6 +53,11 @@ What is checked
 ``TestRollbackFloor``
     ``keepCount`` is at least 2, so an edit cannot remove every rollback target.
 
+``TestEveryReferenceIsRead``
+    Every mention of ``docker.pkg.dev`` in the configs is one the parser reads.
+    The checks above see only what the parser collects, so a reference it
+    skips would have none of them.
+
 ``TestOneRepository``
     Every Artifact Registry reference in the configs points at the repository
     the policy belongs to. A reference to another repository is outside this
@@ -79,6 +84,12 @@ substitution (``$COMMIT_SHA`` and the like) is unique per build, so recency
 covers it. Any other ``$`` substitution could expand to anything, so it is
 treated as a fixed tag, and it will not match a tag prefix.
 
+And to references. The parser needs the region, project, repository and
+package written literally, so ``$PROJECT_ID`` or ``${_REGION}`` in the path,
+the usual Cloud Build idiom, is a shape it cannot read. Such a reference is
+reported, not skipped: a package pushed that way would otherwise pass every
+check without being checked.
+
 
 What this test does not check
 -----------------------------
@@ -96,10 +107,11 @@ traffic was pinned (see ``cloudbuild-api.yaml``). Five deploys after a pin, the
 policy deletes the image production serves. Traffic lives in Cloud Run, not in
 this repo, so the check is a manual one; it is written down in ``CLAUDE.md``.
 
-Only ``*-docker.pkg.dev`` references are read. An image moved to ``gcr.io`` or
-Docker Hub leaves this policy's scope without this file noticing, and so does
-a config file whose name does not match ``cloudbuild-*.yaml`` or
-``cloudrun-*.yaml``.
+It sees only references that spell out ``docker.pkg.dev``. A host that is
+itself a substitution (``${_REGISTRY}/scienceq-x``) never does, so it passes
+unread. An image moved to ``gcr.io`` or Docker Hub leaves this policy's scope
+without this file noticing, and so does a config file whose name does not match
+``cloudbuild-*.yaml`` or ``cloudrun-*.yaml``.
 
 
 Parsing without PyYAML
@@ -148,6 +160,10 @@ _REF = re.compile(
 )
 _PULL_CONTEXT = re.compile(r"--image=|(?:^|\s|-)image:\s")
 
+# Any scalar that names the registry host, readable or not. See "Fail closed".
+_REGISTRY_HOST = "docker.pkg.dev"
+_REGISTRY_TOKEN = re.compile(r"[^\s'\",\[\]]*docker\.pkg\.dev[^\s'\",\[\]]*")
+
 
 # ── Reading the configs ────────────────────────────────────────────────────────
 
@@ -179,27 +195,48 @@ def _strip_comment(line: str) -> str:
     return re.split(r"(?:^|\s)#", line, maxsplit=1)[0]
 
 
+def _config_lines(root: Path):
+    """(path, line number, line without its comment) for every build and run config."""
+    for path in sorted(root.glob(_BUILD_GLOB)) + sorted(root.glob(_RUN_GLOB)):
+        for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            yield path, number, _strip_comment(raw)
+
+
 def _refs(root: Path) -> list[Ref]:
     """Every Artifact Registry image reference in the build and run configs."""
     refs: list[Ref] = []
-    for path in sorted(root.glob(_BUILD_GLOB)) + sorted(root.glob(_RUN_GLOB)):
-        for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            line = _strip_comment(raw)
-            for match in _REF.finditer(line):
-                tag, digest = match.group("tag"), match.group("digest")
-                refs.append(Ref(
-                    file=path.name,
-                    line=number,
-                    registry=match.group("registry"),
-                    package=match.group("package"),
-                    # No tag and no digest means Docker's implicit `latest`.
-                    tag=tag if tag or digest else "latest",
-                    digest=digest,
-                    # A run config names images only to pull them.
-                    pulled=path.match(_RUN_GLOB)
-                    or bool(_PULL_CONTEXT.search(line[: match.start()])),
-                ))
+    for path, number, line in _config_lines(root):
+        for match in _REF.finditer(line):
+            tag, digest = match.group("tag"), match.group("digest")
+            refs.append(Ref(
+                file=path.name,
+                line=number,
+                registry=match.group("registry"),
+                package=match.group("package"),
+                # No tag and no digest means Docker's implicit `latest`.
+                tag=tag if tag or digest else "latest",
+                digest=digest,
+                # A run config names images only to pull them.
+                pulled=path.match(_RUN_GLOB)
+                or bool(_PULL_CONTEXT.search(line[: match.start()])),
+            ))
     return refs
+
+
+def _unparsed(root: Path) -> list[str]:
+    """Every ``docker.pkg.dev`` occurrence that no ``_REF`` match covers.
+
+    Checked per occurrence, not per line, so a readable reference cannot hide an
+    unreadable one beside it in a flow list.
+    """
+    unparsed = []
+    for path, number, line in _config_lines(root):
+        spans = [match.span() for match in _REF.finditer(line)]
+        for token in _REGISTRY_TOKEN.finditer(line):
+            host = token.start() + token.group().index(_REGISTRY_HOST)
+            if not any(start <= host < end for start, end in spans):
+                unparsed.append(f"{path.name}:{number}: {token.group()}")
+    return unparsed
 
 
 def _pushed(refs: list[Ref]) -> set[str]:
@@ -372,6 +409,19 @@ class TestRollbackFloor:
         )
 
 
+class TestEveryReferenceIsRead:
+
+    def test_every_registry_reference_is_parsed(self):
+        unparsed = _unparsed(_REPO_ROOT)
+        assert not unparsed, (
+            "Artifact Registry references this file cannot parse:\n"
+            + "\n".join(f"  {u}" for u in unparsed)
+            + "\n\nEvery check above skips these, so a package pushed this way "
+            "has no coverage check at all. Write the registry path literally, or "
+            "teach `_REF` the new shape and add it to the parser-shapes test."
+        )
+
+
 class TestOneRepository:
 
     def test_every_reference_is_in_the_policed_repository(self):
@@ -496,6 +546,32 @@ _CONFIG_CASES = [
 ]
 
 
+_UNREADABLE_CASES = [
+    # (id, {file: (old, new)}, expected substring). A substitution in each
+    # segment of the path, each of which `_REF` requires to be literal.
+    (
+        "region-substituted",
+        {"cloudbuild-api.yaml": ("europe-west1-docker.pkg.dev/", "${_REGION}-docker.pkg.dev/")},
+        "${_REGION}-docker.pkg.dev",
+    ),
+    (
+        "project-substituted",
+        {"cloudbuild-web.yaml": ("/scienceq-prod/", "/$PROJECT_ID/")},
+        "$PROJECT_ID",
+    ),
+    (
+        "repository-substituted",
+        {"cloudrun-pipeline-job.yaml": ("/cloud-run-source-deploy/", "/${_REPO}/")},
+        "${_REPO}",
+    ),
+    (
+        "package-substituted",
+        {"cloudbuild-pipeline.yaml": ("/scienceq-pipeline:", "/${_SERVICE}:")},
+        "${_SERVICE}",
+    ),
+]
+
+
 def _run(check: str, policy: dict, refs: list[Ref]) -> list[str]:
     return {
         "push": lambda: _unkept_pushes(policy, refs),
@@ -536,6 +612,19 @@ class TestChecksFailOnBrokenInput:
         assert not _run(check, policy, _refs(_config_copy(real))), "the real configs must pass first"
         violations = _run(check, policy, _refs(_config_copy(broken, replace)))
         assert any(expected in v for v in violations), violations
+
+    @pytest.mark.parametrize(
+        "replace, expected",
+        [case[1:] for case in _UNREADABLE_CASES],
+        ids=[case[0] for case in _UNREADABLE_CASES],
+    )
+    def test_unreadable_references(self, tmp_path, replace, expected):
+        real, broken = tmp_path / "real", tmp_path / "broken"
+        real.mkdir()
+        broken.mkdir()
+        assert not _unparsed(_config_copy(real)), "the real configs must pass first"
+        unparsed = _unparsed(_config_copy(broken, replace))
+        assert any(expected in u for u in unparsed), unparsed
 
 
 # ── The guard's own seams ──────────────────────────────────────────────────────
@@ -603,3 +692,21 @@ class TestGuardIsNotVacuous:
             # tag, and one no tag prefix will match.
             ("job", "$_CHANNEL", None, True, False),
         }
+        # Every shape above is readable, so none of it may be reported.
+        assert not _unparsed(tmp_path)
+
+    def test_an_unreadable_reference_is_reported_per_occurrence(self, tmp_path):
+        literal = "europe-west1-docker.pkg.dev/p/r"
+        (tmp_path / "cloudbuild-x.yaml").write_text(
+            "steps:\n"
+            # One readable and one unreadable reference in the same flow list:
+            # the readable one must not hide its neighbour.
+            f"  - args: [build, -t, {literal}/a:$COMMIT_SHA,"
+            " -t, europe-west1-docker.pkg.dev/$PROJECT_ID/r/b:latest, .]\n"
+            "  # - --image=${_REGION}-docker.pkg.dev/p/r/commented:latest\n"
+            f"      - --image={literal}/a  # ${{_REGION}}-docker.pkg.dev/p/r/c\n",
+            encoding="utf-8",
+        )
+        assert _unparsed(tmp_path) == [
+            "cloudbuild-x.yaml:2: europe-west1-docker.pkg.dev/$PROJECT_ID/r/b:latest",
+        ]
