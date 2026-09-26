@@ -1,0 +1,35 @@
+{
+  "name": "projects/scienceq-prod/locations/europe-west1/repositories/cloud-run-source-deploy",
+  "registryUri": "europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy",
+  "cleanupPolicyDryRun": false,
+  "cleanupPolicies": [
+    {
+      "id": "delete-older-than-7d",
+      "action": "DELETE",
+      "condition": {
+        "olderThan": "604800s",
+        "tagState": "ANY"
+      }
+    },
+    {
+      "id": "keep-5-most-recent",
+      "action": "KEEP",
+      "mostRecentVersions": {
+        "keepCount": 5,
+        "packageNamePrefixes": [
+          "scienceq-"
+        ]
+      }
+    },
+    {
+      "id": "keep-latest-tag",
+      "action": "KEEP",
+      "condition": {
+        "tagPrefixes": [
+          "latest"
+        ],
+        "tagState": "TAGGED"
+      }
+    }
+  ]
+}

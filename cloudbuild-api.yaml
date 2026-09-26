@@ -62,6 +62,12 @@ steps:
       # production. If traffic is pinned again, re-asserting here changes the
       # revision but not what users hit.
       #
+      # Pinning has a second cost since the Artifact Registry cleanup policy
+      # went live (#144): a pinned revision's image is kept only while it is
+      # among the 5 most recent, so five deploys after a pin it is deleted.
+      # Check before pinning — see "Artifact Registry cleanup policy" in
+      # CLAUDE.md.
+      #
       # Idempotent: verified 25 July 2026 against a service whose binding was
       # already removed — exits 0 and creates a clean revision rather than
       # erroring on the absent key, so this flag is safe to leave in place
