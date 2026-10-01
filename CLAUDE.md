@@ -34,6 +34,13 @@ configs. Renaming a package or the pipeline's `latest` tag without updating the
 policy fails the backend suite. Without that test, the rule would stop matching
 and the image would be deleted.
 
+`keep-5-most-recent` counts versions, and rollback needs deploys. The two match
+only while each push stores one version, which holds because every build step
+sets `BUILDX_NO_DEFAULT_ATTESTATIONS=1` (#150). Without it, the `regular`
+Cloud Build worker (the default from 2027-03-28) stores an index and two
+children per push, and the rule protects 3 deploys (#149).
+`tests/test_build_provenance.py` fails if a build step loses the variable.
+
 **Before pinning traffic to a revision, confirm its image is among the 5 most
 recent for its package, or add a keep rule for its digest.** A pinned revision is
 kept only by recency, so five deploys after a pin the policy deletes the image

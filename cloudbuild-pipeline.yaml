@@ -1,5 +1,13 @@
 steps:
+  # Provenance off (#150): on the `regular` worker, BuildKit's default
+  # provenance turns each push into an image index plus two children, so
+  # keep-5-most-recent protects 3 deploys instead of 5 (#149). The legacy
+  # worker's Docker 20.10 ignores the variable and builds as before (#151).
+  # Step-level env, not options.env: only this form was tested.
+  # tests/test_build_provenance.py fails if it is removed.
   - name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'BUILDX_NO_DEFAULT_ATTESTATIONS=1'
     args:
       - build
       - -f
