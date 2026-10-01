@@ -113,6 +113,10 @@ unread. An image moved to ``gcr.io`` or Docker Hub leaves this policy's scope
 without this file noticing, and so does a config file whose name does not match
 ``cloudbuild-*.yaml`` or ``cloudrun-*.yaml``.
 
+It counts versions, not deploys. ``keep-5-most-recent`` keeps 5 deploys only
+while each push stores one version, and that depends on provenance being off
+in every build step. ``test_build_provenance.py`` checks that (#150).
+
 
 Parsing without PyYAML
 ----------------------
