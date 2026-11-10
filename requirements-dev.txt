@@ -87,7 +87,7 @@ openai==2.50.0
 # file. Bump the two together or CI silently keeps testing the old version:
 # Dependabot only ever edits this line, so its green check on a pytest bump is
 # measuring the version it just replaced.
-pytest==9.1.1
+pytest==9.2.0
 
 # Note: .dockerignore excludes eval/ and tests/, so the pipeline image installs
 # openai and pytest for code it never copies in. Pre-existing — the freeze this
