@@ -32,6 +32,8 @@ source of truth. Change the policy by editing that file; I apply it by hand:
       --policy=infra/artifact-registry/cloud-run-source-deploy-cleanup-policy.json \
       --no-dry-run
 
+`--no-dry-run` is required: the policy file cannot express dry-run, and without
+the flag the command keeps whatever dry-run setting the repository already has.
 Never re-export the file from Google Cloud, and never change the policy in the
 console: a change that is not in the file is reverted by the next apply.
 `tests/test_cleanup_policy.py` holds the file against the Cloud Build and

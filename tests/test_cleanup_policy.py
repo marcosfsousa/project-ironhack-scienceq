@@ -62,11 +62,21 @@ What is checked
 
 ``TestPolicyFileIsApplyable``
     The file has the shape ``set-cleanup-policies --policy`` reads: a list of
-    rules, each with a unique ``name``, an ``action`` whose ``type`` is
+    rules, each with a unique string ``name``, an ``action`` whose ``type`` is
     ``DELETE`` or ``KEEP``, and exactly one of ``condition`` and
-    ``mostRecentVersions``. gcloud ignores any other key without a word, so a
-    key it does not read, such as one copied from an API response, is
-    reported instead of silently not applied.
+    ``mostRecentVersions``. gcloud drops any other key on a rule without a
+    word, and forwards a selector key the v1 API does not define unchecked;
+    both are reported, so a key copied from an API response or mistyped
+    cannot pass. Enum values must be the exact v1 names: gcloud converts no
+    casing, and forwards a value that is not an exact name unchecked instead
+    of rejecting it. Every DELETE rule must carry ``olderThan``; without an
+    age it deletes everything it matches.
+
+``TestApplyCommand``
+    The apply command in ``CLAUDE.md`` passes ``--no-dry-run``, names the
+    repository, location and project of ``_REPOSITORY``, and points
+    ``--policy`` at this policy file. The file cannot express dry-run, so the
+    command is where live mode is decided.
 
 Each check is a function that returns its violations, so the same function runs
 against the real files and, in ``TestChecksFailOnBrokenInput``, against broken
@@ -148,9 +158,22 @@ _POLICY = _REPO_ROOT / "infra" / "artifact-registry" / "cloud-run-source-deploy-
 # literally (TestEveryReferenceIsRead), so a reference elsewhere is a move.
 _REPOSITORY = "europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy"
 
-# What `set-cleanup-policies --policy` reads from a rule. See TestPolicyFileIsApplyable.
+# What `set-cleanup-policies --policy` reads, taken from the gcloud SDK source.
+# ParseCleanupPolicy (command_lib/artifacts/cleanup_policy_util.py) keeps only
+# the four rule keys below. The selector keys and enum names are the fields of
+# the artifactregistry v1 messages CleanupPolicy, CleanupPolicyCondition and
+# CleanupPolicyMostRecentVersions. apitools resolves an enum by exact name, so
+# no other casing is recognised. See TestPolicyFileIsApplyable.
 _KNOWN_RULE = {"name", "action", "condition", "mostRecentVersions"}
+_CONDITION_KEYS = {
+    "tagState", "tagPrefixes", "versionNamePrefixes", "packageNamePrefixes",
+    "olderThan", "newerThan", "moreStaleThan",
+}
+_MOST_RECENT_KEYS = {"keepCount", "packageNamePrefixes"}
 _ACTIONS = {"DELETE", "KEEP"}
+_TAG_STATES = {"TAGGED", "UNTAGGED", "ANY"}
+
+_CLAUDE_MD = _REPO_ROOT / "CLAUDE.md"
 
 _BUILD_GLOB = "cloudbuild-*.yaml"
 _RUN_GLOB = "cloudrun-*.yaml"
@@ -356,8 +379,14 @@ def _foreign_refs(refs: list[Ref]) -> list[str]:
     return [f"{ref}: in {ref.registry}" for ref in refs if ref.registry != _REPOSITORY]
 
 
+def _is_one_of(value, allowed: set[str]) -> bool:
+    # isinstance first: an unhashable value must be reported, not raise.
+    return isinstance(value, str) and value in allowed
+
+
 def _not_applyable(policy) -> list[str]:
-    """Why `set-cleanup-policies --policy` would reject the file or drop part of it."""
+    """Why `set-cleanup-policies --policy` would reject the file, drop part of
+    it, or forward part of it unchecked."""
     if not isinstance(policy, list):
         return ["the file must be a list of rules"]
     problems, seen = [], set()
@@ -365,19 +394,77 @@ def _not_applyable(policy) -> list[str]:
         if not isinstance(rule, dict):
             problems.append(f"rule {i}: not an object")
             continue
-        name = rule.get("name", f"rule {i}")
-        if "name" not in rule:
-            problems.append(f"rule {i}: no name")
+        name = rule.get("name")
+        if not isinstance(name, str):
+            problems.append(f"rule {i}: name must be a string" if "name" in rule else f"rule {i}: no name")
+            name = f"rule {i}"
         elif name in seen:
             problems.append(f"{name}: duplicate name")
         seen.add(name)
         for key in sorted(set(rule) - _KNOWN_RULE):
             problems.append(f"{name}: key {key!r} is not read by gcloud")
+
         action = rule.get("action")
-        if not (isinstance(action, dict) and set(action) == {"type"} and action["type"] in _ACTIONS):
+        action_type = action.get("type") if isinstance(action, dict) and set(action) == {"type"} else None
+        if not _is_one_of(action_type, _ACTIONS):
             problems.append(f'{name}: action must be {{"type": "DELETE"|"KEEP"}}')
+
         if ("condition" in rule) == ("mostRecentVersions" in rule):
             problems.append(f"{name}: needs exactly one of condition and mostRecentVersions")
+        for block, allowed in (("condition", _CONDITION_KEYS), ("mostRecentVersions", _MOST_RECENT_KEYS)):
+            if block not in rule:
+                continue
+            if not isinstance(rule[block], dict):
+                problems.append(f"{name}: {block} must be an object")
+                continue
+            for key in sorted(set(rule[block]) - allowed):
+                problems.append(f"{name}: {block} key {key!r} is not defined by the API")
+
+        condition = rule["condition"] if isinstance(rule.get("condition"), dict) else {}
+        if "tagState" in condition and not _is_one_of(condition["tagState"], _TAG_STATES):
+            problems.append(f"{name}: tagState must be TAGGED, UNTAGGED or ANY")
+        if action_type == "DELETE" and "olderThan" not in condition:
+            problems.append(f"{name}: a DELETE rule needs olderThan")
+    return problems
+
+
+def _apply_command(text: str) -> str | None:
+    """The `gcloud ... set-cleanup-policies` command in a text, continuation lines joined."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("gcloud ") and "set-cleanup-policies" in line:
+            command = line
+            while command.rstrip().endswith("\\") and i + 1 < len(lines):
+                i += 1
+                command = command.rstrip()[:-1] + " " + lines[i]
+            return " ".join(command.split())
+    return None
+
+
+def _apply_command_problems(text: str) -> list[str]:
+    command = _apply_command(text)
+    if command is None:
+        return ["no `gcloud ... set-cleanup-policies` command found"]
+    location, project, repository = re.fullmatch(
+        r"([a-z0-9-]+)-docker\.pkg\.dev/([a-z0-9-]+)/([a-z0-9-]+)", _REPOSITORY
+    ).groups()
+    tokens = command.split()
+    flags = dict(t[2:].split("=", 1) for t in tokens if t.startswith("--") and "=" in t)
+    after = tokens[tokens.index("set-cleanup-policies") + 1:]
+    positional = next((t for t in after if not t.startswith("-")), None)
+    policy = _POLICY.relative_to(_REPO_ROOT).as_posix()
+
+    problems = []
+    if "--no-dry-run" not in tokens or "--dry-run" in tokens:
+        problems.append("--no-dry-run is missing")
+    if positional != repository:
+        problems.append(f"repository is {positional!r}, expected {repository!r}")
+    if flags.get("location") != location:
+        problems.append(f"--location is {flags.get('location')!r}, expected {location!r}")
+    if flags.get("project") != project:
+        problems.append(f"--project is {flags.get('project')!r}, expected {project!r}")
+    if flags.get("policy") != policy:
+        problems.append(f"--policy is {flags.get('policy')!r}, expected {policy!r}")
     return problems
 
 
@@ -488,6 +575,19 @@ class TestPolicyFileIsApplyable:
         ]
 
 
+class TestApplyCommand:
+
+    def test_the_documented_command_applies_this_file_live(self):
+        problems = _apply_command_problems(_CLAUDE_MD.read_text(encoding="utf-8"))
+        assert not problems, (
+            "The set-cleanup-policies command in CLAUDE.md does not match this "
+            "policy:\n" + "\n".join(f"  {p}" for p in problems)
+            + "\n\nThe policy file cannot express dry-run, so --no-dry-run on "
+            "the command is what keeps the policy live, and the repository, "
+            f"location and project must be those of {_REPOSITORY}."
+        )
+
+
 # ── The checks fail on broken input ────────────────────────────────────────────
 #
 # Each case breaks one thing, in the policy or in a copy of the configs, and
@@ -562,6 +662,31 @@ def _duplicate_name(policy):
     _rule(policy, "keep-latest-tag")["name"] = "keep-5-most-recent"
 
 
+def _unhashable_name(policy):
+    _rule(policy, "keep-latest-tag")["name"] = ["keep-latest-tag"]
+
+
+def _older_than_mistyped(policy):
+    condition = _rule(policy, "delete-older-than-7d")["condition"]
+    condition["olderthan"] = condition.pop("olderThan")
+
+
+def _older_than_dropped(policy):
+    del _rule(policy, "delete-older-than-7d")["condition"]["olderThan"]
+
+
+def _most_recent_unknown_key(policy):
+    _rule(policy, "keep-5-most-recent")["mostRecentVersions"]["keep_count"] = 5
+
+
+def _action_lowercase(policy):
+    _rule(policy, "keep-5-most-recent")["action"] = {"type": "Keep"}
+
+
+def _tag_state_lowercase(policy):
+    _rule(policy, "keep-latest-tag")["condition"]["tagState"] = "tagged"
+
+
 _POLICY_CASES = [
     # (id, mutation, check, expected substring in a violation)
     ("latest-rule-dropped", _without_latest_rule, "tag", "scienceq-pipeline:latest"),
@@ -578,6 +703,24 @@ _POLICY_CASES = [
     ("action-as-string", _action_as_string, "apply", "keep-5-most-recent: action"),
     ("both-selectors", _both_selectors, "apply", "exactly one"),
     ("duplicate-name", _duplicate_name, "apply", "duplicate name"),
+    ("unhashable-name", _unhashable_name, "apply", "rule 2: name must be a string"),
+    ("older-than-mistyped", _older_than_mistyped, "apply", "condition key 'olderthan' is not defined"),
+    ("older-than-dropped", _older_than_dropped, "apply", "a DELETE rule needs olderThan"),
+    ("most-recent-unknown-key", _most_recent_unknown_key, "apply", "mostRecentVersions key 'keep_count'"),
+    ("action-lowercase", _action_lowercase, "apply", "keep-5-most-recent: action"),
+    ("tag-state-lowercase", _tag_state_lowercase, "apply", "keep-latest-tag: tagState"),
+]
+
+_COMMAND_CASES = [
+    # (id, (old, new) in CLAUDE.md, expected substring)
+    ("dry-run-flag-dropped", (".json \\\n      --no-dry-run", ".json"), "--no-dry-run is missing"),
+    ("dry-run-switched-on", ("--no-dry-run", "--dry-run"), "--no-dry-run is missing"),
+    ("repository-changed", ("set-cleanup-policies cloud-run-source-deploy",
+                            "set-cleanup-policies other-repo"), "repository is 'other-repo'"),
+    ("location-changed", ("--location=europe-west1", "--location=us-central1"), "--location"),
+    ("project-changed", ("--project=scienceq-prod", "--project=other-project"), "--project"),
+    ("policy-path-changed", ("--policy=infra/artifact-registry/cloud-run-source-deploy-cleanup-policy.json",
+                             "--policy=policy.json"), "--policy"),
 ]
 
 _CONFIG_CASES = [
@@ -695,6 +838,24 @@ class TestChecksFailOnBrokenInput:
         assert not _unparsed(_config_copy(real)), "the real configs must pass first"
         unparsed = _unparsed(_config_copy(broken, replace))
         assert any(expected in u for u in unparsed), unparsed
+
+    @pytest.mark.parametrize(
+        "replace, expected",
+        [case[1:] for case in _COMMAND_CASES],
+        ids=[case[0] for case in _COMMAND_CASES],
+    )
+    def test_broken_apply_command(self, replace, expected):
+        text = _CLAUDE_MD.read_text(encoding="utf-8")
+        assert not _apply_command_problems(text), "the real command must pass first"
+        old, new = replace
+        assert old in text, f"{old!r} not in CLAUDE.md; the case no longer breaks anything"
+        problems = _apply_command_problems(text.replace(old, new))
+        assert any(expected in p for p in problems), problems
+
+    def test_a_missing_apply_command_is_reported(self):
+        assert _apply_command_problems("no command here") == [
+            "no `gcloud ... set-cleanup-policies` command found"
+        ]
 
 
 # ── The guard's own seams ──────────────────────────────────────────────────────
