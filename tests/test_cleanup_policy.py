@@ -4,28 +4,25 @@
 The Artifact Registry cleanup policy must still protect what the build configs
 push and what Cloud Run pulls (#145).
 
-``cloud-run-source-deploy`` has deleted on a schedule since 2026-09-25 (#144):
-every version older than 7 days goes, unless a keep rule holds it. The keep
-rules hold images by **package-name prefix** and **tag prefix**, and Artifact
-Registry does not check those strings against anything. A keep rule that stops
-matching does not error. It stops keeping, and the next run deletes.
+``cloud-run-source-deploy`` deletes on a schedule (#144): every version older
+than 7 days goes, unless a keep rule holds it. The keep rules hold images by
+**package-name prefix** and **tag prefix**, and Artifact Registry does not check
+those strings against anything. A keep rule that stops matching does not error.
+It stops keeping, and the next run deletes.
 
-``infra/artifact-registry/cloud-run-source-deploy.json`` is the record of the
-live policy, and this file is what holds it against the configs that name
-images.
+``infra/artifact-registry/cloud-run-source-deploy-cleanup-policy.json`` is the
+policy, in the format ``gcloud artifacts repositories set-cleanup-policies``
+accepts, and this file is what holds it against the configs that name images.
 
 
 The case that matters most
 --------------------------
 
 The pipeline job has exactly one image and pulls it by tag,
-``scienceq-pipeline:latest``. Each execution resolves the tag to a digest when
-it starts (checked 2026-09-26: execution ``scienceq-pipeline-ztrdp`` recorded
-``@sha256:866ef8a3…``, the digest ``latest`` pointed at), so what the next run
-needs is whatever ``latest`` points at. ``keep-latest-tag`` is what keeps it.
-Rename the tag in the build config, narrow or drop that rule, and the job's only
-image becomes a deletion candidate with no error anywhere — until the next
-scheduled run fails to pull.
+``scienceq-pipeline:latest``, so what the next run needs is whatever ``latest``
+points at. ``keep-latest-tag`` is what keeps it. Rename the tag in the build
+config, narrow or drop that rule, and the job's only image becomes a deletion
+candidate with no error anywhere — until the next scheduled run fails to pull.
 
 The API and web services are deployed by ``$COMMIT_SHA``, a tag no two builds
 share, so tag rules cannot protect them. ``keep-5-most-recent`` does: it keeps
@@ -59,9 +56,17 @@ What is checked
     skips would have none of them.
 
 ``TestOneRepository``
-    Every Artifact Registry reference in the configs points at the repository
-    the policy belongs to. A reference to another repository is outside this
-    policy, and nothing here would say so.
+    Every Artifact Registry reference in the configs points at
+    ``_REPOSITORY``, the repository the policy is applied to. A reference to
+    another repository is outside this policy, and nothing here would say so.
+
+``TestPolicyFileIsApplyable``
+    The file has the shape ``set-cleanup-policies --policy`` reads: a list of
+    rules, each with a unique ``name``, an ``action`` whose ``type`` is
+    ``DELETE`` or ``KEEP``, and exactly one of ``condition`` and
+    ``mostRecentVersions``. gcloud ignores any other key without a word, so a
+    key it does not read, such as one copied from an API response, is
+    reported instead of silently not applied.
 
 Each check is a function that returns its violations, so the same function runs
 against the real files and, in ``TestChecksFailOnBrokenInput``, against broken
@@ -75,9 +80,8 @@ Fail closed on what this file does not understand
 A keep rule counts as protecting something only when every key on it is one this
 file knows the meaning of. ``versionNamePrefixes``, ``olderThan`` or
 ``newerThan`` on a keep rule narrow it; so, likely, would a key the API adds
-later. ``scripts/export_cleanup_policy.py`` copies ``condition`` wholesale, so
-such a key reaches the record. Here it makes the rule stop counting, and the
-test fails until someone teaches it the key.
+later. Such a key added to the file makes the rule stop counting, and the test
+fails until someone teaches it the key.
 
 The same rule applies to tags. A tag that is a Cloud Build per-build
 substitution (``$COMMIT_SHA`` and the like) is unique per build, so recency
@@ -94,18 +98,17 @@ check without being checked.
 What this test does not check
 -----------------------------
 
-It reads the committed JSON, not GCP. Someone editing the policy in the console
-and not re-exporting leaves this file green and wrong. Re-export after any
-change:
-
-    python scripts/export_cleanup_policy.py
+It reads the committed file, not GCP. The file is applied by hand, so a change
+that was never applied, or one made in the console instead of here, leaves this
+test green while the repository runs something else. The apply command is in
+``CLAUDE.md``.
 
 It also does not check the operating hazard of **pinned traffic**. A revision
 serving pinned traffic is deployed by digest, and ``keep-5-most-recent`` keeps
-it only while it is among the 5 newest images of its package. On 2026-07-25
-traffic was pinned (see ``cloudbuild-api.yaml``). Five deploys after a pin, the
-policy deletes the image production serves. Traffic lives in Cloud Run, not in
-this repo, so the check is a manual one; it is written down in ``CLAUDE.md``.
+it only while it is among the 5 newest images of its package. Five deploys
+after a pin, the policy deletes the image production serves. Traffic lives in
+Cloud Run, not in this repo, so the check is a manual one; it is written down
+in ``CLAUDE.md``.
 
 It sees only references that spell out ``docker.pkg.dev``. A host that is
 itself a substitution (``${_REGISTRY}/scienceq-x``) never does, so it passes
@@ -139,7 +142,15 @@ import pytest
 
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_POLICY = _REPO_ROOT / "infra" / "artifact-registry" / "cloud-run-source-deploy.json"
+_POLICY = _REPO_ROOT / "infra" / "artifact-registry" / "cloud-run-source-deploy-cleanup-policy.json"
+
+# The repository the policy is applied to. Every config writes this path
+# literally (TestEveryReferenceIsRead), so a reference elsewhere is a move.
+_REPOSITORY = "europe-west1-docker.pkg.dev/scienceq-prod/cloud-run-source-deploy"
+
+# What `set-cleanup-policies --policy` reads from a rule. See TestPolicyFileIsApplyable.
+_KNOWN_RULE = {"name", "action", "condition", "mostRecentVersions"}
+_ACTIONS = {"DELETE", "KEEP"}
 
 _BUILD_GLOB = "cloudbuild-*.yaml"
 _RUN_GLOB = "cloudrun-*.yaml"
@@ -247,16 +258,17 @@ def _pushed(refs: list[Ref]) -> set[str]:
     return {ref.package for ref in refs if not ref.pulled}
 
 
-def _load_policy() -> dict:
+def _load_policy() -> list:
     return json.loads(_POLICY.read_text(encoding="utf-8"))
 
 
 # ── Reading the policy ─────────────────────────────────────────────────────────
 
-def _keep_rules(policy: dict) -> list[dict]:
+def _keep_rules(policy: list) -> list[dict]:
     return [
-        rule for rule in policy.get("cleanupPolicies", [])
-        if str(rule.get("action", "")).upper() == "KEEP"
+        rule for rule in policy
+        if isinstance(rule.get("action"), dict)
+        and str(rule["action"].get("type", "")).upper() == "KEEP"
     ]
 
 
@@ -265,7 +277,7 @@ def _matches_package(prefixes: list[str] | None, package: str) -> bool:
     return prefixes is None or any(package.startswith(p) for p in prefixes)
 
 
-def _recency_rules(policy: dict) -> list[dict]:
+def _recency_rules(policy: list) -> list[dict]:
     """Keep rules that keep the N most recent versions, and nothing narrower."""
     return [
         rule for rule in _keep_rules(policy)
@@ -291,7 +303,7 @@ def _keeps_tag(rule: dict, package: str, tag: str) -> bool:
 #
 # Each returns a list of violations, empty when the check passes.
 
-def _unkept_pushes(policy: dict, refs: list[Ref]) -> list[str]:
+def _unkept_pushes(policy: list, refs: list[Ref]) -> list[str]:
     rules = _recency_rules(policy)
     return sorted(
         package for package in _pushed(refs)
@@ -302,18 +314,18 @@ def _unkept_pushes(policy: dict, refs: list[Ref]) -> list[str]:
     )
 
 
-def _dead_prefixes(policy: dict, refs: list[Ref]) -> list[str]:
+def _dead_prefixes(policy: list, refs: list[Ref]) -> list[str]:
     pushed = _pushed(refs)
     dead = []
     for rule in _keep_rules(policy):
         for block in ("condition", "mostRecentVersions"):
             for prefix in rule.get(block, {}).get("packageNamePrefixes") or []:
                 if not any(package.startswith(prefix) for package in pushed):
-                    dead.append(f"{rule.get('id')}: {prefix!r}")
+                    dead.append(f"{rule.get('name')}: {prefix!r}")
     return dead
 
 
-def _unkept_tag_pulls(policy: dict, refs: list[Ref]) -> list[str]:
+def _unkept_tag_pulls(policy: list, refs: list[Ref]) -> list[str]:
     pushed_tags = {(r.package, r.tag) for r in refs if not r.pulled}
     problems = []
     for ref in refs:
@@ -331,30 +343,50 @@ def _unbuilt_pulls(refs: list[Ref]) -> list[str]:
     return [str(ref) for ref in refs if ref.pulled and ref.package not in pushed]
 
 
-def _low_keep_counts(policy: dict) -> list[str]:
+def _low_keep_counts(policy: list) -> list[str]:
     return [
-        f"{rule.get('id')}: keepCount {rule['mostRecentVersions'].get('keepCount')}"
+        f"{rule.get('name')}: keepCount {rule['mostRecentVersions'].get('keepCount')}"
         for rule in _keep_rules(policy)
         if "mostRecentVersions" in rule
         and (rule["mostRecentVersions"].get("keepCount") or 0) < _KEEP_FLOOR
     ]
 
 
-def _foreign_refs(policy: dict, refs: list[Ref]) -> list[str]:
-    return [
-        f"{ref}: in {ref.registry}"
-        for ref in refs
-        if ref.registry != policy.get("registryUri")
-    ]
+def _foreign_refs(refs: list[Ref]) -> list[str]:
+    return [f"{ref}: in {ref.registry}" for ref in refs if ref.registry != _REPOSITORY]
+
+
+def _not_applyable(policy) -> list[str]:
+    """Why `set-cleanup-policies --policy` would reject the file or drop part of it."""
+    if not isinstance(policy, list):
+        return ["the file must be a list of rules"]
+    problems, seen = [], set()
+    for i, rule in enumerate(policy):
+        if not isinstance(rule, dict):
+            problems.append(f"rule {i}: not an object")
+            continue
+        name = rule.get("name", f"rule {i}")
+        if "name" not in rule:
+            problems.append(f"rule {i}: no name")
+        elif name in seen:
+            problems.append(f"{name}: duplicate name")
+        seen.add(name)
+        for key in sorted(set(rule) - _KNOWN_RULE):
+            problems.append(f"{name}: key {key!r} is not read by gcloud")
+        action = rule.get("action")
+        if not (isinstance(action, dict) and set(action) == {"type"} and action["type"] in _ACTIONS):
+            problems.append(f'{name}: action must be {{"type": "DELETE"|"KEEP"}}')
+        if ("condition" in rule) == ("mostRecentVersions" in rule):
+            problems.append(f"{name}: needs exactly one of condition and mostRecentVersions")
+    return problems
 
 
 # ── The guard ──────────────────────────────────────────────────────────────────
 
-_REEXPORT = (
-    "If the policy was changed in the console, re-export it with "
-    "`python scripts/export_cleanup_policy.py`; if a config changed, change "
-    "the live policy to match and then re-export. The file is the record, not "
-    "the enforcement."
+_FIX = (
+    "The policy file is the source of truth: edit it to match the configs, "
+    "then it is applied by hand with `gcloud artifacts repositories "
+    "set-cleanup-policies` (see CLAUDE.md). Never re-export it from GCP."
 )
 
 
@@ -367,7 +399,7 @@ class TestEveryPushIsKept:
             "keep rule covers:\n" + "\n".join(f"  {p}" for p in unkept)
             + "\n\nEvery version of these older than 7 days is deleted, the one "
             "serving included, and there is nothing to roll back to. "
-            + _REEXPORT
+            + _FIX
         )
 
 
@@ -379,7 +411,7 @@ class TestEveryKeepPrefixMatches:
             "Keep-rule package prefixes that match no pushed package:\n"
             + "\n".join(f"  {d}" for d in dead)
             + "\n\nA prefix matching nothing keeps nothing. It is usually the "
-            "trace of a rename on one side only. " + _REEXPORT
+            "trace of a rename on one side only. " + _FIX
         )
 
 
@@ -396,7 +428,7 @@ class TestEveryTagPullIsKept:
             "hold:\n" + "\n".join(f"  {p}" for p in problems)
             + "\n\nThe pipeline job has one image and pulls it by tag. Once no "
             "keep rule holds that tag, the image is deleted 7 days after it was "
-            "pushed and the next job run fails to pull. " + _REEXPORT
+            "pushed and the next job run fails to pull. " + _FIX
         )
 
 
@@ -429,14 +461,31 @@ class TestEveryReferenceIsRead:
 class TestOneRepository:
 
     def test_every_reference_is_in_the_policed_repository(self):
-        policy = _load_policy()
-        foreign = _foreign_refs(policy, _refs(_REPO_ROOT))
+        foreign = _foreign_refs(_refs(_REPO_ROOT))
         assert not foreign, (
-            f"Image references outside {policy.get('registryUri')}:\n"
+            f"Image references outside {_REPOSITORY}:\n"
             + "\n".join(f"  {f}" for f in foreign)
             + "\n\nThis policy does not apply there, and none of the checks "
             "above can say what does."
         )
+
+
+class TestPolicyFileIsApplyable:
+
+    def test_the_file_is_a_valid_policy_input(self):
+        problems = _not_applyable(_load_policy())
+        assert not problems, (
+            "The policy file is not what `set-cleanup-policies --policy` reads:\n"
+            + "\n".join(f"  {p}" for p in problems)
+            + "\n\ngcloud rejects some of these and silently drops the rest, so "
+            "what gets applied is not what this file says. " + _FIX
+        )
+
+    def test_a_response_shaped_file_is_rejected(self):
+        # The shape the API returns: an object with the rules under a key.
+        assert _not_applyable({"cleanupPolicies": _load_policy()}) == [
+            "the file must be a list of rules"
+        ]
 
 
 # ── The checks fail on broken input ────────────────────────────────────────────
@@ -458,14 +507,12 @@ def _config_copy(tmp_path: Path, replace: dict[str, tuple[str, str]] | None = No
     return tmp_path
 
 
-def _rule(policy: dict, rule_id: str) -> dict:
-    return next(r for r in policy["cleanupPolicies"] if r["id"] == rule_id)
+def _rule(policy: list, name: str) -> dict:
+    return next(r for r in policy if r["name"] == name)
 
 
 def _without_latest_rule(policy):
-    policy["cleanupPolicies"] = [
-        r for r in policy["cleanupPolicies"] if r["id"] != "keep-latest-tag"
-    ]
+    policy[:] = [r for r in policy if r["name"] != "keep-latest-tag"]
 
 
 def _latest_rule_renamed(policy):
@@ -490,15 +537,29 @@ def _recency_prefix_changed(policy):
 
 
 def _recency_rule_dropped(policy):
-    policy["cleanupPolicies"] = [
-        r for r in policy["cleanupPolicies"] if r["id"] != "keep-5-most-recent"
-    ]
+    policy[:] = [r for r in policy if r["name"] != "keep-5-most-recent"]
 
 
 def _keep_count(n):
     def mutate(policy):
         _rule(policy, "keep-5-most-recent")["mostRecentVersions"]["keepCount"] = n
     return mutate
+
+
+def _api_field_added(policy):
+    _rule(policy, "keep-latest-tag")["id"] = "keep-latest-tag"
+
+
+def _action_as_string(policy):
+    _rule(policy, "keep-5-most-recent")["action"] = "KEEP"
+
+
+def _both_selectors(policy):
+    _rule(policy, "keep-5-most-recent")["condition"] = {"tagState": "ANY"}
+
+
+def _duplicate_name(policy):
+    _rule(policy, "keep-latest-tag")["name"] = "keep-5-most-recent"
 
 
 _POLICY_CASES = [
@@ -513,6 +574,10 @@ _POLICY_CASES = [
     ("recency-rule-dropped", _recency_rule_dropped, "push", "scienceq-web"),
     ("keep-count-0", _keep_count(0), "floor", "keepCount 0"),
     ("keep-count-1", _keep_count(1), "floor", "keepCount 1"),
+    ("api-field-added", _api_field_added, "apply", "key 'id' is not read by gcloud"),
+    ("action-as-string", _action_as_string, "apply", "keep-5-most-recent: action"),
+    ("both-selectors", _both_selectors, "apply", "exactly one"),
+    ("duplicate-name", _duplicate_name, "apply", "duplicate name"),
 ]
 
 _CONFIG_CASES = [
@@ -576,13 +641,14 @@ _UNREADABLE_CASES = [
 ]
 
 
-def _run(check: str, policy: dict, refs: list[Ref]) -> list[str]:
+def _run(check: str, policy: list, refs: list[Ref]) -> list[str]:
     return {
         "push": lambda: _unkept_pushes(policy, refs),
         "prefix": lambda: _dead_prefixes(policy, refs),
         "tag": lambda: _unkept_tag_pulls(policy, refs),
         "floor": lambda: _low_keep_counts(policy),
-        "repo": lambda: _foreign_refs(policy, refs),
+        "repo": lambda: _foreign_refs(refs),
+        "apply": lambda: _not_applyable(policy),
     }[check]()
 
 
@@ -638,15 +704,10 @@ class TestChecksFailOnBrokenInput:
 
 class TestGuardIsNotVacuous:
 
-    def test_the_record_exists_and_holds_three_rules(self):
-        policy = _load_policy()
-        assert [r["id"] for r in policy["cleanupPolicies"]] == [
+    def test_the_policy_exists_and_holds_three_rules(self):
+        assert [r["name"] for r in _load_policy()] == [
             "delete-older-than-7d", "keep-5-most-recent", "keep-latest-tag",
         ]
-
-    def test_the_policy_is_recorded_as_live(self):
-        # Written explicitly by the export script; the API omits it when false.
-        assert _load_policy()["cleanupPolicyDryRun"] is False
 
     def test_pushed_packages_are_collected(self):
         # A floor, not an inventory: a new package is fine, so long as a
