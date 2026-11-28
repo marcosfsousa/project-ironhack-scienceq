@@ -1,0 +1,26 @@
+[
+  {
+    "name": "delete-older-than-7d",
+    "action": {"type": "DELETE"},
+    "condition": {
+      "tagState": "ANY",
+      "olderThan": "7d"
+    }
+  },
+  {
+    "name": "keep-5-most-recent",
+    "action": {"type": "KEEP"},
+    "mostRecentVersions": {
+      "packageNamePrefixes": ["scienceq-"],
+      "keepCount": 5
+    }
+  },
+  {
+    "name": "keep-latest-tag",
+    "action": {"type": "KEEP"},
+    "condition": {
+      "tagState": "TAGGED",
+      "tagPrefixes": ["latest"]
+    }
+  }
+]

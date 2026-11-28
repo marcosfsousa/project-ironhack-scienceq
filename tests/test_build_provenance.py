@@ -5,16 +5,14 @@ Every image build must run with provenance off (#150).
 
 ``keep-5-most-recent`` keeps the 5 most recent **versions** per ``scienceq-*``
 package, and rollback needs 5 **deploys**. The two are the same only while each
-push stores one version. On the ``regular`` Cloud Build worker release, the
-default from 2027-03-28, BuildKit adds provenance by default: each push stores
-an image index and two children, and #149 measured the result — the rule kept
-3 deploys, not 5. Nothing errors. The rollback window just shrinks.
+push stores one version. On the ``regular`` Cloud Build worker release, BuildKit
+adds provenance attestations by default, so each push stores more than one
+version and the rule covers fewer deploys than its count says (#149). Nothing
+errors. The rollback window just shrinks.
 
-``BUILDX_NO_DEFAULT_ATTESTATIONS=1`` on the build step turns provenance off.
-#151 tested it on both workers: on ``regular`` each push is one OCI manifest
-again, and on ``legacy`` Docker 20.10 ignores the variable and builds exactly
-as before. ``--provenance=false`` was rejected because ``legacy`` fails on the
-unknown flag.
+``BUILDX_NO_DEFAULT_ATTESTATIONS=1`` on the build step turns provenance off, and
+the ``legacy`` worker ignores it, so one form works on both workers (#151).
+``--provenance=false`` was rejected because ``legacy`` fails on the unknown flag.
 
 
 What is checked
@@ -242,10 +240,10 @@ class TestEveryBuildIsProvenanceOff:
         assert not problems, (
             "Cloud Build docker build steps with provenance on:\n"
             + "\n".join(f"  {p}" for p in problems)
-            + f"\n\nOn the regular worker each push then stores 3 versions, and "
-            "keep-5-most-recent protects 3 deploys instead of 5 (#149). Add "
-            f"`env: ['{_REQUIRED}']` to the build step itself, not to "
-            "options.env (#151)."
+            + "\n\nOn the regular worker each push then stores more than one "
+            "version, and keep-5-most-recent protects fewer than 5 deploys "
+            f"(#149). Add `env: ['{_REQUIRED}']` to the build step itself, not "
+            "to options.env (#151)."
         )
 
 
