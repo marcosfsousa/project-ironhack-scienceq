@@ -46,8 +46,18 @@ steps:
   #     --format="value(spec.template.spec.containers.env.name)"
   #   → confirm LANGCHAIN_TRACING_V2 and LANGSMITH_TRACING are listed, and that
   #     LANGSMITH_API_KEY is not. A secret-backed variable is listed by name
-  #     too, so its absence covers both env and secret bindings. The two
-  #     tracing values are not shown; --update-env-vars above sets them.
+  #     too, so an absent name proves there is no binding of either kind. A
+  #     listed name alone does not prove a live binding (see the
+  #     IPROYAL_PROXY_URL check below). The two tracing values are not shown;
+  #     --update-env-vars above sets them.
+  #   If traffic is pinned, run the check against the revision serving traffic,
+  #   not the service's latest configuration, with the same projection rooted
+  #   at spec.containers (a revision has no spec.template, so the service's
+  #   path would print nothing):
+  #     gcloud run revisions describe <REVISION> --region=europe-west1 \
+  #       --project=scienceq-prod \
+  #       --flatten="spec.containers[].env[]" \
+  #       --format="value(spec.containers.env.name)"
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - gcloud
