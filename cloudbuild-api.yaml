@@ -39,12 +39,25 @@ steps:
   # e.g. GROQ/COHERE/PINECONE keys set out-of-band). Development and evaluation
   # environments keep tracing on via their own .env.
   #
-  # Post-deploy verification (record the result when this ships):
+  # Post-deploy verification (prints variable names only, never values):
   #   gcloud run services describe scienceq-api --region=europe-west1 \
   #     --project=scienceq-prod \
-  #     --format='value(spec.template.spec.containers[0].env)'
-  #   → confirm LANGCHAIN_TRACING_V2=false and LANGSMITH_TRACING=false, and that
-  #     no LANGSMITH_API_KEY is bound to the service (env or secret).
+  #     --flatten="spec.template.spec.containers[].env[]" \
+  #     --format="value(spec.template.spec.containers.env.name)"
+  #   → confirm LANGCHAIN_TRACING_V2 and LANGSMITH_TRACING are listed, and that
+  #     LANGSMITH_API_KEY is not. A secret-backed variable is listed by name
+  #     too, so an absent name proves there is no binding of either kind. A
+  #     listed name alone does not prove a live binding (see the
+  #     IPROYAL_PROXY_URL check below). The two tracing values are not shown;
+  #     --update-env-vars above sets them.
+  #   If traffic is pinned, run the check against the revision serving traffic,
+  #   not the service's latest configuration, with the same projection rooted
+  #   at spec.containers (a revision has no spec.template, so the service's
+  #   path would print nothing):
+  #     gcloud run revisions describe <REVISION> --region=europe-west1 \
+  #       --project=scienceq-prod \
+  #       --flatten="spec.containers[].env[]" \
+  #       --format="value(spec.containers.env.name)"
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     args:
       - gcloud
@@ -64,11 +77,10 @@ steps:
       # leaves a live credential bound to the service. Re-asserted on every
       # deploy, so a console edit re-adding it survives only until the next one.
       #
-      # That last guarantee holds only while traffic follows LATEST. On
-      # 25 July 2026 traffic was pinned to a specific revision, so newly
-      # deployed revisions served 0% and this flag's effect never reached
-      # production. If traffic is pinned again, re-asserting here changes the
-      # revision but not what users hit.
+      # That last guarantee holds only while traffic follows LATEST. While
+      # traffic is pinned to a specific revision, newly deployed revisions
+      # serve 0% and this flag's effect does not reach production:
+      # re-asserting here changes the revision but not what users hit.
       #
       # Pinning has a second cost since the Artifact Registry cleanup policy
       # went live (#144): a pinned revision's image is kept only while it is
@@ -76,10 +88,9 @@ steps:
       # Check before pinning — see "Artifact Registry cleanup policy" in
       # CLAUDE.md.
       #
-      # Idempotent: verified 25 July 2026 against a service whose binding was
-      # already removed — exits 0 and creates a clean revision rather than
-      # erroring on the absent key, so this flag is safe to leave in place
-      # permanently.
+      # Idempotent: against a service whose binding is already removed it
+      # exits 0 and creates a clean revision rather than erroring on the absent
+      # key, so this flag is safe to leave in place permanently.
       #
       # It must be --remove-secrets, NOT --remove-env-vars. The variable is
       # secret-backed, and --remove-env-vars only removes plain values: against
@@ -88,12 +99,11 @@ steps:
       # environment variable's name, not the underlying secret's name.
       #
       # Unbinding here does NOT revoke the credential — it only detaches it
-      # from this service. The secret itself was destroyed in Secret Manager on
-      # 25 July 2026 (verified: `gcloud secrets list --project=scienceq-prod`
-      # returns COHERE / GROQ / LANGSMITH / PINECONE only). Cancelling the plan
-      # with IPRoyal is a billing step outside this project's control.
+      # from this service. Revoking it is a separate step: the secret is
+      # deleted in Secret Manager, and the plan with IPRoyal is cancelled as a
+      # billing step outside this project's control.
       #
-      # Post-deploy verification (record the result when this ships):
+      # Post-deploy verification:
       #   gcloud run services describe scienceq-api --region=europe-west1 \
       #     --project=scienceq-prod \
       #     --flatten="spec.template.spec.containers[].env[]" \
